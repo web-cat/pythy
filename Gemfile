@@ -24,6 +24,7 @@ gem 'jquery-rails'
 gem 'devise'
 gem 'net-ldap'
 gem 'devise_ldap_authenticatable', :git => 'git://github.com/cschiewek/devise_ldap_authenticatable.git'
+gem 'cancan'
 
 # To use ActiveModel has_secure_password
 # gem 'bcrypt-ruby', '~> 3.0.0'
