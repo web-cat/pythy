@@ -1,4 +1,12 @@
+include ApplicationHelper
+
 Pythy::Application.routes.draw do
+
+  # Provide the setup routes if the User table is empty.
+  scope :constraints => lambda { |req| needs_initial_setup? } do
+    match 'setup(/:action)', :controller => 'setup', :as => 'setup'
+    root :to => "setup#index"
+  end
 
   devise_for :users
 
