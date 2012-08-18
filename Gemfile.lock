@@ -6,6 +6,14 @@ GIT
       devise (~> 2.0)
       net-ldap (~> 0.2.2)
 
+GIT
+  remote: git://github.com/stouset/twitter_bootstrap_form_for.git
+  revision: b581853d51beabe56515100fb66d83663d3fbd3c
+  specs:
+    twitter_bootstrap_form_for (1.0.5)
+      actionpack (~> 3)
+      railties (~> 3)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -147,4 +155,5 @@ DEPENDENCIES
   sass-rails (~> 3.2.3)
   sqlite3
   therubyracer
+  twitter_bootstrap_form_for!
   uglifier (>= 1.0.3)
