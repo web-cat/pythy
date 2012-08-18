@@ -22,6 +22,8 @@ end
 
 gem 'haml', '>= 3.1.4'
 gem 'jquery-rails'
+gem 'therubyracer'
+gem 'less-rails-bootstrap'
 gem 'devise'
 gem 'net-ldap'
 gem 'devise_ldap_authenticatable', :git => 'git://github.com/cschiewek/devise_ldap_authenticatable.git'
