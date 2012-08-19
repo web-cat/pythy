@@ -8,9 +8,10 @@ GIT
 
 GIT
   remote: git://github.com/stouset/twitter_bootstrap_form_for.git
-  revision: b581853d51beabe56515100fb66d83663d3fbd3c
+  revision: 4e338d1e383787a1dd3a1aba877561e959cca984
+  branch: bootstrap-2.0
   specs:
-    twitter_bootstrap_form_for (1.0.5)
+    twitter_bootstrap_form_for (2.0.1.0.rc1)
       actionpack (~> 3)
       railties (~> 3)
 
