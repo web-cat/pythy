@@ -14,7 +14,12 @@ Pythy::Application.routes.draw do
     :registrations => 'registrations'
   }
 
-  # Default route for the site's root.
-  root :to => 'home#index'
+  # Default route when a user is logged in.
+  authenticated :user do
+    root :to => 'home#index'
+  end
+
+  # Default route when a user is not logged in.
+  root :to => 'landing#index'
 
 end
