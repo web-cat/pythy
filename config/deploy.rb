@@ -91,6 +91,12 @@ production:
   end
 
   # -------------------------------------------------------------
+  desc "Create production database"
+  task :create do
+    run "cd #{current_path}; bundle exec rake db:create RAILS_ENV=production"
+  end
+
+  # -------------------------------------------------------------
   desc "Run database migrations"
   task :migrate, :roles => :app do
     run "cd #{current_path}; bundle exec rake db:migrate RAILS_ENV=production"
