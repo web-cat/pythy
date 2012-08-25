@@ -13,7 +13,7 @@ set :use_sudo,    false
 #
 # Project-specific settings. Only edit if necessary.
 #
-set :application, "Pythy"
+set :application, "pythy"
 set :scm,         :git
 set :repository,  "git://github.com/web-cat/pythy.git"
 set :branch,      "master"
