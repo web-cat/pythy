@@ -36,7 +36,9 @@ role :db,  domain, :primary => true
 namespace :deploy do
 
   # -------------------------------------------------------------
-  task :start do ; end
+  task :start, :roles => :app, :except => { :no_release => true } do
+    run "touch #{File.join(current_path, 'tmp', 'restart.txt')}"
+  end
 
   # -------------------------------------------------------------
   task :stop do ; end
