@@ -54,7 +54,7 @@ end
 namespace :db do
 
   # -------------------------------------------------------------
-  desc "Create database.yaml in shared path"
+  desc "Create database.yml in shared path"
   task :configure do
     set :db_password do
       Capistrano::CLI.password_prompt "Password for database user '#{db_user}': "
@@ -85,7 +85,7 @@ production:
   end
 
   # -------------------------------------------------------------
-  desc "Make symlink for database.yaml"
+  desc "Make symlink for database.yml"
   task :symlink do
     run "ln -nfs #{shared_path}/config/database.yml #{latest_release}/config/database.yml"
   end
@@ -97,3 +97,6 @@ production:
   end
 
 end
+
+before "deploy:setup",       "db:configure"
+after  "deploy:update_code", "db:symlink"
