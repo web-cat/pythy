@@ -14,6 +14,9 @@ Pythy::Application.routes.draw do
     :registrations => 'registrations'
   }
 
+  # Route for viewing code.
+  match 'code(/:action)', :controller => 'code'
+
   # Default route when a user is logged in.
   authenticated :user do
     root :to => 'home#index'

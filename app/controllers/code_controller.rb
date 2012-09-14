@@ -1,0 +1,3 @@
+class CodeController < ApplicationController
+
+end
