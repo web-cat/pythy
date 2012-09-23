@@ -15,4 +15,4 @@
 //= require twitter/bootstrap
 //= require codemirror
 //= require codemirror/modes/python
-//= require_tree .
+//= require_directory .
