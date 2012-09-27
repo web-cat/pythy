@@ -9,6 +9,7 @@ $ ->
     mode: { name: "python", version: 3, singleLineStringErrors: false },
     lineNumbers: true,
     indentUnit: 2,
+    tabSize: 2,
     tabMode: "shift",
     matchBrackets: true
 
@@ -24,7 +25,7 @@ $ ->
 
   handleError = (error) ->
     alert 'Failed!'
-    console.log data.error
+    console.log error
 
   # Create HTML5 web worker to run code in a separate thread, so infinite
   # loops will not cause the entire browser to hang.

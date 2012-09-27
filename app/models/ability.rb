@@ -2,6 +2,19 @@ class Ability
   include CanCan::Ability
 
   def initialize(user)
+    user ||= User.new   # guest user (not logged in); may not need this
+
+    if user.admin?
+      # Just let admins do everything. No point in trying to parcel up
+      # permissions here.
+      can :manage, :all
+    else
+      can :read, CourseOffering, :students => { :id => user.id }
+      can :read, CourseOffering, :staff => { :id => user.id }
+      can :manage, CourseOffering, :staff => { :id => user.id },
+        :course_offering_staff => { :manager => true }
+    end
+
     # Define abilities for the passed in user here. For example:
     #
     #   user ||= User.new # guest user (not logged in)

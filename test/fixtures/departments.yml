@@ -1,0 +1,11 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+cs_at_vt:
+  institution: vt
+  name: Computer Science
+  abbreviation: CS
+
+cs_at_test:
+  institution: test_institution
+  name: Computer Science
+  abbreviation: CS

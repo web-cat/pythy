@@ -1,0 +1,33 @@
+<%= form_for(@assignment_offering) do |f| %>
+  <% if @assignment_offering.errors.any? %>
+    <div id="error_explanation">
+      <h2><%= pluralize(@assignment_offering.errors.count, "error") %> prohibited this assignment_offering from being saved:</h2>
+
+      <ul>
+      <% @assignment_offering.errors.full_messages.each do |msg| %>
+        <li><%= msg %></li>
+      <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :assignment_id %><br />
+    <%= f.number_field :assignment_id %>
+  </div>
+  <div class="field">
+    <%= f.label :course_offering_id %><br />
+    <%= f.number_field :course_offering_id %>
+  </div>
+  <div class="field">
+    <%= f.label :published %><br />
+    <%= f.check_box :published %>
+  </div>
+  <div class="field">
+    <%= f.label :due_at %><br />
+    <%= f.datetime_select :due_at %>
+  </div>
+  <div class="actions">
+    <%= f.submit %>
+  </div>
+<% end %>

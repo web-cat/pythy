@@ -1,0 +1,2 @@
+module AssignmentOfferingsHelper
+end

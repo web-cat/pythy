@@ -2,6 +2,22 @@ include ApplicationHelper   # Brings in needs_initial_setup?
 
 Pythy::Application.routes.draw do
 
+  mount RailsAdmin::Engine => '/admin', :as => 'rails_admin'
+
+  resources :assignment_offerings
+
+  resources :assignments
+
+  resources :course_offerings
+
+  resources :courses
+
+  resources :terms
+
+  resources :departments
+
+  resources :institutions
+
   # Provide the initial setup routes if the User table is empty.
   scope :constraints => lambda { |req| needs_initial_setup? } do
     match 'setup(/:action)', :controller => 'setup', :as => 'setup'

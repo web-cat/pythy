@@ -1,0 +1,27 @@
+<h1>Listing assignments</h1>
+
+<table>
+  <tr>
+    <th>Creator</th>
+    <th>Short name</th>
+    <th>Long name</th>
+    <th></th>
+    <th></th>
+    <th></th>
+  </tr>
+
+<% @assignments.each do |assignment| %>
+  <tr>
+    <td><%= assignment.creator_id %></td>
+    <td><%= assignment.short_name %></td>
+    <td><%= assignment.long_name %></td>
+    <td><%= link_to 'Show', assignment %></td>
+    <td><%= link_to 'Edit', edit_assignment_path(assignment) %></td>
+    <td><%= link_to 'Destroy', assignment, :method => :delete, :data => { :confirm => 'Are you sure?' } %></td>
+  </tr>
+<% end %>
+</table>
+
+<br />
+
+<%= link_to 'New Assignment', new_assignment_path %>

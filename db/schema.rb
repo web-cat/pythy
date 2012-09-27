@@ -10,7 +10,91 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20120709125501) do
+ActiveRecord::Schema.define(:version => 20120927011009) do
+
+  create_table "assignment_offerings", :force => true do |t|
+    t.integer  "assignment_id"
+    t.integer  "course_offering_id"
+    t.boolean  "published"
+    t.datetime "due_at"
+    t.datetime "created_at",         :null => false
+    t.datetime "updated_at",         :null => false
+  end
+
+  create_table "assignments", :force => true do |t|
+    t.integer  "creator_id"
+    t.string   "short_name"
+    t.string   "long_name"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
+
+  create_table "course_offering_staff", :id => false, :force => true do |t|
+    t.integer "course_offering_id"
+    t.integer "user_id"
+    t.boolean "manager"
+    t.integer "title"
+  end
+
+  create_table "course_offering_students", :id => false, :force => true do |t|
+    t.integer "course_offering_id"
+    t.integer "user_id"
+  end
+
+  create_table "course_offerings", :force => true do |t|
+    t.integer  "course_id"
+    t.integer  "term_id"
+    t.integer  "crn"
+    t.string   "label"
+    t.string   "url"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
+
+  create_table "courses", :force => true do |t|
+    t.string   "name"
+    t.string   "number"
+    t.integer  "department_id"
+    t.datetime "created_at",    :null => false
+    t.datetime "updated_at",    :null => false
+  end
+
+  create_table "departments", :force => true do |t|
+    t.integer  "institution_id"
+    t.string   "name"
+    t.string   "abbreviation"
+    t.datetime "created_at",     :null => false
+    t.datetime "updated_at",     :null => false
+  end
+
+  create_table "institutions", :force => true do |t|
+    t.string   "domain"
+    t.string   "display_name"
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
+  end
+
+  create_table "rails_admin_histories", :force => true do |t|
+    t.text     "message"
+    t.string   "username"
+    t.integer  "item"
+    t.string   "table"
+    t.integer  "month",      :limit => 2
+    t.integer  "year",       :limit => 5
+    t.datetime "created_at",              :null => false
+    t.datetime "updated_at",              :null => false
+  end
+
+  add_index "rails_admin_histories", ["item", "table", "month", "year"], :name => "index_rails_admin_histories"
+
+  create_table "terms", :force => true do |t|
+    t.integer  "year"
+    t.integer  "season"
+    t.date     "starts_on"
+    t.date     "ends_on"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
 
   create_table "users", :force => true do |t|
     t.string   "email",                  :default => "", :null => false
@@ -26,6 +110,8 @@ ActiveRecord::Schema.define(:version => 20120709125501) do
     t.datetime "created_at",                             :null => false
     t.datetime "updated_at",                             :null => false
     t.string   "username",               :default => "", :null => false
+    t.integer  "institution_id"
+    t.string   "role"
   end
 
   add_index "users", ["email"], :name => "index_users_on_email", :unique => true

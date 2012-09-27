@@ -1,0 +1,25 @@
+<p id="notice"><%= notice %></p>
+
+<p>
+  <b>Assignment:</b>
+  <%= @assignment_offering.assignment_id %>
+</p>
+
+<p>
+  <b>Course offering:</b>
+  <%= @assignment_offering.course_offering_id %>
+</p>
+
+<p>
+  <b>Published:</b>
+  <%= @assignment_offering.published %>
+</p>
+
+<p>
+  <b>Due at:</b>
+  <%= @assignment_offering.due_at %>
+</p>
+
+
+<%= link_to 'Edit', edit_assignment_offering_path(@assignment_offering) %> |
+<%= link_to 'Back', assignment_offerings_path %>

@@ -1,0 +1,5 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+cs1064_student:
+  course_offering: cs1064_98765
+  user: test_student

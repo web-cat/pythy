@@ -7,7 +7,7 @@ module ApplicationHelper
   # admin user.
   #
   def needs_initial_setup?
-    User.all.empty?
+    User.count == 0
   end
 
 
@@ -30,7 +30,7 @@ module ApplicationHelper
 
   # -------------------------------------------------------------
   def devise_error_messages!
-    return "" if resource.errors.empty?
+    return "" if resource.nil? || resource.errors.empty?
 
     messages = resource.errors.full_messages.map { |msg| content_tag(:li, msg) }.join
     sentence = I18n.t("errors.messages.not_saved",

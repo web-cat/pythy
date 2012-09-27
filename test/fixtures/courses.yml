@@ -1,0 +1,11 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+cs1064:
+  name: Computational Thinking in Python
+  number: 1064
+  department: cs_at_vt
+
+cs1124:
+  name: Intro to Media Computation
+  number: 1124
+  department: cs_at_uva

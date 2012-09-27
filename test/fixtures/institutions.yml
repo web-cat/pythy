@@ -1,0 +1,9 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+vt:
+  domain: vt.edu
+  display_name: Virginia Tech
+
+test_institution:
+  domain: test.edu
+  display_name: Test Institution

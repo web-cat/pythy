@@ -37,6 +37,8 @@ gem 'devise'
 gem 'net-ldap'
 gem 'devise_ldap_authenticatable', :git => 'git://github.com/cschiewek/devise_ldap_authenticatable.git'
 gem 'cancan'
+gem 'fastercsv'
+gem 'rails_admin'
 
 # To use ActiveModel has_secure_password
 # gem 'bcrypt-ruby', '~> 3.0.0'

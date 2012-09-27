@@ -1,0 +1,7 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+cs1064_p1_98765:
+  assignment: cs1064_p1
+  course_offering: cs1064_98765
+  published: true
+  due_at: <%= 1.week.from_now.to_s(:db) %>
