@@ -28,3 +28,4 @@ self.addEventListener 'message', (e) =>
         self.postMessage event: 'success'
       catch e
         self.postMessage event: 'error', error: e
+, false

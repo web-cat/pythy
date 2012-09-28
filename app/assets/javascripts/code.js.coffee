@@ -42,6 +42,7 @@ $ ->
         # TODO Do something appropriate when the code had an
         # error (syntax or runtime)
         handleError data.error
+  , false
 
   # Register event handlers for widgets.
   $('#run').click (e) => runCode(worker)
