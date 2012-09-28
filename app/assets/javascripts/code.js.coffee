@@ -29,7 +29,7 @@ $ ->
 
   # Create HTML5 web worker to run code in a separate thread, so infinite
   # loops will not cause the entire browser to hang.
-  worker = new Worker 'assets/internal/skulpt-worker.js'
+  worker = new Worker '/assets/internal/skulpt-worker.js'
   worker.addEventListener 'message', (e) =>
     data = e.data
     switch data.event
