@@ -12,11 +12,11 @@
         .container
           %a.brand{:href => "#"} Pythy
           %ul.nav
-            %li.active
+            %li{:class => ("active" if params[:controller] == 'home')}
               %a{:href => url_for(:controller => 'home')}
                 %i.icon-home.icon-large
                 %span.hidden-phone Home
-            %li
+            %li{:class => ("active" if params[:controller] == 'code')}
               %a{:href => url_for(:controller => 'code')}
                 %i.icon-edit.icon-large
                 %span.hidden-phone Code
