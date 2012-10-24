@@ -30,7 +30,7 @@ end
 gem 'haml', '>= 3.1.4'
 gem 'jquery-rails'
 gem 'therubyracer'
-gem 'less-rails-bootstrap'
+gem 'less-rails'
 gem 'twitter_bootstrap_form_for', :git => 'git://github.com/stouset/twitter_bootstrap_form_for.git', :branch => 'bootstrap-2.0'
 gem 'codemirror-rails'
 gem 'devise'
@@ -39,6 +39,7 @@ gem 'devise_ldap_authenticatable', :git => 'git://github.com/cschiewek/devise_ld
 gem 'cancan'
 gem 'fastercsv'
 gem 'rails_admin'
+gem 'font-awesome-rails'
 
 # To use ActiveModel has_secure_password
 # gem 'bcrypt-ruby', '~> 3.0.0'

@@ -39,6 +39,7 @@ Pythy::Application.routes.draw do
   end
 
   # Default route when a user is not logged in.
-  root :to => 'landing#index'
+  # root :to => 'landing#index'
+  root :to => 'home#index'
 
 end

@@ -1,6 +1,153 @@
 @import url("http://fonts.googleapis.com/css?family=Open+Sans:300,500,700,900,300italic,500italic,700italic,900italic");
 
+// import bootstrap itself with the responsive extras
 @import "twitter/bootstrap/bootstrap";
 @import "twitter/bootstrap/responsive";
 
-@sansFontFamily: "Open Sans";
+// import the "font awesome" gem
+@fontAwesomeEotPath:  'fontawesome-webfont.eot';
+@fontAwesomeWoffPath: 'fontawesome-webfont.woff';
+@fontAwesomeTtfPath:  'fontawesome-webfont.ttf';
+@fontAwesomeSvgzPath: 'fontawesome-webfont.svgz';
+@fontAwesomeSvgPath:  'fontawesome-webfont.svg';
+@import "font-awesome.css";
+
+// set the correct font family
+@sansFontFamily: "Raleway","Helvetica Neue",Helvetica,Arial,sans-serif;
+@textColor: @black;
+
+@linkColor: #566E1F;
+
+@btnPrimaryBackground:              #638613;
+@btnPrimaryBackgroundHighlight:     darken(@btnPrimaryBackground, 10%);
+
+// manual theme stuff (should this be elsewhere?)
+html, body {
+  height: 100%;
+}
+
+body {
+  background: #393939 url('/assets/bg.png') top left repeat;
+}
+
+#main-container {
+  background-color: white;
+  color: black;
+  padding: 0 10px;
+  min-height: 100%;
+  box-shadow: 0px -5px 7px 2px rgba(0, 0, 0, 0.5);
+}
+
+#main-container-inner {
+  padding-top: 45px;
+}
+
+h1 {
+  font-size: 20px;
+}
+
+/* font awesome tweaks */
+[class^="icon-"]::before, [class*=" icon-"]::before {
+  font-weight: 400;
+}
+
+/* twitter bootstrap responsive tweaks */
+@media (max-width: 979px) {
+  body {
+    padding: 0;
+  }
+
+  .navbar-fixed-top {
+    margin-bottom: 0;
+    position: relative;
+    margin: 0;
+  }
+
+  .navbar-fixed-top .navbar-inner,
+  .navbar-fixed-bottom .navbar-inner {
+    padding: 0;
+  box-shadow: 0px -5px 8px 5px rgba(0, 0, 0, 0.7);
+  }
+
+  #main-container {
+    width: auto;
+  }
+
+  #main-container-inner {
+    padding-top: 7px;
+  }
+
+}
+
+/* twitter bootstrap tweaks */
+.navbar-inverse .navbar-inner {
+  background-color: #37431C;
+  background-image: -moz-linear-gradient(top, #607236, #1d250b);
+  background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#607236), to(#1d250b));
+  background-image: -webkit-linear-gradient(top, #607236, #1d250b);
+  background-image: -o-linear-gradient(top, #607236, #1d250b);
+  background-image: linear-gradient(to bottom, #607236, #1d250b);
+  background-repeat: repeat-x;
+  border: 0px none;
+  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff607236', endColorstr='#ff1d250b', GradientType=0);
+}
+
+.navbar-fixed-top .container {
+  padding: 0;
+}
+
+.navbar-inverse .brand,
+.navbar-inverse .nav > li > a {
+  color: white;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.navbar {
+  font-weight: 600;
+}
+
+.navbar-inverse .brand {
+  font-weight: 600;
+  font-size: 24px;
+  padding: 8px 20px 8px;
+}
+
+.navbar .nav > li > a {
+  padding: 8px 12px 8px;
+}
+
+.navbar-inner {
+  min-height: 38px;
+}
+
+.navbar-fixed-top .navbar-inner, .navbar-static-top .navbar-inner {
+  -webkit-box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1), 0 1px 10px rgba(0, 0, 0, 0.1);
+  -moz-box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1), 0 1px 10px rgba(0, 0, 0, 0.1);
+  /*box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 10px rgba(0, 0, 0, 0.5);*/
+  box-shadow: 0px -5px 8px 5px rgba(0, 0, 0, 0.7);
+}
+
+.navbar .nav > li > a {
+  background: transparent url('/assets/navbar-separator.png') left center no-repeat;
+}
+
+.navbar-inverse .divider-vertical {
+  border: 0 none;
+}
+
+.navbar .divider-vertical {
+  background: transparent url('/assets/navbar-separator.png') left center no-repeat;
+  height: 38px;
+  width: 2px;
+  margin: 0;
+  border: 0 none;
+}
+
+.navbar-inverse .nav .active > a, .navbar-inverse .nav .active > a:hover, .navbar-inverse .nav .active > a:focus {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* font awesome tweaks */
+.icon-large:before {
+  vertical-align: middle;
+}

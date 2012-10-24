@@ -75,6 +75,8 @@ GEM
     execjs (1.4.0)
       multi_json (~> 1.0)
     fastercsv (1.5.5)
+    font-awesome-rails (0.4.1)
+      railties (~> 3.1)
     haml (3.1.7)
     highline (1.6.15)
     hike (1.2.1)
@@ -96,8 +98,6 @@ GEM
     less-rails (2.2.3)
       actionpack (>= 3.1)
       less (~> 2.2.0)
-    less-rails-bootstrap (2.1.1)
-      less-rails (~> 2.2.0)
     libv8 (3.3.10.4)
     mail (2.4.4)
       i18n (>= 0.4.0)
@@ -196,10 +196,11 @@ DEPENDENCIES
   devise
   devise_ldap_authenticatable!
   fastercsv
+  font-awesome-rails
   haml (>= 3.1.4)
   jquery-rails
   json
-  less-rails-bootstrap
+  less-rails
   mysql
   net-ldap
   rails (= 3.2.6)

@@ -2,11 +2,45 @@
 %html
   %head
     %title Pythy
+    = google_font_link_tag "Raleway"
     = stylesheet_link_tag "application", :media => "all"
     = javascript_include_tag "application"
     = csrf_meta_tags
   %body
-    .container-fluid
-      %p= notice
-      %p= alert
-      = yield
+    .navbar.navbar-inverse.navbar-fixed-top
+      .navbar-inner
+        .container
+          %a.brand{:href => "#"} Pythy
+          %ul.nav
+            %li.active
+              %a{:href => url_for(:controller => 'home')}
+                %i.icon-home.icon-large
+                %span.hidden-phone Home
+            %li
+              %a{:href => url_for(:controller => 'code')}
+                %i.icon-edit.icon-large
+                %span.hidden-phone Code
+            %li
+              %a{:href => "#contact"}
+                %i.icon-book.icon-large
+                %span.hidden-phone Textbook
+          %ul.nav.pull-right
+            %li.dropdown
+              %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
+                %i.icon-user.icon-large
+                %span.hidden-phone George Speidermin
+                %b.caret
+              %ul.dropdown-menu
+                %li
+                  %a{:href => "#"} Action
+                %li
+                  %a{:href => "#"} Another action
+                %li
+                  %a{:href => "#"} Something else here
+                %li.divider
+                %li
+                  %a{:href => "#"} Separated link
+    #main-container.container
+      #main-container-inner
+        = yield
+

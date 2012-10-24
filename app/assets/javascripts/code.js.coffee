@@ -36,9 +36,11 @@ $ ->
       when 'output'
         handleOutput data.text
       when 'success'
+        alert 'success reported'
         # TODO Do something when the code successfully executes
         ;
       when 'error'
+        alert 'failure reported'
         # TODO Do something appropriate when the code had an
         # error (syntax or runtime)
         handleError data.error
