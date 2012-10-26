@@ -24,7 +24,7 @@ $ ->
     output.text(output.text() + text);
 
   handleError = (error) ->
-    alert 'Failed!'
+    alert 'Failed! ' + error
     console.log error
 
   # Create HTML5 web worker to run code in a separate thread, so infinite
