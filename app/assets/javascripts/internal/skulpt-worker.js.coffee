@@ -1,4 +1,3 @@
-# TODO Make this local!
 importScripts 'http://localhost:3000/assets/internal/skulpt-uncomp.js'
 
 # Function: output
