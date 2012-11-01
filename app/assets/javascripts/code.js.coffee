@@ -32,7 +32,15 @@ $ ->
   worker = new Worker '/assets/internal/skulpt-worker.js'
   worker.addEventListener 'message', (e) =>
     data = e.data
-    switch data.event
+    
+    # clear error markers, syntax highlighting
+    length = codeArea.lineCount()
+    for i in [0..length] by 1
+      codeArea.clearMarker(i)
+      codeArea.setLine(i, codeArea.getLine(i))
+
+      
+    switch data.event    
       when 'output'
         handleOutput data.text
       when 'success'
@@ -41,6 +49,18 @@ $ ->
         ;
       when 'error'
         alert 'failure reported'
+        console.log(data.error)
+        
+        message = data.error.message
+        type = data.error.type
+        error = type + ": " + message
+        start = { line : data.error.start.line-1, ch: data.error.start.ch }
+        end = { line: data.error.end.line-1, ch: data.error.end.ch }
+        
+        codeArea.markText(start, end, "syntax-highlight") 
+        codeArea.setMarker(start.line, "<span class=\"error-marker\"" +
+            "title=\"" + error + "\">●  " + (start.line+1) + "</span>")
+        
         # TODO Do something appropriate when the code had an
         # error (syntax or runtime)
         handleError data.error
