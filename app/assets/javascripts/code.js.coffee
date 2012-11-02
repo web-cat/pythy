@@ -48,22 +48,34 @@ $ ->
         # TODO Do something when the code successfully executes
         ;
       when 'error'
-        alert 'failure reported'
+        # alert 'failure reported'
         console.log(data.error)
         
         message = data.error.message
         type = data.error.type
         error = type + ": " + message
-        start = { line : data.error.start.line-1, ch: data.error.start.ch }
-        end = { line: data.error.end.line-1, ch: data.error.end.ch }
         
-        codeArea.markText(start, end, "syntax-highlight") 
-        codeArea.setMarker(start.line, "<span class=\"error-marker\"" +
+        if data.error.start? and data.error.start?
+          start = { line : data.error.start.line-1, ch: data.error.start.ch }
+          end = { line: data.error.end.line-1, ch: data.error.end.ch }
+        
+          codeArea.markText(start, end, "syntax-highlight") 
+          codeArea.setMarker(start.line, "<span class=\"error-marker\"" +
             "title=\"" + error + "\">●  " + (start.line+1) + "</span>")
+        
+        else
+          pos = { line: 0, ch: 0 }
+          node = document.createElement("span")
+          node.innerHTML = error
+          node.className = "error-marker"
+          console.log(error)
+          codeArea.addLineWidget(pos, node, {above: true})
+            
+        
         
         # TODO Do something appropriate when the code had an
         # error (syntax or runtime)
-        handleError data.error
+        # handleError data.error
   , false
 
   # Register event handlers for widgets.
