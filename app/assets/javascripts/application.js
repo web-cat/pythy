@@ -12,6 +12,7 @@
 //
 //= require jquery
 //= require jquery_ujs
-//= require codemirror
-//= require codemirror/modes/python
+//= require codemirror/codemirror.js
+//= require codemirror/util/matchbrackets.js
+//= require codemirror/mode/python/python.js
 //= require_directory .
