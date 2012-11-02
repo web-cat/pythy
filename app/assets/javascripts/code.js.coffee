@@ -8,6 +8,7 @@ $ ->
   codeArea = CodeMirror.fromTextArea $('#codearea')[0],
     mode: { name: "python", version: 3, singleLineStringErrors: false },
     lineNumbers: true,
+    gutters: ["CodeMirror-linenumbers"]
     indentUnit: 2,
     tabSize: 2,
     tabMode: "shift",
@@ -33,13 +34,17 @@ $ ->
   worker.addEventListener 'message', (e) =>
     data = e.data
     
-    # clear error markers, syntax highlighting
-    length = codeArea.lineCount()
-    for i in [0..length] by 1
-      codeArea.clearMarker(i)
+    # Clear gutters markers
+    codeArea.clearGutter("CodeMirror-linenumbers")
+
+    # Clear syntax-highlighting
+    for i in [0..codeArea.lineCount()] by 1
       codeArea.setLine(i, codeArea.getLine(i))
 
-      
+    # Clear line widgets
+    if codeArea.lineInfo(0)? and codeArea.lineInfo(0).widgets?
+      codeArea.removeLineWidget(codeArea.lineInfo(0).widgets[0])
+            
     switch data.event    
       when 'output'
         handleOutput data.text
@@ -58,20 +63,18 @@ $ ->
         if data.error.start? and data.error.start?
           start = { line : data.error.start.line-1, ch: data.error.start.ch }
           end = { line: data.error.end.line-1, ch: data.error.end.ch }
-        
+          marker = document.createElement("div")
+          marker.className = "error-marker"
+          marker.innerHTML = "● " + (start.line + 1)
+          marker.title = error
           codeArea.markText(start, end, "syntax-highlight") 
-          codeArea.setMarker(start.line, "<span class=\"error-marker\"" +
-            "title=\"" + error + "\">●  " + (start.line+1) + "</span>")
+          codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
         
-        else
-          pos = { line: 0, ch: 0 }
-          node = document.createElement("span")
+        else # no line information
+          node = document.createElement("div")
           node.innerHTML = error
           node.className = "error-marker"
-          console.log(error)
-          codeArea.addLineWidget(pos, node, {above: true})
-            
-        
+          codeArea.addLineWidget(0, node, {above: true})
         
         # TODO Do something appropriate when the code had an
         # error (syntax or runtime)
