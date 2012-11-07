@@ -6,5 +6,7 @@
     = javascript_include_tag "application"
     = csrf_meta_tags
   %body.landing
-    .container
-      = yield
+    #main-container.container
+      #main-container-inner
+        = render :partial => "flashbar"
+        = yield

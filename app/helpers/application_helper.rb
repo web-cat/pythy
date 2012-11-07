@@ -9,7 +9,18 @@ module ApplicationHelper
   def needs_initial_setup?
     User.count == 0
   end
-
+  
+  # -------------------------------------------------------------
+  # Returns the correct twitter bootstrap class mapping for different
+  # types of flash messages
+  # 
+  def flash_class(level)
+    case level
+    when :notice then "alert-info"
+    when :error then "alert-error"
+    when :alert then ""
+    end
+  end
 
   # Devise helpers
 
