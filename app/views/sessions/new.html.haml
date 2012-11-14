@@ -3,7 +3,7 @@
 = twitter_bootstrap_form_for resource, :as => resource_name, :url => session_path(resource_name), :html => { :class => 'form-horizontal'} do |f|
   = devise_error_messages!
 
-  = f.text_field :username
+  = f.text_field :email
   = f.password_field :password
 
   - if devise_mapping.rememberable?

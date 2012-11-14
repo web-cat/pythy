@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20120927011009) do
+ActiveRecord::Schema.define(:version => 20121114050604) do
 
   create_table "assignment_offerings", :force => true do |t|
     t.integer  "assignment_id"
@@ -68,12 +68,29 @@ ActiveRecord::Schema.define(:version => 20120927011009) do
     t.datetime "updated_at",     :null => false
   end
 
+  create_table "global_roles", :force => true do |t|
+    t.string  "name",                                             :null => false
+    t.text    "description"
+    t.boolean "can_manage_own_courses",        :default => false, :null => false
+    t.boolean "can_manage_all_courses",        :default => false, :null => false
+    t.boolean "can_edit_system_configuration", :default => false, :null => false
+  end
+
   create_table "institutions", :force => true do |t|
     t.string   "domain"
     t.string   "display_name"
     t.datetime "created_at",   :null => false
     t.datetime "updated_at",   :null => false
   end
+
+  create_table "projects", :force => true do |t|
+    t.string   "name"
+    t.integer  "assignment_id"
+    t.datetime "created_at",    :null => false
+    t.datetime "updated_at",    :null => false
+  end
+
+  add_index "projects", ["assignment_id"], :name => "index_projects_on_assignment_id"
 
   create_table "rails_admin_histories", :force => true do |t|
     t.text     "message"
@@ -87,6 +104,11 @@ ActiveRecord::Schema.define(:version => 20120927011009) do
   end
 
   add_index "rails_admin_histories", ["item", "table", "month", "year"], :name => "index_rails_admin_histories"
+
+  create_table "role_assignments", :force => true do |t|
+    t.integer "user_id"
+    t.integer "global_role_id"
+  end
 
   create_table "terms", :force => true do |t|
     t.integer  "year"

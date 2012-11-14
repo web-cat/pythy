@@ -9,6 +9,8 @@ class Ability
       # permissions here.
       can :manage, :all
     else
+      # the user can read CourseOfferings WHERE the students table 
+      # contains that student's user id
       can :read, CourseOffering, :students => { :id => user.id }
       can :read, CourseOffering, :staff => { :id => user.id }
       can :manage, CourseOffering, :staff => { :id => user.id },
