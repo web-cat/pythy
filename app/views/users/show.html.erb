@@ -7,8 +7,8 @@
 
 <p>
   <b>Assigned Roles:</b>
-  <% @user.role_assignments.each do |role_assignment| %>
-    <%= role_assignment.global_role.name %>, 
+  <% @user.global_roles.each do |role| %>
+    <%= role.name %>, 
   <% end %>
 </p>
 

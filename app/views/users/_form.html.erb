@@ -11,6 +11,16 @@
     </div>
   <% end %>
 
+  <div class="field">
+    <%= f.label :email %>
+    <%= f.text_field :email %>
+  </div>
+
+  <% GlobalRole.all.each do |role| %>
+    <%= check_box_tag :global_role_ids, role.id, @user.global_roles.include?(role), :name => 'user[global_role_ids][]' %>
+    <%= role.name %>
+  <% end %> 
+
   <div class="actions">
     <%= f.submit %>
   </div>

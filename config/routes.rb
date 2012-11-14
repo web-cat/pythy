@@ -28,6 +28,7 @@ Pythy::Application.routes.draw do
 
   scope "/admin" do
     resources :users
+    resources :global_roles
     resources :departments
     resources :institutions
   end

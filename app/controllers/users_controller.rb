@@ -56,6 +56,9 @@ class UsersController < ApplicationController
   # PUT /users/1
   # PUT /users/1.json
   def update
+    # ensure that any unchecked checkboxes get set
+    params[:user][:global_role_ids] ||= []
+
     @user = User.find(params[:id])
 
     respond_to do |format|

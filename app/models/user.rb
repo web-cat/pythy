@@ -16,7 +16,8 @@ class User < ActiveRecord::Base
 
   belongs_to  :institution
 
-  has_many    :role_assignments
+  has_many    :role_assignments, :dependent => :destroy
+  has_many    :global_roles, :through => :role_assignments
 
   has_many    :course_offering_students
   has_many    :enrolled_course_offerings,
@@ -37,7 +38,7 @@ class User < ActiveRecord::Base
 
   # Setup accessible (or protected) attributes for your model
   attr_accessible :username, :email, :password, :password_confirmation,
-    :remember_me
+    :remember_me, :global_role_ids
 
   before_create :set_default_role
   before_save :get_ldap_email, :get_institution
