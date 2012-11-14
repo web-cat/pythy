@@ -16,6 +16,8 @@ class User < ActiveRecord::Base
 
   belongs_to  :institution
 
+  has_many    :role_assignments
+
   has_many    :course_offering_students
   has_many    :enrolled_course_offerings,
               :through => :course_offering_students,
@@ -75,6 +77,14 @@ class User < ActiveRecord::Base
       domain = $1
       self.institution = Institution.where(:domain => domain).first
     end
+  end
+
+  # -------------------------------------------------------------
+  # Overrides the built-in password required method to allow for users
+  # to be updated without errors
+  # taked from: http://www.chicagoinformatics.com/index.php/2012/09/user-administration-for-devise/
+  def password_required?
+    (!password.blank? && !password_confirmation.blank?) || new_record?
   end
 
 end
