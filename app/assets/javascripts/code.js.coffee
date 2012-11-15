@@ -50,6 +50,7 @@ $ ->
         handleOutput data.text
       when 'success'
         alert 'success reported'
+        console.log(data)
         # TODO Do something when the code successfully executes
         ;
       when 'error'
