@@ -39,6 +39,9 @@ gem 'cancan'
 gem 'fastercsv'
 gem 'rails_admin'
 gem 'font-awesome-rails'
+gem 'delayed_job'
+gem 'delayed_job_active_record'
+gem 'daemon'
 
 # To use ActiveModel has_secure_password
 # gem 'bcrypt-ruby', '~> 3.0.0'
