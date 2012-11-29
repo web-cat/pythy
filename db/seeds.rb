@@ -5,3 +5,9 @@
 #
 #   cities = City.create([{ :name => 'Chicago' }, { :name => 'Copenhagen' }])
 #   Mayor.create(:name => 'Emanuel', :city => cities.first)
+
+GlobalRole.create!(:can_edit_system_configuration => true, 
+                    :can_manage_all_courses => true,
+                    :can_manage_own_courses => true,
+                    :description => '', 
+                    :name => "Administrator")
