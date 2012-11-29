@@ -49,7 +49,7 @@
             %li{:class => ("active" if params[:controller] == 'code')}
               %a{:href => url_for(:controller => 'code')}
                 %i.icon-bar-chart.icon-large
-                %span.hidden-phone Review 
+                %span.hidden-phone View 
             / %li
             /   %a{:href => "#contact"}
             /     %i.icon-book.icon-large
@@ -58,22 +58,23 @@
             %li.dropdown
               %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
                 %i.icon-wrench.icon-large
-                %span.hidden-phone System 
+                %span.hidden-phone.hidden-tablet Administration 
                 %i.icon-caret-down
               %ul.dropdown-menu
                 %li.nav-header Manage
                 %li
-                  %a{:href => "#"} Users
+                  = link_to 'Users', users_path
                 %li
-                  %a{:href => "#"} Global roles 
+                  = link_to 'Global roles', global_roles_path 
                 %li
                   %a{:href => "#"} Course-specific roles 
                 %li
-                  %a{:href => "#"} Institutions 
+                  = link_to 'Institutions', institutions_path 
             %li.dropdown
               %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
                 %i.icon-user.icon-large
-                %span.hidden-phone George Speidermin
+                %span.hidden-phone
+                  = current_user.email
                 %i.icon-caret-down
               %ul.dropdown-menu
                 %li
@@ -82,7 +83,7 @@
                     Account settings 
                 %li.divider
                 %li
-                  %a{:href => "#"} 
+                  = link_to destroy_user_session_path, :method => :delete do
                     %i.icon-signout
                     Sign out 
     #main-container.container
