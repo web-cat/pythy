@@ -10,7 +10,7 @@
     .navbar.navbar-inverse.navbar-fixed-top
       .navbar-inner
         .container
-          %a.brand{:href => "#"} Pythy
+          = link_to 'Pythy', root_url, :class => 'brand'
           %ul.nav
             %li.dropdown
               %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
@@ -26,14 +26,11 @@
                 %li.active
                   %a{:href => "#"}
                     %strong CS 1024 - 
-                    Intro to Computer Science 
+                    Intro to COBOL 
                 %li
                   %a{:href => "#"}
-                    %strong CS 2199 - 
-                    Intro to Utter Confusion 
-                %li.nav-header Course Administration 
-                %li
-                  %a{:href => "#"} Manage courses 
+                    %strong CS 1034 - 
+                    Intro to Pascal
             %li{:class => ("active" if params[:controller] == 'home')}
               %a{:href => url_for(:controller => 'home')}
                 %i.icon-home.icon-large
@@ -61,7 +58,7 @@
                 %span.hidden-phone.hidden-tablet Administration 
                 %i.icon-caret-down
               %ul.dropdown-menu
-                %li.nav-header Manage
+                %li.nav-header Configure
                 %li
                   = link_to 'Users', users_path
                 %li
@@ -70,6 +67,9 @@
                   %a{:href => "#"} Course-specific roles 
                 %li
                   = link_to 'Institutions', institutions_path 
+                %li.nav-header Manage 
+                %li
+                  %a{:href => "#"} Courses 
             %li.dropdown
               %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
                 %i.icon-user.icon-large

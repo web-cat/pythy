@@ -5,15 +5,6 @@
 # of supporting multiple authenticators in Devise.)
 class User < ActiveRecord::Base
 
-  # Roles:
-  #   admin: Admins can do anything and manage all models.
-  #   creator: Creators can create new courses by themselves, but do not
-  #     have any other special privileges. (A non-creator can still be
-  #     a manager for a course; he just can't create his own.)
-  #   user: A default catch-all for a user with no special systemwide
-  #     privileges (students, graders, and non-creating instructors).
-  ROLES = %w( admin creator user )
-
   belongs_to  :institution
 
   has_many    :role_assignments, :dependent => :destroy
@@ -52,14 +43,14 @@ class User < ActiveRecord::Base
 
 
   private
-
   # -------------------------------------------------------------
-  # Sets the default role for the user if it is not already set.
+  # Sets the first user's role as administrator and subsequent users
+  # as student (note: be sure to run rake db:seed to create these roles)
   def set_default_role
     if User.count == 0
-      self.role = 'admin'
+      self.global_roles << GlobalRole.where(:id => GlobalRole::ADMINISTRATOR_ID)
     else
-      self.role ||= 'user'
+      self.global_roles << GlobalRole.where(:id => GlobalRole::STUDENT_ID)
     end
   end
 
