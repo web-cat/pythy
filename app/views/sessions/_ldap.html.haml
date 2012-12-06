@@ -1,0 +1,16 @@
+= twitter_bootstrap_form_for resource, :as => resource_name, :url => '/auth/ldap/callback', :html => { :class => 'form-horizontal' } do |f|
+  = devise_error_messages!
+
+  .control-group
+    .control-label
+      %label{:for => 'username'} Username
+    .controls
+      = text_field_tag :username, nil, :id => 'username'
+  .control-group
+    .control-label
+      %label{:for => 'password'} Password
+    .controls
+      = password_field_tag :password, nil, :id => 'password'
+
+  = f.actions do
+    = f.submit 'Sign in', :class => 'btn btn-primary'

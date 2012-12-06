@@ -4,14 +4,13 @@ Pythy::Application.routes.draw do
 
   mount RailsAdmin::Engine => 'rails_admin'
 
+  match '/auth/:provider/callback' => 'authentications#create'
+
+  resources :authentications
   resources :assignment_offerings
-
   resources :assignments
-
   resources :course_offerings
-
   resources :courses
-
   resources :terms
 
   # Provide the initial setup routes if the User table is empty.
@@ -42,7 +41,6 @@ Pythy::Application.routes.draw do
   end
 
   # Default route when a user is not logged in.
-
   root :to => 'landing#index'
 
 end

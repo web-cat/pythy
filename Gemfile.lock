@@ -15,6 +15,16 @@ GIT
       actionpack (~> 3)
       railties (~> 3)
 
+GIT
+  remote: git://github.com/web-cat/omniauth-ldap.git
+  revision: 90280bbad880893962c57894e128070f4e3c8479
+  specs:
+    omniauth-ldap (1.0.2)
+      net-ldap (~> 0.3.1)
+      omniauth (~> 1.0)
+      pyu-ruby-sasl (~> 0.0.3.1)
+      rubyntlm (~> 0.1.1)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -78,12 +88,16 @@ GEM
     erubis (2.7.0)
     execjs (1.4.0)
       multi_json (~> 1.0)
+    faraday (0.8.0)
+      multipart-post (~> 1.1)
     fastercsv (1.5.5)
     font-awesome-rails (0.4.1)
       railties (~> 3.1)
     haml (3.1.7)
+    hashie (1.2.0)
     highline (1.6.15)
     hike (1.2.1)
+    httpauth (0.1)
     i18n (0.6.1)
     journey (1.0.4)
     jquery-rails (2.1.3)
@@ -109,6 +123,7 @@ GEM
       treetop (~> 1.4.8)
     mime-types (1.19)
     multi_json (1.3.6)
+    multipart-post (1.1.5)
     mysql (2.8.1)
     nested_form (0.2.3)
     net-ldap (0.3.1)
@@ -121,8 +136,23 @@ GEM
     net-ssh-gateway (1.1.0)
       net-ssh (>= 1.99.1)
     nokogiri (1.5.5)
+    oauth2 (0.6.1)
+      faraday (~> 0.7)
+      httpauth (~> 0.1)
+      multi_json (~> 1.3)
+    omniauth (1.1.1)
+      hashie (~> 1.2)
+      rack
+    omniauth-facebook (1.2.0)
+      omniauth-oauth2 (~> 1.0.0)
+    omniauth-oauth2 (1.0.1)
+      oauth2 (~> 0.6.0)
+      omniauth (~> 1.0)
     orm_adapter (0.4.0)
     polyglot (0.3.3)
+    pyu-ruby-sasl (0.0.3.3)
+    quiet_assets (1.0.1)
+      railties (~> 3.1)
     rack (1.4.1)
     rack-cache (1.2)
       rack (>= 0.4)
@@ -165,6 +195,7 @@ GEM
     rdoc (3.12)
       json (~> 1.4)
     remotipart (1.0.2)
+    rubyntlm (0.1.1)
     sass (3.2.1)
     sass-rails (3.2.5)
       railties (~> 3.2.0)
@@ -209,6 +240,10 @@ DEPENDENCIES
   less-rails
   mysql
   net-ldap
+  omniauth
+  omniauth-facebook
+  omniauth-ldap!
+  quiet_assets
   rails (= 3.2.6)
   rails_admin
   sass-rails (~> 3.2.3)

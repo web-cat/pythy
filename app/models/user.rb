@@ -16,6 +16,8 @@ class User < ActiveRecord::Base
 
   belongs_to  :institution
 
+  has_many    :authentications
+
   has_many    :role_assignments, :dependent => :destroy
   has_many    :global_roles, :through => :role_assignments
 
@@ -35,7 +37,8 @@ class User < ActiveRecord::Base
   # :timeoutable and :omniauthable
 
   # devise :ldap_authenticatable, :rememberable, :trackable, :validatable
-  devise :registerable, :database_authenticatable, :rememberable, :trackable, :validatable
+  devise :registerable, :database_authenticatable, :rememberable,
+    :recoverable, :trackable, :validatable
 
   # Setup accessible (or protected) attributes for your model
   attr_accessible :username, :email, :password, :password_confirmation,
