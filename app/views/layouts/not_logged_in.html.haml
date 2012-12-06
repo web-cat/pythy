@@ -7,6 +7,5 @@
     = csrf_meta_tags
   %body.landing
     #main-container.container
-      #main-container-inner
-        = render :partial => "flashbar"
-        = yield
+      = render :partial => "flashbar"
+      = yield

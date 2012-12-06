@@ -1,7 +1,23 @@
-# This file should contain all the record creation needed to seed the database with its default values.
-# The data can then be loaded with the rake db:seed (or created alongside the db with db:setup).
-#
-# Examples:
-#
-#   cities = City.create([{ :name => 'Chicago' }, { :name => 'Copenhagen' }])
-#   Mayor.create(:name => 'Emanuel', :city => cities.first)
+# Populates the database with a set of default data necessary for proper
+# operation
+
+# Create a the two default roles -- these are both required
+# for user creation
+GlobalRole.create!(:can_edit_system_configuration => true, 
+                    :can_manage_all_courses => true,
+                    :can_manage_own_courses => true,
+                    :builtin => true,
+                    :name => "Administrator")
+
+GlobalRole.create!(:can_edit_system_configuration => false, 
+                    :can_manage_all_courses => false,
+                    :can_manage_own_courses => false,
+                    :builtin => true,
+                    :name => "Student")
+
+# The instructor role is not required, but is handy in practice
+GlobalRole.create!(:can_edit_system_configuration => false, 
+                    :can_manage_all_courses => false,
+                    :can_manage_own_courses => true,
+                    :builtin => true,
+                    :name => "Instructor")

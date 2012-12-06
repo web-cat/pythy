@@ -95,10 +95,10 @@ ActiveRecord::Schema.define(:version => 20121206145720) do
 
   create_table "global_roles", :force => true do |t|
     t.string  "name",                                             :null => false
-    t.text    "description"
     t.boolean "can_manage_own_courses",        :default => false, :null => false
     t.boolean "can_manage_all_courses",        :default => false, :null => false
     t.boolean "can_edit_system_configuration", :default => false, :null => false
+    t.boolean "builtin",                       :default => false, :null => false
   end
 
   create_table "institutions", :force => true do |t|
