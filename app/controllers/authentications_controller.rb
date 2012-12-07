@@ -18,7 +18,7 @@ class AuthenticationsController < ApplicationController
 
     authentication = Authentication.find_by_provider_and_uid(provider, uid)
 
-    if authentication
+    if authentication && authentication.user.present?
       # Found the authentication, meaning some user has already signed in
       # with this method before. Look up the user from the authentication
       # model and log them in.
