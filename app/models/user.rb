@@ -8,6 +8,8 @@ class User < ActiveRecord::Base
   belongs_to  :institution
 
   belongs_to  :global_role
+  
+  has_many    :authentications
 
   has_many    :course_offering_students
   has_many    :enrolled_course_offerings,
@@ -25,11 +27,12 @@ class User < ActiveRecord::Base
   # :timeoutable and :omniauthable
 
   # devise :ldap_authenticatable, :rememberable, :trackable, :validatable
-  devise :registerable, :database_authenticatable, :rememberable, :trackable, :validatable
+  devise :registerable, :database_authenticatable, :rememberable,
+    :recoverable, :trackable, :validatable
 
   # Setup accessible (or protected) attributes for your model
   attr_accessible :username, :email, :password, :password_confirmation,
-    :remember_me, :global_role_id
+    :remember_me, :global_role_id, :full_name, :institution_id
 
   before_create :set_default_role
   before_save :get_ldap_email, :get_institution

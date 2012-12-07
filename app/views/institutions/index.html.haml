@@ -1,0 +1,21 @@
+%ul.breadcrumb
+  %li.active
+    Institutions
+  %li.pull-right
+    = link_to 'New...', new_institution_path
+
+%table.table.table-striped.table-bordered
+  %thead
+    %tr
+      %th Display Name
+      %th Domain
+      %th Actions
+  %tbody
+    - @institutions.each do |institution|
+      %tr
+        %td= link_to institution.display_name, institution
+        %td= institution.domain
+        %td
+          = link_to 'Edit', edit_institution_path(institution)
+          |
+          = link_to 'Destroy', institution, method: :delete, data: { confirm: 'Are you sure?' }

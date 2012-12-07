@@ -1,10 +1,25 @@
-%h1.no-border Users
-= render :partial => "flashbar"
+%ul.breadcrumb
+  %li
+    = link_to 'Users', users_path
+    %span.divider /
+  %li.active
+    = @user.full_name
+  %li.pull-right
+    = link_to edit_user_path(@user) do
+      %i.icon-pencil
+      Edit
 
-%p
-  %b Email:
-  = @user.email
-
-%p
-  %b Assigned Role:
-  = @user.global_role.name
+%table.table
+  %tbody
+    %tr
+      %th Full Name
+      %td= @user.full_name
+    %tr
+      %th E-mail
+      %td= @user.email
+    %tr
+      %th Institution
+      %td= (link_to @user.institution.display_name, @user.institution) rescue '(none)'
+    %tr
+      %th Global Role
+      %td= @user.global_role.name

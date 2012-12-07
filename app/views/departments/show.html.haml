@@ -1,0 +1,23 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Institutions', institutions_path
+    %span.divider /
+  %li
+    = link_to @institution.display_name, @institution
+    %span.divider /
+  %li
+    = link_to 'Departments', institution_departments_path(@institution)
+    %span.divider /
+  %li.active
+    = @department.name
+  %li.pull-right
+    = link_to edit_institution_department_path(@institution, @department) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @department.name
+  %small
+    = @department.abbreviation
+    at
+    = @institution.display_name

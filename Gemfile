@@ -1,12 +1,14 @@
 source 'https://rubygems.org'
 
 gem 'rails', '3.2.6'
+gem 'thin'
 
 # Bundle edge Rails instead:
 # gem 'rails', :git => 'git://github.com/rails/rails.git'
 
 group :development, :test do
-   gem 'sqlite3', '~> 1.3.4'
+  gem 'sqlite3', '~> 1.3.4'
+  gem 'quiet_assets'
 end
 
 group :production do
@@ -42,6 +44,10 @@ gem 'font-awesome-rails'
 gem 'delayed_job'
 gem 'delayed_job_active_record'
 gem 'daemon'
+
+gem 'omniauth'
+gem 'omniauth-facebook'
+gem 'omniauth-ldap', :git => 'git://github.com/web-cat/omniauth-ldap.git'
 
 # To use ActiveModel has_secure_password
 # gem 'bcrypt-ruby', '~> 3.0.0'

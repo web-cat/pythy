@@ -1,0 +1,16 @@
+= twitter_bootstrap_form_for [@institution, @department], html: { class: 'form-horizontal' } do |f|
+  = form_errors @department
+
+  = f.collection_select :institution_id, 'Institution', Institution.all, :id, :display_name, prompt: '(none)'
+
+  = f.text_field :name do
+    %span.help-block
+      The full name of the department (for example, Computer Science).
+
+  = f.text_field :abbreviation do
+    %span.help-block
+      The department abbreviation, used to display course numbers
+      (for example, the "CS" in "CS 1064").
+
+  = f.actions do
+    = f.submit

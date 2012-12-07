@@ -1,0 +1,3 @@
+class ScratchpadRepository < Repository
+
+end

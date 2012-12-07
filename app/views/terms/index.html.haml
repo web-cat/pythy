@@ -1,0 +1,24 @@
+%ul.breadcrumb
+  %li.active
+    Terms
+  %li.pull-right
+    = link_to 'New...', new_term_path
+
+%table.table.table-striped.table-bordered
+  %thead
+    %tr
+      %th Season and Year
+      %th Time Period
+      %th Actions
+  %tbody
+    - @terms.each do |term|
+      %tr
+        %td= link_to term.display_name, term
+        %td
+          = l term.starts_on
+          to
+          = l term.ends_on
+        %td
+          = link_to 'Edit', edit_term_path(term)
+          |
+          = link_to 'Destroy', term, method: :delete, data: { confirm: 'Are you sure?' }

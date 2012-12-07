@@ -1,0 +1,7 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Department', institution_departments_path(@institution)
+    %span.divider /
+  %li.active (new department)
+
+= render 'form'

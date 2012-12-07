@@ -1,0 +1,3 @@
+class PersonalRepository < Repository
+
+end

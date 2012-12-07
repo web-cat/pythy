@@ -1,0 +1,9 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Terms', terms_path
+    %span.divider /
+  %li.active
+    = @term.display_name
+    (editing)
+
+= render 'form'

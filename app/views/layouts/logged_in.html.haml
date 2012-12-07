@@ -13,7 +13,7 @@
           = link_to 'Pythy', root_url, :class => 'brand'
           %ul.nav
             %li.dropdown
-              %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
+              = dropdown_tag do
                 %i.icon-caret-down
                 %span CS 1024 
               %ul.dropdown-menu
@@ -31,31 +31,26 @@
                   %a{:href => "#"}
                     %strong CS 1034 - 
                     Intro to Pascal
-            %li{:class => ("active" if params[:controller] == 'home')}
-              %a{:href => url_for(:controller => 'home')}
-                %i.icon-home.icon-large
-                %span.hidden-phone Home
-            %li{:class => ("active" if params[:controller] == 'code')}
-              %a{:href => url_for(:controller => 'code')}
-                %i.icon-edit.icon-large
-                %span.hidden-phone Code
-            %li{:class => ("active" if params[:controller] == 'code')}
-              %a{:href => url_for(:controller => 'code')}
-                %i.icon-bar-chart.icon-large
-                %span.hidden-phone Grade 
-            %li{:class => ("active" if params[:controller] == 'code')}
-              %a{:href => url_for(:controller => 'code')}
-                %i.icon-bar-chart.icon-large
-                %span.hidden-phone View 
+            = nav_item_tag :home do
+              %i.icon-home.icon-large
+              %span.hidden-phone Home
+            = nav_item_tag :code do
+              %i.icon-edit.icon-large
+              %span.hidden-phone Code
+            = nav_item_tag :code do
+              %i.icon-bar-chart.icon-large
+              %span.hidden-phone Grade 
+            = nav_item_tag :code do
+              %i.icon-bar-chart.icon-large
+              %span.hidden-phone View 
             / %li
             /   %a{:href => "#contact"}
             /     %i.icon-book.icon-large
             /     %span.hidden-phone Textbook
           %ul.nav.pull-right
-            %li.dropdown
-              %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
+            %li.dropdown          
+              = dropdown_tag do
                 %i.icon-wrench.icon-large
-                %span.hidden-phone.hidden-tablet Administration 
                 %i.icon-caret-down
               %ul.dropdown-menu
                 %li.nav-header Configure
@@ -71,21 +66,21 @@
                 %li
                   %a{:href => "#"} Courses 
             %li.dropdown
-              %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
+              = dropdown_tag do
                 %i.icon-user.icon-large
                 %span.hidden-phone
                   = current_user.email
                 %i.icon-caret-down
-              %ul.dropdown-menu
-                %li
-                  %a{:href => "#"}
-                    %i.icon-cog
-                    Account settings 
-                %li.divider
-                %li
-                  = link_to destroy_user_session_path, :method => :delete do
-                    %i.icon-signout
-                    Sign out 
+                %ul.dropdown-menu
+                  %li
+                    %a{:href => "#"}
+                      %i.icon-cog
+                      Account settings 
+                  %li.divider
+                  %li
+                    = link_to destroy_user_session_path, :method => :delete do
+                      %i.icon-signout
+                      Sign out 
     #main-container.container
       #main-container-inner
         = yield

@@ -13,6 +13,7 @@
 //= require jquery
 //= require jquery_ujs
 //= require_tree ../../../vendor/assets/javascripts/twitter/bootstrap/.
+//= require eternicode/bootstrap-datepicker/bootstrap-datepicker.js
 //= require codemirror/codemirror.js
 //= require codemirror/util/matchbrackets.js
 //= require codemirror/mode/python/python.js

@@ -58,4 +58,32 @@ HTML
     html.html_safe
   end
 
+  # -------------------------------------------------------------
+  def dropdown_tag
+    # %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
+    content_tag :a, :href => '#', :class => 'dropdown-toggle',
+      :'data-toggle' => 'dropdown' do
+      yield
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def nav_item_tag(destination)
+    # %li{:class => ("active" if params[:controller] == 'home')}
+    #   %a{:href => url_for(:controller => 'home')}
+
+    content_tag :li, :class => ('active' if params[:controller] == destination.to_s) do
+      link_to :controller => destination do
+        yield
+      end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def form_errors(model)
+    render partial: 'form_errors', locals: { model: model }
+  end
+
 end

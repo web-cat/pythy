@@ -1,0 +1,31 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Institutions', institutions_path
+    %span.divider /
+  %li.active
+    = @institution.display_name
+  %li.pull-right
+    = link_to edit_institution_path(@institution) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @institution.display_name
+  %small= "(#{@institution.domain})"
+
+-# Table of statistics about the institution
+%table.table.table-bordered
+  %tbody
+    %tr
+      %th Number of users
+      %td= @institution.users.count
+
+
+-# Table listing the departments belonging to the institution (and allowing
+-# them to be modified
+%h3
+  = link_to 'Departments', institution_departments_path(@institution)
+
+= render partial: 'departments/index', locals: { departments: @institution.departments }
+.pull-right
+  = link_to 'Create a new department...', new_institution_department_path(@institution), class: 'btn btn-success'

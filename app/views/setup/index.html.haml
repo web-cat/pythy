@@ -1,4 +1,27 @@
 .row
   .span8.offset2
     .well
-      = render :template => 'sessions/new_initial'
+      /= render :template => 'sessions/new_initial'
+      %h2 Welcome to Pythy!
+      %p
+        This is the first time the application is being started,
+        so please log-in and your account will be used as the application&apos;s
+        administrator user.
+      %ul.nav.nav-tabs
+        %li
+          %a{:href => '#local', :'data-toggle' => 'tab'} Local Database
+        %li.active
+          %a{:href => '#ldap', :'data-toggle' => 'tab'} LDAP
+      .tab-content
+        #local.tab-pane
+          = twitter_bootstrap_form_for resource, :as => resource_name, :url => registration_path(resource_name), :html => { :class => 'form-horizontal' } do |f|
+            = devise_error_messages!
+
+            = f.email_field :email
+            = f.password_field :password
+            = f.password_field :password_confirmation
+
+            = f.actions do
+              = f.submit 'Sign in'
+        #ldap.tab-pane.active
+          = render :partial => 'sessions/ldap'
