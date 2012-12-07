@@ -6,7 +6,7 @@ class InstitutionsController < ApplicationController
 
     respond_to do |format|
       format.html # index.html.erb
-      format.json { render :json => @institutions }
+      format.json { render json: @institutions }
     end
   end
 
@@ -17,7 +17,7 @@ class InstitutionsController < ApplicationController
 
     respond_to do |format|
       format.html # show.html.erb
-      format.json { render :json => @institution }
+      format.json { render json: @institution }
     end
   end
 
@@ -28,7 +28,7 @@ class InstitutionsController < ApplicationController
 
     respond_to do |format|
       format.html # new.html.erb
-      format.json { render :json => @institution }
+      format.json { render json: @institution }
     end
   end
 
@@ -44,11 +44,11 @@ class InstitutionsController < ApplicationController
 
     respond_to do |format|
       if @institution.save
-        format.html { redirect_to @institution, :notice => 'Institution was successfully created.' }
-        format.json { render :json => @institution, :status => :created, :location => @institution }
+        format.html { redirect_to @institution, notice: 'Institution was successfully created.' }
+        format.json { render json: @institution, status: created, location: @institution }
       else
-        format.html { render :action => "new" }
-        format.json { render :json => @institution.errors, :status => :unprocessable_entity }
+        format.html { render action: "new" }
+        format.json { render json: @institution.errors, status: :unprocessable_entity }
       end
     end
   end
@@ -60,11 +60,11 @@ class InstitutionsController < ApplicationController
 
     respond_to do |format|
       if @institution.update_attributes(params[:institution])
-        format.html { redirect_to @institution, :notice => 'Institution was successfully updated.' }
+        format.html { redirect_to @institution, notice: 'Institution was successfully updated.' }
         format.json { head :no_content }
       else
-        format.html { render :action => "edit" }
-        format.json { render :json => @institution.errors, :status => :unprocessable_entity }
+        format.html { render action: "edit" }
+        format.json { render json: @institution.errors, status: :unprocessable_entity }
       end
     end
   end
