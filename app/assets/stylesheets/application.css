@@ -10,5 +10,6 @@
  *
  *= require_self
  *= require codemirror/codemirror.css
+ *= require eternicode/bootstrap-datepicker/datepicker.css
  *= require_tree .
  */
