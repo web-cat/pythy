@@ -1,18 +1,20 @@
-%h1 Listing Global Roles 
+%h1.no-border Global Roles 
 = render :partial => "flashbar"
-%table
-  %tr
-    %th Name
-    %th
-    %th
-    %th
-  - @global_roles.each do |global_role|
-    %tr
-      %td= global_role.name
-      %td= link_to 'Show', global_role
-      %td= link_to 'Edit', edit_global_role_path(global_role)
-      - if global_role.builtin?
-        %td.disabled Destroy
-      - else
-        %td= link_to 'Destroy', global_role, method: :delete, data: { confirm: 'Are you sure?' }
-= link_to 'New global role', new_global_role_path
+%table.table.table-striped
+  %tbody
+    - @global_roles.each do |global_role|
+      %tr
+        %td= global_role.name
+        %td= link_to 'Edit', edit_global_role_path(global_role), :class => 'btn'
+        - if global_role.builtin?
+          %td
+            %span.label Builtin
+        - else
+          %td
+            = link_to global_role, method: :delete, :class => 'btn btn-danger' do 
+              %i.icon-large.icon-trash 
+              Delete
+
+= link_to new_global_role_path, :class => 'btn btn-primary' do
+  %i.icon-plus
+  New global role

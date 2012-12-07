@@ -1,0 +1,10 @@
+%h1.no-border Users
+= render :partial => "flashbar"
+
+%p
+  %b Email:
+  = @user.email
+
+%p
+  %b Assigned Role:
+  = @user.global_role.name

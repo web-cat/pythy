@@ -1,0 +1,8 @@
+= twitter_bootstrap_form_for @user, :html => { :class => 'form-horizontal'} do |f|
+  = f.fieldset title do
+    = f.text_field :email, 'E-Mail'
+
+    = collection_select(:user, :global_role_id , GlobalRole.all, :id, :name , {:prompt => true})
+
+  = f.actions do 
+    = f.submit 'Save changes' 

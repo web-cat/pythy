@@ -5,6 +5,8 @@ class GlobalRole < ActiveRecord::Base
                   :builtin,
                   :name
 
+  validates_uniqueness_of :name
+
   before_destroy :check_builtin?
 
   ## make sure to run rake db:seed after initial database creation

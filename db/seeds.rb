@@ -3,6 +3,7 @@
 
 # Create a the two default roles -- these are both required
 # for user creation
+GlobalRole.delete_all
 GlobalRole.create!(:can_edit_system_configuration => true, 
                     :can_manage_all_courses => true,
                     :can_manage_own_courses => true,

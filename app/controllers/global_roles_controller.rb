@@ -44,7 +44,7 @@ class GlobalRolesController < ApplicationController
 
     respond_to do |format|
       if @global_role.save
-        format.html { redirect_to @global_role, notice: 'Global role was successfully created.' }
+        format.html { redirect_to global_roles_url, notice: 'Global role was successfully created.' }
         format.json { render json: @global_role, status: :created, location: @global_role }
       else
         format.html { render action: "new" }
@@ -60,7 +60,7 @@ class GlobalRolesController < ApplicationController
 
     respond_to do |format|
       if @global_role.update_attributes(params[:global_role])
-        format.html { redirect_to @global_role, notice: 'Global role was successfully updated.' }
+        format.html { redirect_to global_roles_url, notice: 'Global role was successfully updated.' }
         format.json { head :no_content }
       else
         format.html { render action: "edit" }
