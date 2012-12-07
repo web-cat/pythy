@@ -1,0 +1,19 @@
+- if departments.empty?
+  %p
+    This institution does not have any departments.
+- else
+  %table.table.table-striped.table-bordered
+    %thead
+      %tr
+        %th Department Name
+        %th Abbreviation
+        %th Actions
+    %tbody
+      - departments.each do |department|
+        %tr
+          %td= link_to department.name, department
+          %td= department.abbreviation
+          %td
+            = link_to 'Edit', edit_department_path(department)
+            |
+            = link_to 'Destroy', department, method: :delete, data: { confirm: 'Are you sure?' }
