@@ -1,1 +1,9 @@
-= render 'form', :title => 'Editing Global Role'
+%ul.breadcrumb
+  %li
+    = link_to 'Global Roles', global_roles_path
+    %span.divider /
+  %li.active
+    = @global_role.name
+    (editing)
+
+= render 'form'

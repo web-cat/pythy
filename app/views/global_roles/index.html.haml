@@ -1,15 +1,19 @@
-%h1 Listing Global Roles 
-= render :partial => "flashbar"
-%table
-  %tr
-    %th Name
-    %th
-    %th
-    %th
-  - @global_roles.each do |global_role|
+%ul.breadcrumb
+  %li.active
+    Global Roles
+  %li.pull-right
+    = link_to 'New...', new_global_role_path
+
+%table.table.table-striped.table-bordered
+  %thead
     %tr
-      %td= global_role.name
-      %td= link_to 'Show', global_role
-      %td= link_to 'Edit', edit_global_role_path(global_role)
-      %td= link_to 'Destroy', global_role, method: :delete, data: { confirm: 'Are you sure?' }
-= link_to 'New global role', new_global_role_path
+      %th Name
+      %th Actions
+  %tbody
+    - @global_roles.each do |role|
+      %tr
+        %td= link_to role.name, role
+        %td
+          = link_to 'Edit', edit_global_role_path(role)
+          |
+          = link_to 'Destroy', role, method: :delete, data: { confirm: 'Are you sure?' }
