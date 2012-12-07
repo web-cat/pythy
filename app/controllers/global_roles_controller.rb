@@ -73,11 +73,15 @@ class GlobalRolesController < ApplicationController
   # DELETE /global_roles/1.json
   def destroy
     @global_role = GlobalRole.find(params[:id])
-    @global_role.destroy
-
+    
     respond_to do |format|
-      format.html { redirect_to global_roles_url }
-      format.json { head :no_content }
+      if @global_role.destroy
+        format.html { redirect_to global_roles_url, :notice => "Role deleted successfully" }
+        format.json { head :no_content }
+      else
+        format.html { redirect_to global_roles_url, :notice => @global_role.errors[:base].to_s() }
+        format.json { head :no_content }
+      end
     end
   end
 end

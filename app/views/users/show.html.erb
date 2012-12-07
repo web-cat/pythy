@@ -6,10 +6,8 @@
 </p>
 
 <p>
-  <b>Assigned Roles:</b>
-  <% @user.global_roles.each do |role| %>
-    <%= role.name %>, 
-  <% end %>
+  <b>Assigned Role:</b>
+  <%= @user.global_role.name %>
 </p>
 
 <%= link_to 'Edit', edit_user_path(@user) %> |

@@ -11,5 +11,8 @@
       %td= global_role.name
       %td= link_to 'Show', global_role
       %td= link_to 'Edit', edit_global_role_path(global_role)
-      %td= link_to 'Destroy', global_role, method: :delete, data: { confirm: 'Are you sure?' }
+      - if global_role.builtin?
+        %td.disabled Destroy
+      - else
+        %td= link_to 'Destroy', global_role, method: :delete, data: { confirm: 'Are you sure?' }
 = link_to 'New global role', new_global_role_path

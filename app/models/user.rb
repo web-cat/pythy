@@ -7,8 +7,7 @@ class User < ActiveRecord::Base
 
   belongs_to  :institution
 
-  has_many    :role_assignments, :dependent => :destroy
-  has_many    :global_roles, :through => :role_assignments
+  belongs_to  :global_role
 
   has_many    :course_offering_students
   has_many    :enrolled_course_offerings,
@@ -29,7 +28,7 @@ class User < ActiveRecord::Base
 
   # Setup accessible (or protected) attributes for your model
   attr_accessible :username, :email, :password, :password_confirmation,
-    :remember_me, :global_role_ids
+    :remember_me, :global_role_id
 
   before_create :set_default_role
   before_save :get_ldap_email, :get_institution
@@ -48,9 +47,9 @@ class User < ActiveRecord::Base
   # as student (note: be sure to run rake db:seed to create these roles)
   def set_default_role
     if User.count == 0
-      self.global_roles << GlobalRole.where(:id => GlobalRole::ADMINISTRATOR_ID)
+      self.global_role_id = GlobalRole::ADMINISTRATOR_ID
     else
-      self.global_roles << GlobalRole.where(:id => GlobalRole::STUDENT_ID)
+      self.global_role_id = GlobalRole::STUDENT_ID
     end
   end
 
