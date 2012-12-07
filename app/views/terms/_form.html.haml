@@ -1,7 +1,7 @@
 = twitter_bootstrap_form_for @term, html: { class: 'form-horizontal' } do |f|
   = form_errors @term
 
-  = f.select :season, 'Season', Term::SEASON_NAMES
+  = f.select :season, 'Season', Term::SEASONS
   = f.text_field :year
   = f.date_select :starts_on
   = f.date_select :ends_on
