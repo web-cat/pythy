@@ -23,6 +23,7 @@ class User < ActiveRecord::Base
   # Include default devise modules. Others available are:
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
   # :timeoutable and :omniauthable
+
   # devise :ldap_authenticatable, :rememberable, :trackable, :validatable
   devise :registerable, :database_authenticatable, :rememberable, :trackable, :validatable
 
@@ -57,7 +58,9 @@ class User < ActiveRecord::Base
   # Populates the e-mail field from the LDAP directory entry once the user
   # has authenticated and his or her username is known.
   def get_ldap_email
+
     # self.email = Devise::LdapAdapter.get_ldap_param(self.username, 'mail')
+
   end
 
   # -------------------------------------------------------------

@@ -1,0 +1,2 @@
+class RegistratrionsController < Devise:RegistrationCrontroller
+end

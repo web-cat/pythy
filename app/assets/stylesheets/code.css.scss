@@ -1,3 +1,15 @@
 // Place all the styles related to the code controller here.
 // They will automatically be included in application.css.
 // You can use Sass (SCSS) here: http://sass-lang.com/
+
+.syntax-highlight{
+  background-color: YELLOW;
+}
+
+.error-marker{
+  color: #FF0000;
+}
+
+.empty{
+  background-color: NONE;
+}
