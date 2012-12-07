@@ -67,6 +67,8 @@ HTML
     end
   end
 
+
+  # -------------------------------------------------------------
   def nav_item_tag(destination)
     # %li{:class => ("active" if params[:controller] == 'home')}
     #   %a{:href => url_for(:controller => 'home')}
@@ -76,6 +78,12 @@ HTML
         yield
       end
     end
+  end
+
+
+  # -------------------------------------------------------------
+  def form_errors(model)
+    render partial: 'form_errors', locals: { model: model }
   end
 
 end
