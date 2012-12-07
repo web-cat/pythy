@@ -1,0 +1,10 @@
+- if model.errors.any?
+  .alert.alert-block.alert-danger
+    %h4
+      The
+      = model.class.name.humanize
+      could not be saved due to the following errors:
+
+    %ul
+      - model.errors.full_messages.each do |msg|
+        %li= msg
