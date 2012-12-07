@@ -1,0 +1,25 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Users', users_path
+    %span.divider /
+  %li.active
+    = @user.full_name
+  %li.pull-right
+    = link_to edit_user_path(@user) do
+      %i.icon-pencil
+      Edit
+
+%table.table
+  %tbody
+    %tr
+      %th Full Name
+      %td= @user.full_name
+    %tr
+      %th E-mail
+      %td= @user.email
+    %tr
+      %th Institution
+      %td= (link_to @user.institution.display_name, @user.institution) rescue '(none)'
+    %tr
+      %th Global Roles
+      %td= @user.global_roles.map { |role| role.name }.join(', ')

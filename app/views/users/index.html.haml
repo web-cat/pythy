@@ -1,0 +1,19 @@
+%ul.breadcrumb
+  %li.active
+    Users
+
+%table.table.table-striped.table-bordered
+  %thead
+    %tr
+      %th E-mail
+      %th Full Name
+      %th Actions
+  %tbody
+    - @users.each do |user|
+      %tr
+        %td= link_to user.email, user
+        %td= user.full_name
+        %td
+          = link_to 'Edit', edit_user_path(user)
+          |
+          = link_to 'Destroy', user, method: :delete, data: { confirm: 'Are you sure?' }
