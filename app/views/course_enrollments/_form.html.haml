@@ -1,0 +1,9 @@
+= twitter_bootstrap_form_for @course_enrollment, html: { class: 'form-horizontal' } do |f|
+  = form_errors @course_enrollment
+
+  = f.collection_select :user_id , 'User', User.all, :id, :email , :prompt => true
+  = f.collection_select :course_offering_id , 'Course', CourseOffering.all, :id, :label , :prompt => true
+  = f.collection_select :course_role_id , 'Role', CourseRole.all, :id, :name , :prompt => true
+
+  = f.actions do
+    = f.submit

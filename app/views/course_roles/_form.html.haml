@@ -1,0 +1,11 @@
+= twitter_bootstrap_form_for @course_role, html: { class: 'form-horizontal' } do |f|
+  = f.text_field :name, 'Name'
+
+  = f.label 'Permissions' do |controls|
+    = controls.check_box :can_manage_course, 'Modify course'
+    = controls.check_box :can_manage_assignments, 'Create and edit assignments'
+    = controls.check_box :can_grade_submissions, 'Grade student submissions'
+    = controls.check_box :can_view_other_submissions, 'View student submissions'
+
+  = f.actions do 
+    = f.submit

@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20121206145720) do
+ActiveRecord::Schema.define(:version => 20121212161741) do
 
   create_table "assignment_offerings", :force => true do |t|
     t.integer  "assignment_id"
@@ -39,6 +39,17 @@ ActiveRecord::Schema.define(:version => 20121206145720) do
     t.datetime "updated_at", :null => false
   end
 
+  create_table "course_enrollments", :force => true do |t|
+    t.integer "user_id"
+    t.integer "course_offering_id"
+    t.integer "course_role_id"
+  end
+
+  add_index "course_enrollments", ["course_offering_id"], :name => "index_course_enrollments_on_course_offering_id"
+  add_index "course_enrollments", ["course_role_id"], :name => "index_course_enrollments_on_course_role_id"
+  add_index "course_enrollments", ["user_id", "course_offering_id"], :name => "index_course_enrollments_on_user_id_and_course_offering_id", :unique => true
+  add_index "course_enrollments", ["user_id"], :name => "index_course_enrollments_on_user_id"
+
   create_table "course_offering_staff", :id => false, :force => true do |t|
     t.integer "course_offering_id"
     t.integer "user_id"
@@ -59,6 +70,15 @@ ActiveRecord::Schema.define(:version => 20121206145720) do
     t.string   "url"
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
+  end
+
+  create_table "course_roles", :force => true do |t|
+    t.string  "name",                                          :null => false
+    t.boolean "can_manage_course",          :default => false, :null => false
+    t.boolean "can_manage_assignments",     :default => false, :null => false
+    t.boolean "can_grade_submissions",      :default => false, :null => false
+    t.boolean "can_view_other_submissions", :default => false, :null => false
+    t.boolean "builtin",                    :default => false, :null => false
   end
 
   create_table "courses", :force => true do |t|

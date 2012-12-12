@@ -22,3 +22,26 @@ GlobalRole.create!(:can_edit_system_configuration => false,
                     :can_manage_own_courses => true,
                     :builtin => true,
                     :name => "Instructor")
+
+# Create the default course roles
+CourseRole.delete_all
+CourseRole.create!(:can_manage_course => true,
+                    :can_manage_assignments => true,
+                    :can_grade_submissions => true,
+                    :can_view_other_submissions => true,
+                    :builtin => true,
+                    :name => "Administrator (course)")
+
+CourseRole.create!(:can_manage_course => false,
+                    :can_manage_assignments => false,
+                    :can_grade_submissions => false,
+                    :can_view_other_submissions => false,
+                    :builtin => true,
+                    :name => "Student (course)")
+
+CourseRole.create!(:can_manage_course => false,
+                    :can_manage_assignments => true,
+                    :can_grade_submissions => true,
+                    :can_view_other_submissions => true,
+                    :builtin => true,
+                    :name => "Instructor (course)")

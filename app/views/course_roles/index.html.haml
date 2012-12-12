@@ -1,0 +1,22 @@
+%ul.breadcrumb
+  %li.active
+    Course-Specific Roles
+  %li.pull-right
+    = link_to 'New...', new_course_role_path
+
+= render :partial => "flashbar"
+
+%table.table.table-striped.table-bordered
+  %thead
+    %tr
+      %th Name
+      %th Actions
+  %tbody
+    - @course_roles.each do |role|
+      %tr
+        %td= link_to role.name, role
+        %td
+          = link_to 'Edit', edit_course_role_path(role)
+          - unless role.builtin?
+            |
+            = link_to 'Destroy', role, method: :delete, data: { confirm: 'Are you sure?' }
