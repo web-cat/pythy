@@ -3,13 +3,13 @@
 one:
   name: MyString
   description: MyText
-  can_manage_own_courses: false
+  can_create_courses: false
   can_manage_all_courses: false
   can_edit_system_configuration: false
 
 two:
   name: MyString
   description: MyText
-  can_manage_own_courses: false
+  can_create_courses: false
   can_manage_all_courses: false
   can_edit_system_configuration: false

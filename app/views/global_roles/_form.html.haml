@@ -2,7 +2,7 @@
   = f.text_field :name, 'Name'
 
   = f.label 'Permissions' do |controls|
-    = controls.check_box :can_manage_own_courses, 'Manage own courses'
+    = controls.check_box :can_create_courses, 'Create courses'
     = controls.check_box :can_manage_all_courses, 'Manage all courses'
     = controls.check_box :can_edit_system_configuration, 'Edit system configuration'
 

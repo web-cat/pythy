@@ -115,7 +115,7 @@ ActiveRecord::Schema.define(:version => 20121212161741) do
 
   create_table "global_roles", :force => true do |t|
     t.string  "name",                                             :null => false
-    t.boolean "can_manage_own_courses",        :default => false, :null => false
+    t.boolean "can_create_courses",            :default => false, :null => false
     t.boolean "can_manage_all_courses",        :default => false, :null => false
     t.boolean "can_edit_system_configuration", :default => false, :null => false
     t.boolean "builtin",                       :default => false, :null => false
