@@ -18,10 +18,10 @@
                  "Bitstream Vera Sans Mono", "Courier New", monospace;
 @textColor: @black;
 
-@linkColor: #566E1F;
+//@linkColor: #566E1F;
 
-@btnPrimaryBackground:              #638613;
-@btnPrimaryBackgroundHighlight:     darken(@btnPrimaryBackground, 10%);
+//@btnPrimaryBackground:              #638613;
+//@btnPrimaryBackgroundHighlight:     darken(@btnPrimaryBackground, 10%);
 
 // manual theme stuff (should this be elsewhere?)
 html, body {
@@ -143,6 +143,10 @@ body {
 
 .navbar-inverse .nav .active > a, .navbar-inverse .nav .active > a:hover, .navbar-inverse .nav .active > a:focus {
   background-color: rgba(0, 0, 0, 0.5);
+}
+
+.dropdown-menu .active > a, .dropdown-menu .active > a:hover {
+  color: rgba(255, 255, 255, 1.0);
 }
 
 /* font awesome tweaks */
