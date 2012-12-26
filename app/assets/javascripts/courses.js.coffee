@@ -1,3 +1,11 @@
-# Place all the behaviors and hooks related to the matching controller here.
-# All this logic will automatically be available in application.js.
-# You can use CoffeeScript in this file: http://jashkenas.github.com/coffee-script/
+$ ->
+  # -------------------------------------------------------------
+  # New/edit course: when a different department is selected in the select
+  # field, change the add-on span to the left of the course number field
+  # to the new department's abbreviation.
+  #
+  $('#course_department_id').change ->
+    department = $(this).val()
+    $.get '/departments/' + department + '.json', (data) ->
+      $('#course_number_control_group span.add-on').text(data.abbreviation)
+    , 'json'

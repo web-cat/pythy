@@ -1,0 +1,27 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Institutions', institutions_path
+    %span.divider /
+  %li
+    = link_to @department.institution.display_name, @department.institution
+    %span.divider /
+  %li
+    = link_to 'Departments', institution_departments_path(@department.institution)
+    %span.divider /
+  %li
+    = link_to @department.name, department_path(@department)
+    %span.divider /
+  %li
+    = link_to 'Courses', department_courses_path(@department)
+    %span.divider /
+  %li.active
+    = @course.department_name_and_number
+  %li.pull-right
+    = link_to edit_course_path(@course) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @course.department_name_and_number
+  %small
+    = @course.name

@@ -1,0 +1,19 @@
+- if courses.empty?
+  %p
+    This department does not have any courses.
+- else
+  %table.table.table-striped.table-bordered
+    %thead
+      %tr
+        %th Course Number
+        %th Title
+        %th Actions
+    %tbody
+      - courses.each do |course|
+        %tr
+          %td= link_to course.department_name_and_number, course
+          %td= course.name
+          %td
+            = link_to 'Edit', edit_course_path(course)
+            |
+            = link_to 'Destroy', course, method: :delete, data: { confirm: 'Are you sure?' }
