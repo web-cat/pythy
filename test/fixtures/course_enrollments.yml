@@ -1,0 +1,11 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+one:
+  user: 
+  course_offering: 
+  course_role: 
+
+two:
+  user: 
+  course_offering: 
+  course_role: 
