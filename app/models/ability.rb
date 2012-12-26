@@ -26,9 +26,9 @@ class Ability
       # in all other cases, the ability to manage a course depends on the user's
       # individual course role
       can :manage, CourseOffering do |course|
-        enrollement = CourseEnrollments.where(:user_id => user.id,
-                                              :course_id => course.id).first
-        enrollement.course_role.can_manage_course
+        enrollment = CourseEnrollments.where(:user_id => user.id,
+                                             :course_id => course.id).first
+        enrollment.course_role.can_manage_course
       end
       # # the user can only update themself
       # can :update, User do |target_user|
