@@ -1,0 +1,5 @@
+%li{ class: ('active' if current_page.first?) }
+  - if current_page.first?
+    %span= raw(t 'views.pagination.previous')
+  - else
+    = link_to raw(t 'views.pagination.previous'), url, rel: 'prev', remote: remote
