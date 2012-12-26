@@ -7,7 +7,7 @@ class ApplicationController < ActionController::Base
   end
 
   rescue_from CanCan::AccessDenied do |exception|
-    flash[:error] = "Access denied!"
+    flash[:error] = "You do not have access to that resource."
     redirect_to root_url
   end
 
