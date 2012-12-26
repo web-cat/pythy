@@ -2,10 +2,12 @@
 %html
   %head
     %title!= 'Pythy &ndash; Sign In'
-    = stylesheet_link_tag "application", :media => "all"
-    = javascript_include_tag "application"
+    = stylesheet_link_tag 'application', media: 'all'
+    = controller_stylesheet_link_tag
+    = javascript_include_tag 'application'
+    = controller_javascript_include_tag
     = csrf_meta_tags
   %body.landing
     #main-container.container
-      = render :partial => "flashbar"
+      = render partial: "flashbar"
       = yield
