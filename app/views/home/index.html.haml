@@ -1,38 +1,36 @@
-%body
+- if course_exists?
   .row-fluid
-    .row-fluid
-      .span7
-        %h3 Recent Work
-      .span5
-        %h3 Not Yet Started
-    .row-fluid
-      .btn.span7.project
-        %h4 Project 1
-        This is a description of Project 1.
-        %h5 9 out of 10 goals complete
-        .progress
-          .bar.bar-success{:style=>"width:90%;"}
-      .btn.span5.project
-        %h4 Project 4
-        This is a description of Project 4.
-        .alert.alert-error
-          Due in 1 hour, 23 minutes
-    .row-fluid
-      .btn.span7.project
-        %h4 Project 2
-        This is a description of Project 2.
-        %h5 5 out of 10 goals complete
-        .progress
-          .bar.bar-success{:style=>"width:50%;"}
-    .row-fluid
-      .btn.span7.project
-        %h4 Project 3
-        This is a description of Project 3.
-        %h5 1 out of 10 goals complete
-        .progress
-          .bar.bar-success{:style=>"width:10%;"} 
+    .span7
+      %h3 Recent Work
+      -# if recent work
+      = render partial: 'started_assignment'
+      = render partial: 'started_assignment'
+      -# else
+      %div.alert.alert-info
+        You haven't started any assignments yet in this course. As you
+        work on assignments, they will be listed here, with the most
+        recent work shown at the top.
 
-
-
-%footer
-  = link_to 'Sign out', destroy_user_session_path, :method => :delete
+    .span5
+      %h3 Not Yet Started
+      -# if assignments exist
+      = render partial: 'not_started_assignment'
+      = render partial: 'not_started_assignment'
+      -# else
+      %div.alert.alert-info
+        The course instructor hasn't made any assignments available yet.        
+      
+      %h3 Instructor Examples
+      -# if examples exist
+      %table.examples
+        %tbody
+          %tr
+            %td
+              %a{href: '#'} Linked Lists
+            %td
+              02/12/2013
+      -# else
+      %div.alert.alert-info
+        The course instructor hasn't made any examples available yet.
+- else
+  = render partial: 'not_found'
