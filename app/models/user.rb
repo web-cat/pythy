@@ -8,6 +8,7 @@ class User < ActiveRecord::Base
   belongs_to  :institution
 
   has_many    :authentications
+  has_many    :activity_logs
 
   has_many    :role_assignments, :dependent => :destroy
   has_many    :global_roles, :through => :role_assignments
@@ -32,12 +33,23 @@ class User < ActiveRecord::Base
     :recoverable, :trackable, :validatable
 
   # Setup accessible (or protected) attributes for your model
-  attr_accessible :username, :email, :password, :password_confirmation,
-    :remember_me, :global_role_ids
+  attr_accessible :full_name, :email, :password, :password_confirmation,
+    :remember_me, :global_role_ids, :institution_id
 
   before_create :set_default_role
-  before_save :get_ldap_email, :get_institution
+#  before_save :get_institution
 
+
+  #~ Class methods ............................................................
+
+  # -------------------------------------------------------------
+  def self.all_emails(prefix = '')
+    self.uniq.where(self.arel_table[:email].matches(
+      "#{prefix}%")).reorder('email asc').pluck(:email)
+  end
+
+
+  #~ Instance methods .........................................................
 
   # -------------------------------------------------------------
   # Returns true if the user is an admin, otherwise false.
@@ -46,34 +58,34 @@ class User < ActiveRecord::Base
   end
 
 
+  # -------------------------------------------------------------
+  # Gets the user's "display name", which is their full name if it is in the
+  # database, otherwise it is their e-mail address.
+  def display_name
+    full_name || email
+  end
+
+
   private
+
   # -------------------------------------------------------------
   # Sets the first user's role as administrator and subsequent users
   # as student (note: be sure to run rake db:seed to create these roles)
   def set_default_role
     if User.count == 0
-      self.global_roles << GlobalRole.where(:id => GlobalRole::ADMINISTRATOR_ID)
+      self.global_roles << GlobalRole.where(id: GlobalRole::ADMINISTRATOR_ID)
     else
-      self.global_roles << GlobalRole.where(:id => GlobalRole::STUDENT_ID)
+      self.global_roles << GlobalRole.where(id: GlobalRole::STUDENT_ID)
     end
-  end
-
-  # -------------------------------------------------------------
-  # Populates the e-mail field from the LDAP directory entry once the user
-  # has authenticated and his or her username is known.
-  def get_ldap_email
-
-    # self.email = Devise::LdapAdapter.get_ldap_param(self.username, 'mail')
-
   end
 
   # -------------------------------------------------------------
   # Populates the instition relationship by looking up an institution with
   # the e-mail domain of the user's e-mail address.
   def get_institution
-    if email =~ /@.*$/
+    if email =~ /@(.*)$/
       domain = $1
-      self.institution = Institution.where(:domain => domain).first
+      self.institution = Institution.where(domain: domain).first
     end
   end
 
