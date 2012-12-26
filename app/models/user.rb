@@ -44,13 +44,6 @@ class User < ActiveRecord::Base
   #~ Instance methods .........................................................
 
   # -------------------------------------------------------------
-  # Returns true if the user is an admin, otherwise false.
-  def admin?
-    role == 'admin'
-  end
-
-
-  # -------------------------------------------------------------
   # Gets the user's "display name", which is their full name if it is in the
   # database, otherwise it is their e-mail address.
   def display_name
