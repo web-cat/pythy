@@ -10,17 +10,41 @@ module ApplicationHelper
     User.count == 0
   end
   
+
   # -------------------------------------------------------------
   # Returns the correct twitter bootstrap class mapping for different
   # types of flash messages
   # 
   def flash_class(level)
     case level
-    when :notice then "alert-info"
-    when :error then "alert-error"
-    when :alert then ""
+    when :notice then 'alert-info'
+    when :error then 'alert-error'
+    when :alert then ''
     end
   end
+
+
+  # -------------------------------------------------------------
+  # Creates an <i> tag with the specified icon class.
+  #
+  # name: the icon class, without the 'icon-' prefix
+  #
+  def icon_tag(name)
+    content_tag :i, nil, class: "icon-#{name}"
+  end
+
+
+  # -------------------------------------------------------------
+  # Creates a Bootstrap close button, for alerts and such.
+  #
+  # Options:
+  #   dismiss: the surrounding element to dismiss, such as 'alert'
+  #
+  def close_button_tag(options = {})
+    content_tag :button, raw('&times;'), type: 'button', class: 'close',
+      data: { dismiss: options[:dismiss] }
+  end
+
 
   # Devise helpers
 
@@ -70,9 +94,6 @@ HTML
 
   # -------------------------------------------------------------
   def nav_item_tag(destination)
-    # %li{:class => ("active" if params[:controller] == 'home')}
-    #   %a{:href => url_for(:controller => 'home')}
-
     content_tag :li, :class => ('active' if params[:controller] == destination.to_s) do
       link_to :controller => destination do
         yield
