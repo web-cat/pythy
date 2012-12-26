@@ -130,12 +130,15 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
   end
 
   create_table "institutions", :force => true do |t|
-    t.string   "domain"
+    t.string   "abbreviation"
     t.string   "display_name"
+    t.string   "domain"
     t.datetime "created_at",   :null => false
     t.datetime "updated_at",   :null => false
-    t.string   "abbreviation"
   end
+
+  add_index "institutions", ["abbreviation"], :name => "index_institutions_on_abbreviation", :unique => true
+  add_index "institutions", ["domain"], :name => "index_institutions_on_domain", :unique => true
 
   create_table "projects", :force => true do |t|
     t.string   "name"
