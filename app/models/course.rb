@@ -21,7 +21,7 @@ class Course < ActiveRecord::Base
     if path =~ /(?<department>[a-z0-9]+)-(?<course_number>[a-z0-9]+)/
       nil
     else
-      where('1 == 0')
+      where('1 = 0')
     end
   end
 

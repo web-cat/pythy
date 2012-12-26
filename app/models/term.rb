@@ -41,7 +41,7 @@ class Term < ActiveRecord::Base
       year = $2
       where(season: season, year: year)
     else
-      where('1 == 0')
+      where('1 = 0')
     end
   end
 
