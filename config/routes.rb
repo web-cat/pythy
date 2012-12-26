@@ -11,6 +11,9 @@ Pythy::Application.routes.draw do
   resources :course_offerings
   resources :terms
 
+  match 'activity(/:action)', controller: 'activity_logs',
+    as: 'activity_logs'
+
   # Provide the initial setup routes if the User table is empty.
   scope constraints: ->(req) { needs_initial_setup? } do
     match 'setup(/:action)', controller: 'setup', as: 'setup'
@@ -19,8 +22,8 @@ Pythy::Application.routes.draw do
 
   # Routes for Devise authentication.
   devise_for :users, controllers: {
-    :sessions => 'sessions',
-    :registrations => 'registrations'
+    sessions: 'sessions',
+    registrations: 'registrations'
   }
 
   resources :users
@@ -36,6 +39,8 @@ Pythy::Application.routes.draw do
 
   # Route for viewing code.
   match 'code(/:action)', controller: 'code'
+
+  match 'home(/:institution(/:term(/:course)))' => 'home#index'
 
   # Default route when a user is logged in.
   authenticated :user do

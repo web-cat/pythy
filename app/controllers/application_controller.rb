@@ -1,4 +1,5 @@
 class ApplicationController < ActionController::Base
+
   layout :determine_layout
 
   rescue_from DeviseLdapAuthenticatable::LdapException do |exception|
@@ -7,10 +8,26 @@ class ApplicationController < ActionController::Base
 
   protect_from_forgery
 
-  # checks if a user is logged in, and chooses which layout to
-  # frame the application with
+
+  # -------------------------------------------------------------
+  # Logs a controller action to the database. Used for session logging as
+  # well as tracking other actions.
+  def log_event(info = nil)
+    if current_user
+      action = "#{controller_name}/#{action_name}"
+      log = ActivityLog.new(user: current_user, action: action, info: info)
+      log.save
+    end
+  end
+
+
   private
+
+  # -------------------------------------------------------------
+  # Checks if a user is logged in, and chooses which layout to
+  # frame the application with.
   def determine_layout
     current_user ? 'logged_in' : 'not_logged_in'
   end
+
 end
