@@ -1,5 +1,4 @@
-= twitter_bootstrap_form_for [@institution, @department], html: { class: 'form-horizontal' } do |f|
-  = form_errors @department
+= pythy_form_for @institution, @department do |f|
 
   = f.collection_select :institution_id, 'Institution', Institution.all, :id, :display_name, prompt: '(none)'
 

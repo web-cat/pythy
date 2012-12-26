@@ -11,7 +11,7 @@
   %li.active
     = @department.name
   %li.pull-right
-    = link_to edit_institution_department_path(@institution, @department) do
+    = link_to edit_department_path(@department) do
       %i.icon-pencil
       Edit...
 
@@ -21,3 +21,12 @@
     = @department.abbreviation
     at
     = @institution.display_name
+
+-# Table listing the departments belonging to the institution (and allowing
+-# them to be modified
+%h3
+  = link_to 'Courses', department_courses_path(@department)
+
+= render partial: 'courses/index', locals: { courses: @department.courses }
+.pull-right
+  = link_to 'Create a new course...', new_department_course_path(@department), class: 'btn btn-success'
