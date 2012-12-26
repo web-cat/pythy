@@ -47,6 +47,17 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.datetime "updated_at", :null => false
   end
 
+  create_table "course_enrollments", :force => true do |t|
+    t.integer "user_id"
+    t.integer "course_offering_id"
+    t.integer "course_role_id"
+  end
+
+  add_index "course_enrollments", ["course_offering_id"], :name => "index_course_enrollments_on_course_offering_id"
+  add_index "course_enrollments", ["course_role_id"], :name => "index_course_enrollments_on_course_role_id"
+  add_index "course_enrollments", ["user_id", "course_offering_id"], :name => "index_course_enrollments_on_user_id_and_course_offering_id", :unique => true
+  add_index "course_enrollments", ["user_id"], :name => "index_course_enrollments_on_user_id"
+
   create_table "course_offering_staff", :id => false, :force => true do |t|
     t.integer "course_offering_id"
     t.integer "user_id"
@@ -67,6 +78,15 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.string   "url"
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
+  end
+
+  create_table "course_roles", :force => true do |t|
+    t.string  "name",                                          :null => false
+    t.boolean "can_manage_course",          :default => false, :null => false
+    t.boolean "can_manage_assignments",     :default => false, :null => false
+    t.boolean "can_grade_submissions",      :default => false, :null => false
+    t.boolean "can_view_other_submissions", :default => false, :null => false
+    t.boolean "builtin",                    :default => false, :null => false
   end
 
   create_table "courses", :force => true do |t|
@@ -103,7 +123,7 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
 
   create_table "global_roles", :force => true do |t|
     t.string  "name",                                             :null => false
-    t.boolean "can_manage_own_courses",        :default => false, :null => false
+    t.boolean "can_create_courses",            :default => false, :null => false
     t.boolean "can_manage_all_courses",        :default => false, :null => false
     t.boolean "can_edit_system_configuration", :default => false, :null => false
     t.boolean "builtin",                       :default => false, :null => false
@@ -149,11 +169,6 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.string   "name"
   end
 
-  create_table "role_assignments", :force => true do |t|
-    t.integer "user_id"
-    t.integer "global_role_id"
-  end
-
   create_table "terms", :force => true do |t|
     t.integer  "year"
     t.integer  "season"
@@ -178,6 +193,7 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.datetime "updated_at",                             :null => false
     t.integer  "institution_id"
     t.string   "full_name"
+    t.integer  "global_role_id"
   end
 
   add_index "users", ["email"], :name => "index_users_on_email", :unique => true

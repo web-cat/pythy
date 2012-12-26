@@ -32,6 +32,10 @@ body {
   background: #393939 url('/assets/bg.png') top left repeat;
 }
 
+.navbar .brand {
+  background: transparent url('/assets/logo.png') top left no-repeat;
+}
+
 #main-container {
   background-color: white;
   color: black;
@@ -44,9 +48,34 @@ body {
   padding-top: 50px;
 }
 
+/* steal the bootstrap <legend> style for h1 because it looks nice */
+#main-container-inner h1 {
+  font-weight: normal;
+  display: block;
+  margin: 0 0 5px 0;
+  width: 100%;
+  padding: 0;
+  font-size: 21px;
+  line-height: 40px;
+  color: #333;
+  border: 0;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+#main-container-inner h1.no-border {
+  border-bottom: 0;
+  margin: 0;
+}
+
+
 /* font awesome tweaks */
 [class^="icon-"]::before, [class*=" icon-"]::before {
   font-weight: 400;
+}
+
+/* improve icon display on bootstrap buttons */
+.btn i {
+  padding-right: 5px;
 }
 
 /* twitter bootstrap responsive tweaks */
