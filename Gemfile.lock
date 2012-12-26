@@ -81,6 +81,8 @@ GEM
     delayed_job_active_record (0.3.3)
       activerecord (>= 2.1.0, < 4)
       delayed_job (~> 3.0)
+    delocalize (0.3.1)
+      rails (>= 3.0)
     devise (2.1.2)
       bcrypt-ruby (~> 3.0)
       orm_adapter (~> 0.1)
@@ -236,6 +238,7 @@ DEPENDENCIES
   daemon
   delayed_job
   delayed_job_active_record
+  delocalize
   devise
   devise_ldap_authenticatable!
   fastercsv
@@ -243,6 +246,7 @@ DEPENDENCIES
   haml (>= 3.1.4)
   jquery-rails
   json
+  kaminari
   less-rails
   mysql
   net-ldap

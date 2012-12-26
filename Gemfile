@@ -44,6 +44,8 @@ gem 'font-awesome-rails'
 gem 'delayed_job'
 gem 'delayed_job_active_record'
 gem 'daemon'
+gem 'delocalize'
+gem 'kaminari'
 
 gem 'omniauth'
 gem 'omniauth-facebook'
