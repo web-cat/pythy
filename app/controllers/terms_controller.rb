@@ -4,7 +4,7 @@ class TermsController < ApplicationController
   # GET /terms
   # GET /terms.json
   def index
-    @terms = Term.order('year asc, season asc')
+    @terms = Term.latest_first
 
     respond_to do |format|
       format.html # index.html.erb

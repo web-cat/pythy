@@ -13,7 +13,13 @@
   %tbody
     - @terms.each do |term|
       %tr
-        %td= link_to term.display_name, term
+        %td
+          - if term.contains_now?
+            %strong
+              = link_to term.display_name, term
+            (current)
+          - else
+            = link_to term.display_name, term
         %td
           = l term.starts_on
           to

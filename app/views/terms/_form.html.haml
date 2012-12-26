@@ -1,10 +1,12 @@
-= twitter_bootstrap_form_for @term, html: { class: 'form-horizontal' } do |f|
-  = form_errors @term
+= pythy_form_for @term do |f|
 
-  = f.select :season, 'Season', Term::SEASONS
-  = f.text_field :year
-  = f.date_select :starts_on
-  = f.date_select :ends_on
+  = f.label 'Season and Year' do |controls|
+    = controls.select :season, Term::SEASONS, {}, class: 'span2'
+    = controls.number_field :year, delimiter: '', class: 'span2'
+
+  = f.date_field :starts_on, class: 'span2'
+
+  = f.date_field :ends_on, class: 'span2'
 
   = f.actions do
     = f.submit
