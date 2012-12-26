@@ -10,8 +10,25 @@ class Course < ActiveRecord::Base
 
   attr_accessible :department_id, :name, :number
 
-  # Helper methods
+  validates :number, presence: true
+  validates :name, presence: true
 
+
+  #~ Class methods ............................................................
+
+  # -------------------------------------------------------------
+  def self.from_path_component(path)
+    if path =~ /(?<department>[a-z0-9]+)-(?<course_number>[a-z0-9]+)/
+      nil
+    else
+      where('1 == 0')
+    end
+  end
+
+
+  #~ Instance methods .........................................................
+
+  # -------------------------------------------------------------
   # Gets a string representing the short name of the course using its
   # department name and course number. For example, "CS 1064".
   #
