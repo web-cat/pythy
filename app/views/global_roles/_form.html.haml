@@ -1,4 +1,5 @@
-= twitter_bootstrap_form_for @global_role, html: { class: 'form-horizontal' } do |f|
+= pythy_form_for @global_role do |f|
+
   = f.text_field :name, 'Name'
 
   = f.label 'Permissions' do |controls|
