@@ -7,22 +7,13 @@ class User < ActiveRecord::Base
 
   belongs_to  :institution
 
+  belongs_to  :global_role
+  
   has_many    :authentications
   has_many    :activity_logs
 
-  has_many    :role_assignments, :dependent => :destroy
-  has_many    :global_roles, :through => :role_assignments
-
-  has_many    :course_offering_students
-  has_many    :enrolled_course_offerings,
-              :through => :course_offering_students,
-              :source => :course_offering
-
-  has_many    :course_offering_staff
-  has_many    :staffing_course_offerings,
-              :through => :course_offering_staff,
-              :source => :course_offering
-
+  has_many    :course_offerings, :through => :course_enrollments
+  has_many    :course_enrollments
 
   # Include default devise modules. Others available are:
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
@@ -35,6 +26,8 @@ class User < ActiveRecord::Base
   # Setup accessible (or protected) attributes for your model
   attr_accessible :full_name, :email, :password, :password_confirmation,
     :remember_me, :global_role_ids, :institution_id
+    :remember_me, :global_role_id, :full_name, :institution_id, 
+    :course_offerings, :course_enrollments
 
   before_create :set_default_role
 #  before_save :get_institution
@@ -76,6 +69,9 @@ class User < ActiveRecord::Base
       self.global_roles << GlobalRole.where(id: GlobalRole::ADMINISTRATOR_ID)
     else
       self.global_roles << GlobalRole.where(id: GlobalRole::STUDENT_ID)
+      self.global_role_id = GlobalRole::ADMINISTRATOR_ID
+    else
+      self.global_role_id = GlobalRole::STUDENT_ID
     end
   end
 

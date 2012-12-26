@@ -6,6 +6,11 @@ class ApplicationController < ActionController::Base
     render :text => exception, :status => 500
   end
 
+  rescue_from CanCan::AccessDenied do |exception|
+    flash[:error] = "Access denied!"
+    redirect_to root_url
+  end
+
   protect_from_forgery
 
 

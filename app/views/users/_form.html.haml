@@ -3,12 +3,7 @@
   = f.text_field :email
   = f.text_field :full_name
   = f.collection_select :institution_id, 'Institution', Institution.all, :id, :display_name, prompt: '(none)'
-
-  = f.label 'Global roles' do |controls|
-    - GlobalRole.all.each do |role|
-      %label.checkbox
-        = check_box_tag :global_role_ids, role.id, @user.global_roles.include?(role), name: 'user[global_role_ids][]'
-        = role.name
+  = f.collection_select :global_role_id , 'Global Role', GlobalRole.all, :id, :name , :prompt => true
 
   = f.actions do
     = f.submit
