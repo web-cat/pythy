@@ -1,8 +1,8 @@
-= twitter_bootstrap_form_for @institution, html: { class: 'form-horizontal' } do |f|
-  = form_errors @institution
+= pythy_form_for @institution do |f|
 
   = f.text_field :domain
   = f.text_field :display_name
+  = f.text_field :abbreviation
 
   = f.actions do
     = f.submit

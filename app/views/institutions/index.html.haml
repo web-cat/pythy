@@ -13,7 +13,9 @@
   %tbody
     - @institutions.each do |institution|
       %tr
-        %td= link_to institution.display_name, institution
+        %td
+          = link_to institution.display_name, institution
+          = "(#{institution.abbreviation})"
         %td= institution.domain
         %td
           = link_to 'Edit', edit_institution_path(institution)
