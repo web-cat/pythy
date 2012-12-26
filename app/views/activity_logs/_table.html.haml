@@ -1,0 +1,12 @@
+%table.table.table-striped.table-bordered.table-condensed
+  %thead
+    %tr
+      %th.span3 User
+      %th.span2 Action
+      %th.span2 Time
+      %th.span5 Extra Info
+  %tbody#activity_logs
+    = render @activity_logs
+
+#paginator
+  = paginate @activity_logs, remote: true

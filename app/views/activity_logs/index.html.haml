@@ -1,0 +1,13 @@
+%ul.breadcrumb
+  %li.active
+    Activity Log
+
+= filter_form do
+  %span.help-inline Filter:
+  = typeahead_field_tag :email, nil, placeholder: 'E-mail', url: users_path
+  = typeahead_field_tag :action_name, nil, placeholder: 'Action', url: activity_logs_path, submit: true
+  = link_to 'Clear', '#', id: 'reset-filter', class: 'btn'
+  = submit_tag 'Filter', class: 'btn btn-primary'
+
+#log-entries
+  = render partial: 'table'
