@@ -1,4 +1,5 @@
 - [:notice, :error, :alert].each do |level|
   - unless flash[level].blank?
     .alert{:class => flash_class(level)}
+      = close_button_tag dismiss: 'alert'
       = flash[level]
