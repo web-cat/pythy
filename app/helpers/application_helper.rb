@@ -86,4 +86,78 @@ HTML
     render partial: 'form_errors', locals: { model: model }
   end
 
+
+  # -------------------------------------------------------------
+  def shallow_args(parent, child)
+    child.try(:new_record?) ? [parent, child] : child
+  end
+
+
+  # -------------------------------------------------------------
+  # Outputs a Twitter Bootstrap form with .form-horizontal, including an
+  # error alert at the top (if there are any model errors), and handling
+  # shallow nested arguments gracefully (in the case of new vs. edit).
+  def pythy_form_for(*args, &block)
+    if args.length == 2
+      parent = args[0]
+      child = args[1]
+      form_args = child.try(:new_record?) ? [parent, child] : child
+    else
+      parent = nil
+      child = args[0]
+      form_args = child
+    end
+
+    capture do
+      twitter_bootstrap_form_for(form_args,
+        html: { class: 'form-horizontal' }) do |f|
+        concat form_errors child
+        yield f
+      end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  # Creates a text field with Twitter Bootstrap typeahead functionality.
+  #
+  # Options:
+  #   url: the URL that will return a JSON array of entries for the field;
+  #        it will be sent a parameter named "query" with the contents of
+  #        the field
+  #   submit: true to submit the parent form when an item is selected from
+  #           the typeahead list
+  #
+  def typeahead_field_tag(name, value = nil, options = {})
+    data = options['data'] || {}
+    data.merge! provide: 'typeahead'
+    data.merge! url: options.delete(:url)
+    data.merge! submit: options.delete(:submit) && 'yes'
+    options['data'] = data
+
+    if options['class']
+      options['class'] += ' typeahead'
+    else
+      options['class'] = 'typeahead'
+    end
+
+    options['autocomplete'] = 'off'
+
+    text_field_tag name, value, options
+  end
+
+
+  # -------------------------------------------------------------
+  def controller_stylesheet_link_tag
+    c = params[:controller]
+    stylesheet_link_tag c if Rails.application.assets.find_asset("#{c}.css")
+  end
+
+
+  # -------------------------------------------------------------
+  def controller_javascript_include_tag
+    c = params[:controller]
+    javascript_include_tag c if Rails.application.assets.find_asset("#{c}.js")
+  end
+
 end
