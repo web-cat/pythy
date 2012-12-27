@@ -52,10 +52,8 @@
                 %i.icon-caret-down
               %ul.dropdown-menu
                 %li.nav-header Configure
-                %li
-                  = link_to 'Users', users_path
-                %li
-                  = link_to 'Global roles', global_roles_path 
+                = menu_link_to_if can?(:manage, User), 'Users', users_path
+                = menu_link_to_if can?(:manage, GlobalRole), 'Global Roles', global_roles_path
                 %li
                   %a{href: "#"} Course-specific roles 
                 %li
@@ -81,4 +79,5 @@
                       Sign out 
     #main-container.container
       #main-container-inner
+        = render partial: 'flashbar'
         = yield
