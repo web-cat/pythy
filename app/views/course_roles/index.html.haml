@@ -1,22 +1,36 @@
 %ul.breadcrumb
   %li.active
-    Course-Specific Roles
+    Course Roles
   %li.pull-right
     = link_to 'New...', new_course_role_path
 
-= render :partial => "flashbar"
+%h2 Course Roles
+%p
+  Course roles are used to control the permissions that users have
+  in each of their courses. For example, a user can be a grader in
+  one course but a student in another.
 
 %table.table.table-striped.table-bordered
   %thead
     %tr
-      %th Name
-      %th Actions
+      %th.span3 Name
+      %th.span2 Can manage course?
+      %th.span2 Can manage assignments?
+      %th.span2 Can grade assignments?
+      %th.span2 Can view other users' work?
+      %th.span1= icon_tag('cog')
   %tbody
     - @course_roles.each do |role|
       %tr
-        %td= link_to role.name, role
         %td
-          = link_to 'Edit', edit_course_role_path(role)
+          = link_to role.name, role
+          - if role.builtin?
+            %span.muted (built-in)
+        %td= checkmark_if role.can_manage_course?
+        %td= checkmark_if role.can_manage_assignments?
+        %td= checkmark_if role.can_grade_submissions?
+        %td= checkmark_if role.can_view_other_submissions?
+        %td
+          = link_to icon_tag('pencil'), edit_course_role_path(role)
           - unless role.builtin?
-            |
-            = link_to 'Destroy', role, method: :delete, data: { confirm: 'Are you sure?' }
+            = link_to_destroy role

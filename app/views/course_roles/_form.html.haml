@@ -2,10 +2,13 @@
   = f.text_field :name, 'Name'
 
   = f.label 'Permissions' do |controls|
-    = controls.check_box :can_manage_course, 'Modify course'
-    = controls.check_box :can_manage_assignments, 'Create and edit assignments'
-    = controls.check_box :can_grade_submissions, 'Grade student submissions'
-    = controls.check_box :can_view_other_submissions, 'View student submissions'
+    = controls.check_box :can_manage_course, 'Modify course', disabled: @course_role.builtin?
+    = controls.check_box :can_manage_assignments, 'Create and edit assignments', disabled: @course_role.builtin?
+    = controls.check_box :can_grade_submissions, 'Grade other students\' work', disabled: @course_role.builtin?
+    = controls.check_box :can_view_other_submissions, 'View other students\' work', disabled: @course_role.builtin?
+    - if @course_role.builtin?
+      %span.help-block
+        Permissions cannot be changed for built-in roles.
 
   = f.actions do 
     = f.submit

@@ -2,12 +2,19 @@ class CourseRole < ActiveRecord::Base
 
   attr_accessible :name,
                   :builtin,
-                  :can_grade_submissions,
-                  :can_manage_assignments,
                   :can_manage_course,
+                  :can_manage_assignments,
+                  :can_grade_submissions,
                   :can_view_other_submissions
 
-  validates :name, uniqueness: true
+  validates :name, presence: true, uniqueness: true
+  
+  with_options if: :builtin?, on: :update, changeable: false do |builtin|
+    builtin.validates :can_manage_course
+    builtin.validates :can_manage_assignments
+    builtin.validates :can_grade_submissions
+    builtin.validates :can_view_other_submissions
+  end
 
   before_destroy :check_builtin?
 
