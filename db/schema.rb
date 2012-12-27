@@ -58,18 +58,6 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
   add_index "course_enrollments", ["user_id", "course_offering_id"], :name => "index_course_enrollments_on_user_id_and_course_offering_id", :unique => true
   add_index "course_enrollments", ["user_id"], :name => "index_course_enrollments_on_user_id"
 
-  create_table "course_offering_staff", :id => false, :force => true do |t|
-    t.integer "course_offering_id"
-    t.integer "user_id"
-    t.boolean "manager"
-    t.integer "title"
-  end
-
-  create_table "course_offering_students", :id => false, :force => true do |t|
-    t.integer "course_offering_id"
-    t.integer "user_id"
-  end
-
   create_table "course_offerings", :force => true do |t|
     t.integer  "course_id"
     t.integer  "term_id"
@@ -117,6 +105,7 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.integer  "institution_id"
     t.string   "name"
     t.string   "abbreviation"
+    t.string   "url_part"
     t.datetime "created_at",     :null => false
     t.datetime "updated_at",     :null => false
   end
@@ -130,9 +119,10 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
   end
 
   create_table "institutions", :force => true do |t|
-    t.string   "abbreviation"
     t.string   "display_name"
     t.string   "domain"
+    t.string   "abbreviation"
+    t.string   "url_part"
     t.datetime "created_at",   :null => false
     t.datetime "updated_at",   :null => false
   end
