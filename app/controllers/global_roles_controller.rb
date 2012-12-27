@@ -1,5 +1,8 @@
 class GlobalRolesController < ApplicationController
+
   load_and_authorize_resource
+
+  # -------------------------------------------------------------
   # GET /global_roles
   # GET /global_roles.json
   def index
@@ -9,6 +12,8 @@ class GlobalRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /global_roles/1
   # GET /global_roles/1.json
   def show
@@ -18,6 +23,8 @@ class GlobalRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /global_roles/new
   # GET /global_roles/new.json
   def new
@@ -27,10 +34,14 @@ class GlobalRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /global_roles/1/edit
   def edit
   end
 
+
+  # -------------------------------------------------------------
   # POST /global_roles
   # POST /global_roles.json
   def create
@@ -45,6 +56,8 @@ class GlobalRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # PUT /global_roles/1
   # PUT /global_roles/1.json
   def update
@@ -59,6 +72,8 @@ class GlobalRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # DELETE /global_roles/1
   # DELETE /global_roles/1.json
   def destroy
@@ -72,4 +87,5 @@ class GlobalRolesController < ApplicationController
       end
     end
   end
+
 end
