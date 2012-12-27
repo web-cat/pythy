@@ -103,6 +103,16 @@ HTML
 
 
   # -------------------------------------------------------------
+  def menu_link_to_if(condition, text, url, options = {})
+    if condition
+      content_tag :li do
+        link_to text, url, options
+      end
+    end
+  end
+
+
+  # -------------------------------------------------------------
   def form_errors(model)
     render partial: 'form_errors', locals: { model: model }
   end
@@ -179,6 +189,16 @@ HTML
   def controller_javascript_include_tag
     c = params[:controller]
     javascript_include_tag c if Rails.application.assets.find_asset("#{c}.js")
+  end
+
+
+  # -------------------------------------------------------------
+  def link_to_destroy(resource)
+    name = resource.class.name.humanize
+    link_to icon_tag('remove'), resource, method: :delete, data: {
+      confirm: "Are you sure you want to delete this #{name}?",
+      :'yes-class' => 'danger',
+    }
   end
 
 end
