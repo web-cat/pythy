@@ -4,27 +4,32 @@
   %li.pull-right
     = link_to 'New...', new_term_path
 
-%table.table.table-striped.table-bordered
-  %thead
-    %tr
-      %th Season and Year
-      %th Time Period
-      %th Actions
-  %tbody
-    - @terms.each do |term|
+- if @terms.empty?
+  %div.alert
+    You have not yet created any terms.
+    = link_to new_term_path do
+      Click here to create one.
+- else
+  %table.table.table-striped.table-bordered
+    %thead
       %tr
-        %td
-          - if term.contains_now?
-            %strong
+        %th.span6 Season and Year
+        %th.span5 Time Period
+        %th.span1= icon_tag('cog')
+    %tbody
+      - @terms.each do |term|
+        %tr
+          %td
+            - if term.contains_now?
+              %strong
+                = link_to term.display_name, term
+              (current)
+            - else
               = link_to term.display_name, term
-            (current)
-          - else
-            = link_to term.display_name, term
-        %td
-          = l term.starts_on
-          to
-          = l term.ends_on
-        %td
-          = link_to 'Edit', edit_term_path(term)
-          |
-          = link_to 'Destroy', term, method: :delete, data: { confirm: 'Are you sure?' }
+          %td
+            = l term.starts_on
+            to
+            = l term.ends_on
+          %td
+            = link_to icon_tag('pencil'), edit_term_path(term)
+            = link_to_destroy term
