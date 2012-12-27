@@ -1,13 +1,13 @@
 class CoursesController < ApplicationController
 
+  load_and_authorize_resource :department
+  load_and_authorize_resource :course,
+    through: :department, shallow: true
+
   # -------------------------------------------------------------
   # GET /courses
   # GET /courses.json
   def index
-    @department = Department.find(params[:department_id])
-
-    @courses = Course.all
-
     respond_to do |format|
       format.html # index.html.erb
       format.json { render json: @courses }
@@ -19,9 +19,6 @@ class CoursesController < ApplicationController
   # GET /courses/1
   # GET /courses/1.json
   def show
-    @course = Course.find(params[:id])
-    @department = @course.department
-
     respond_to do |format|
       format.html # show.html.erb
       format.json { render json: @course }
@@ -33,11 +30,6 @@ class CoursesController < ApplicationController
   # GET /courses/new
   # GET /courses/new.json
   def new
-    @department = Department.find(params[:department_id])
-    
-    @course = @department ?
-      @department.courses.build : Course.new
-
     respond_to do |format|
       format.html # new.html.erb
       format.json { render json: @course }
@@ -48,8 +40,6 @@ class CoursesController < ApplicationController
   # -------------------------------------------------------------
   # GET /courses/1/edit
   def edit
-    @course = Course.find(params[:id])
-    @department = @course.department
   end
 
 
@@ -57,9 +47,6 @@ class CoursesController < ApplicationController
   # POST /courses
   # POST /courses.json
   def create
-    @course = Course.new(params[:course])
-    @department = @course.department
-
     respond_to do |format|
       if @course.save
         format.html { redirect_to @course, notice: 'Course was successfully created.' }
@@ -76,9 +63,6 @@ class CoursesController < ApplicationController
   # PUT /courses/1
   # PUT /courses/1.json
   def update
-    @course = Course.find(params[:id])
-    @department = @course.department
-
     respond_to do |format|
       if @course.update_attributes(params[:course])
         format.html { redirect_to @course, notice: 'Course was successfully updated.' }
@@ -95,12 +79,10 @@ class CoursesController < ApplicationController
   # DELETE /courses/1
   # DELETE /courses/1.json
   def destroy
-    @course = Course.find(params[:id])
-    @department = @course.department
     @course.destroy
 
     respond_to do |format|
-      format.html { redirect_to department_courses_url(@department) }
+      format.html { redirect_to department_courses_url(@course.department) }
       format.json { head :no_content }
     end
   end

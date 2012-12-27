@@ -1,10 +1,10 @@
-= pythy_form_for @department, @course do |f|
+= pythy_form_for @course.department, @course do |f|
 
   = f.collection_select :department_id, 'Department', Department.all, :id, :name, prompt: '(none)'
 
   = f.text_field :number, add_on: :prepend do
     %span.add-on
-      = @department.abbreviation
+      = @course.department.abbreviation
 
   = f.text_field :name, class: 'span6' do
     %span.help-block

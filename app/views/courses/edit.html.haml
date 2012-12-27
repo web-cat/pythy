@@ -3,16 +3,16 @@
     = link_to 'Institutions', institutions_path
     %span.divider /
   %li
-    = link_to @department.institution.display_name, @department.institution
+    = link_to @course.department.institution.display_name, @course.department.institution
     %span.divider /
   %li
-    = link_to 'Departments', institution_departments_path(@department.institution)
+    = link_to 'Departments', institution_departments_path(@course.department.institution)
     %span.divider /
   %li
-    = link_to @department.name, department_path(@department)
+    = link_to @course.department.name, department_path(@course.department)
     %span.divider /
   %li
-    = link_to 'Courses', department_courses_path(@department)
+    = link_to 'Courses', department_courses_path(@course.department)
     %span.divider /
   %li.active
     = @course.department_name_and_number

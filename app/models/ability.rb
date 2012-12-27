@@ -9,9 +9,11 @@ class Ability
         can :manage, CourseRole
         can :manage, GlobalRole
         can :manage, Institution
+        can :manage, Department
       end
 
       if user.global_role.can_manage_all_courses
+        can :manage, Course
         can :manage, CourseOffering
       end
 
