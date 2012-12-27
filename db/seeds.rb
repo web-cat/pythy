@@ -1,47 +1,61 @@
 # Populates the database with a set of default data necessary for proper
 # operation
 
-# Create a the two default roles -- these are both required
-# for user creation
+# ---------------------------------------------------------------
+# Create the default built-in roles. The order of these must match the
+# order of the IDs in models/global_role.rb.
+#
 GlobalRole.delete_all
-GlobalRole.create!(:can_edit_system_configuration => true, 
-                    :can_manage_all_courses => true,
-                    :can_create_courses => true,
-                    :builtin => true,
-                    :name => "Administrator")
 
-GlobalRole.create!(:can_edit_system_configuration => false, 
-                    :can_manage_all_courses => false,
-                    :can_create_courses => false,
-                    :builtin => true,
-                    :name => "Student")
+GlobalRole.create!(name:                          'Administrator',
+                   builtin:                       true,
+                   can_edit_system_configuration: true,
+                   can_manage_all_courses:        true,
+                   can_create_courses:            true)
 
-# The instructor role is not required, but is handy in practice
-GlobalRole.create!(:can_edit_system_configuration => false, 
-                    :can_manage_all_courses => false,
-                    :can_create_courses => true,
-                    :builtin => true,
-                    :name => "Instructor")
+GlobalRole.create!(name:                          'Instructor',
+                   builtin:                       true,
+                   can_edit_system_configuration: false,
+                   can_manage_all_courses:        false,
+                   can_create_courses:            true)
 
-# Create the default course roles
+GlobalRole.create!(name:                          'Regular User',
+                   builtin:                       true,
+                   can_edit_system_configuration: false,
+                   can_manage_all_courses:        false,
+                   can_create_courses:            false)
+
+
+# ---------------------------------------------------------------
+# Create the default course roles. The order of these must match the
+# order of the IDs in models/course_role.rb.
+#
 CourseRole.delete_all
-CourseRole.create!(:can_manage_course => true,
-                    :can_manage_assignments => true,
-                    :can_grade_submissions => true,
-                    :can_view_other_submissions => true,
-                    :builtin => true,
-                    :name => "Administrator (course)")
 
-CourseRole.create!(:can_manage_course => false,
-                    :can_manage_assignments => false,
-                    :can_grade_submissions => false,
-                    :can_view_other_submissions => false,
-                    :builtin => true,
-                    :name => "Student (course)")
+CourseRole.create!(name:                       'Lead Instructor',
+                   builtin:                    true,
+                   can_manage_course:          true,
+                   can_manage_assignments:     true,
+                   can_grade_submissions:      true,
+                   can_view_other_submissions: true)
 
-CourseRole.create!(:can_manage_course => false,
-                    :can_manage_assignments => true,
-                    :can_grade_submissions => true,
-                    :can_view_other_submissions => true,
-                    :builtin => true,
-                    :name => "Instructor (course)")
+CourseRole.create!(name:                       'Instructor',
+                   builtin:                    true,
+                   can_manage_course:          false,
+                   can_manage_assignments:     true,
+                   can_grade_submissions:      true,
+                   can_view_other_submissions: true)
+
+CourseRole.create!(name:                       'Grader',
+                   builtin:                    true,
+                   can_manage_course:          false,
+                   can_manage_assignments:     false,
+                   can_grade_submissions:      true,
+                   can_view_other_submissions: true)
+
+CourseRole.create!(name:                       'Student',
+                   builtin:                    true,
+                   can_manage_course:          false,
+                   can_manage_assignments:     false,
+                   can_grade_submissions:      false,
+                   can_view_other_submissions: false)

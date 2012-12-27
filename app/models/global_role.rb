@@ -1,21 +1,47 @@
 class GlobalRole < ActiveRecord::Base
 
-  attr_accessible :can_edit_system_configuration, 
-                  :can_manage_all_courses,
-                  :can_create_courses,
+  attr_accessible :name,
                   :builtin,
-                  :name
+                  :can_edit_system_configuration, 
+                  :can_manage_all_courses,
+                  :can_create_courses
 
-  validates_uniqueness_of :name
+  validates :name, uniqueness: true
 
   before_destroy :check_builtin?
 
-  ## make sure to run rake db:seed after initial database creation
-  #  to ensure that these IDs are accurate
-  ADMINISTRATOR_ID = 1
-  STUDENT_ID = 2
-  INSTRUCTOR_ID = 3
 
+  # Make sure to run rake db:seed after initial database creation
+  # to ensure that the built-in roles with these IDs are created.
+  # These IDs should not be referred to directly in most cases;
+  # use the class methods below to fetch the actual role object
+  # instead.
+  ADMINISTRATOR_ID = 1
+  INSTRUCTOR_ID    = 2
+  REGULAR_USER_ID  = 3
+
+
+  #~ Class methods ............................................................
+
+  # -------------------------------------------------------------
+  def self.administrator
+    find(ADMINISTRATOR_ID)
+  end
+
+
+  # -------------------------------------------------------------
+  def self.instructor
+    find(INSTRUCTOR_ID)
+  end
+
+
+  # -------------------------------------------------------------
+  def self.regular_user
+    find(REGULAR_USER_ID)
+  end
+
+
+  #~ Instance methods .........................................................
 
   # -------------------------------------------------------------
   def check_builtin?

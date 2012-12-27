@@ -58,9 +58,9 @@ class User < ActiveRecord::Base
   # as student (note: be sure to run rake db:seed to create these roles)
   def set_default_role
     if User.count == 0
-      self.global_role_id = GlobalRole::ADMINISTRATOR_ID
+      self.global_role = GlobalRole.administrator
     else
-      self.global_role_id = GlobalRole::STUDENT_ID
+      self.global_role = GlobalRole.regular_user
     end
   end
 
