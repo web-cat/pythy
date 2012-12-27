@@ -66,10 +66,6 @@ window.pythy =
         var oldAllowAction = $.rails.allowAction;
         $.rails.allowAction = function() { return true; };
         element.trigger('click');
-        if (element.is('a') && !element.data('remote'))
-        {
-          window.location = element.attr('href');
-        }
         $.rails.allowAction = oldAllowAction;
       }
     });
