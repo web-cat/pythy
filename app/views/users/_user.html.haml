@@ -1,0 +1,7 @@
+%tr
+  %td= link_to user.email, user
+  %td= full_name_or_none(user, muted: true)
+  %td= user.global_role.name
+  %td
+    = link_to icon_tag('pencil'), edit_user_path(user)
+    = link_to_destroy user

@@ -5,15 +5,9 @@
 %table.table.table-striped.table-bordered
   %thead
     %tr
-      %th E-mail
-      %th Full Name
-      %th Actions
+      %th.span4 E-mail
+      %th.span4 Full Name
+      %th.span3 Role
+      %th.span1= icon_tag('cog')
   %tbody
-    - @users.each do |user|
-      %tr
-        %td= link_to user.email, user
-        %td= user.full_name
-        %td
-          = link_to 'Edit', edit_user_path(user)
-          |
-          = link_to 'Destroy', user, method: :delete, data: { confirm: 'Are you sure?' }
+    = render @users

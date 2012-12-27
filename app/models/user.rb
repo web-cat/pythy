@@ -47,7 +47,7 @@ class User < ActiveRecord::Base
   # Gets the user's "display name", which is their full name if it is in the
   # database, otherwise it is their e-mail address.
   def display_name
-    full_name || email
+    full_name.blank? ? email : full_name
   end
 
 
