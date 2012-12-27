@@ -47,7 +47,7 @@ Pythy::Application.routes.draw do
 
   # Default route when a user is logged in.
   authenticated :user do
-    root to: 'home#index'
+    root to: redirect('/home')
   end
 
   # Default route when a user is not logged in.
