@@ -9,7 +9,7 @@
     %tr
       %th Display Name
       %th Domain
-      %th Actions
+      %th= icon_tag('cog')
   %tbody
     - @institutions.each do |institution|
       %tr
@@ -18,6 +18,5 @@
           = "(#{institution.abbreviation})"
         %td= institution.domain
         %td
-          = link_to 'Edit', edit_institution_path(institution)
-          |
-          = link_to 'Destroy', institution, method: :delete, data: { confirm: 'Are you sure?' }
+          = link_to icon_tag('pencil'), edit_institution_path(institution)
+          = link_to_destroy institution

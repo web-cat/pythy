@@ -5,7 +5,35 @@ class Institution < ActiveRecord::Base
 
   attr_accessible :display_name, :domain, :abbreviation
 
-  validates :abbreviation, uniqueness: { case_sensitive: false }
-  validates :domain, uniqueness: { case_sensitive: false }
+  before_validation :set_url_part
+
+  #~ Validation ...............................................................
+
+  validates :abbreviation,
+    format: {
+      with: /[a-zA-Z0-9\-_.]+/,
+      message: 'must contain only [a-zA-Z0-9-_.] only'
+    },
+    uniqueness: { case_sensitive: false }
+
+  validates :display_name, presence: true
+  
+  validates :domain, presence: true, uniqueness: { case_sensitive: false }
+  
+  validates :url_part,
+    presence: true,
+    uniqueness: {
+      case_sensitive: false
+    }
+
+
+  #~ Instance methods .........................................................
+
+  private
+
+  # -------------------------------------------------------------
+  def set_url_part
+    self.url_part = url_part_safe(abbreviation)
+  end
 
 end

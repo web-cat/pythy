@@ -1,3 +1,13 @@
-# Place all the behaviors and hooks related to the matching controller here.
-# All this logic will automatically be available in application.js.
-# You can use CoffeeScript in this file: http://jashkenas.github.com/coffee-script/
+$ ->
+  updateHelpText = ->
+    val = $('#institution_abbreviation').val()
+    if val
+      part = pythy.url_part_safe(val)
+      $('#url_part').text("This institution will appear in URLs like .../#{part}/...").show()
+    else
+      $('#url_part').hide()
+
+  $('#institution_abbreviation').keyup -> updateHelpText()
+  $('#institution_abbreviation').change -> updateHelpText()
+
+  updateHelpText()

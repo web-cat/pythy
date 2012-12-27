@@ -4,7 +4,7 @@ class CreateDepartments < ActiveRecord::Migration
       t.integer :institution_id
       t.string :name
       t.string :abbreviation
-
+      t.string :url_part
       t.timestamps
     end
   end

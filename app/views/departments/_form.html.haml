@@ -1,4 +1,4 @@
-= pythy_form_for @institution, @department do |f|
+= pythy_form_for @department.institution, @department do |f|
 
   = f.collection_select :institution_id, 'Institution', Institution.all, :id, :display_name, prompt: '(none)'
 

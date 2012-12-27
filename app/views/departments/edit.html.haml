@@ -3,10 +3,10 @@
     = link_to 'Institutions', institutions_path
     %span.divider /
   %li
-    = link_to @institution.display_name, @institution
+    = link_to @department.institution.display_name, @institution
     %span.divider /
   %li
-    = link_to 'Departments', institution_departments_path(@institution)
+    = link_to 'Departments', institution_departments_path(@department.institution)
     %span.divider /
   %li.active
     = @department.name

@@ -1,19 +1,20 @@
 - if departments.empty?
-  %p
+  %div.alert
     This institution does not have any departments.
+    = link_to new_institution_department_path(@institution) do
+      Click here to create one.
 - else
   %table.table.table-striped.table-bordered
     %thead
       %tr
-        %th Department Name
-        %th Abbreviation
-        %th Actions
+        %th.span7 Department Name
+        %th.span4 Abbreviation
+        %th.span1= icon_tag('cog')
     %tbody
       - departments.each do |department|
         %tr
           %td= link_to department.name, department
           %td= department.abbreviation
           %td
-            = link_to 'Edit', edit_department_path(department)
-            |
-            = link_to 'Destroy', department, method: :delete, data: { confirm: 'Are you sure?' }
+            = link_to icon_tag('pencil'), edit_department_path(department)
+            = link_to_destroy department
