@@ -201,4 +201,11 @@ HTML
     }
   end
 
+
+  # -------------------------------------------------------------
+  def checkmark_if(value)
+    #icon_tag(value ? 'check' : 'check-empty')
+    value && content_tag(:span, raw('&#10003;'), class: 'label label-success') || ''
+  end
+
 end
