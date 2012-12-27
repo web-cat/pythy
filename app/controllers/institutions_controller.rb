@@ -1,5 +1,11 @@
 class InstitutionsController < ApplicationController
+
   load_and_authorize_resource
+
+
+  #~ Instance methods .........................................................
+
+  # -------------------------------------------------------------
   # GET /institutions
   # GET /institutions.json
   def index
@@ -9,6 +15,8 @@ class InstitutionsController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /institutions/1
   # GET /institutions/1.json
   def show
@@ -18,6 +26,8 @@ class InstitutionsController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /institutions/new
   # GET /institutions/new.json
   def new
@@ -27,10 +37,14 @@ class InstitutionsController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /institutions/1/edit
   def edit
   end
 
+
+  # -------------------------------------------------------------
   # POST /institutions
   # POST /institutions.json
   def create
@@ -45,6 +59,8 @@ class InstitutionsController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # PUT /institutions/1
   # PUT /institutions/1.json
   def update
@@ -59,6 +75,8 @@ class InstitutionsController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # DELETE /institutions/1
   # DELETE /institutions/1.json
   def destroy
@@ -69,4 +87,5 @@ class InstitutionsController < ApplicationController
       format.json { head :no_content }
     end
   end
+
 end
