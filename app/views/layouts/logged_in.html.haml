@@ -51,16 +51,14 @@
                 %i.icon-wrench.icon-large
                 %i.icon-caret-down
               %ul.dropdown-menu
-                %li.nav-header Configure
-                = menu_link_to_if can?(:manage, User), 'Users', users_path
-                = menu_link_to_if can?(:manage, GlobalRole), 'Global Roles', global_roles_path
+                %li.nav-header Manage
+                = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
+                = menu_link_to_if can?(:manage, Institution), icon_tag('sitemap') + ' Institutions', institutions_path
+                = menu_link_to_if can?(:manage, Term), icon_tag('calendar') + ' Terms', institutions_path                
+                %li.divider
+                = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
                 %li
                   %a{href: "#"} Course-specific roles 
-                %li
-                  = link_to 'Institutions', institutions_path 
-                %li.nav-header Manage 
-                %li
-                  %a{href: "#"} Courses 
             %li.dropdown
               = dropdown_tag do
                 %i.icon-user.icon-large
