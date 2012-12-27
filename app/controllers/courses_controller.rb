@@ -19,6 +19,8 @@ class CoursesController < ApplicationController
   # GET /courses/1
   # GET /courses/1.json
   def show
+    @grouped_offerings = @course.course_offerings.group_by(&:term)
+
     respond_to do |format|
       format.html # show.html.erb
       format.json { render json: @course }

@@ -1,0 +1,23 @@
+= pythy_form_for @course_offering.course, @course_offering do |f|
+
+  = f.collection_select :term_id, 'Term', Term.all, :id, :display_name
+
+  = f.text_field :crn, delimiter: '' do
+    %span.help-block
+      A short identifier that uniquely distinguishes this course offering
+      from all other offerings of the same course during the term (for
+      example, your university's course request, index, or section number.)
+
+  = f.text_field :label, class: 'span6' do
+    %span.help-block
+      A descriptive label of your choice for this course offering. Good
+      labels might include the day and time of the course offering.
+
+  = f.text_field :url, class: 'span6' do
+    %span.help-block
+      An optional URL to an external site used by this offering of your
+      course (for example, to a university LMS where the grade book is
+      kept).
+
+  = f.actions do
+    = f.submit

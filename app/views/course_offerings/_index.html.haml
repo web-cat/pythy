@@ -1,0 +1,24 @@
+- if course_offerings.empty?
+  %div.alert
+    This course does not have any offerings.
+    = link_to new_course_course_offering_path(@course) do
+      Click here to create one.
+- else
+  - course_offerings.each do |term, offerings|
+    %h3
+      = term.display_name
+      Offerings
+    %table.table.table-striped.table-bordered
+      %thead
+        %tr
+          %th.span3 CRN
+          %th.span7 Label
+          %th.span1= icon_tag('cog')
+      %tbody
+        - offerings.each do |course_offering|
+          %tr
+            %td= link_to course_offering.crn, course_offering
+            %td= course_offering.label
+            %td
+              = link_to icon_tag('pencil'), edit_course_offering_path(course_offering)
+              = link_to_destroy course_offering

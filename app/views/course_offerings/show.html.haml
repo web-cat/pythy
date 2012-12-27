@@ -1,0 +1,35 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Institutions', institutions_path
+    %span.divider /
+  %li
+    = link_to @course_offering.course.department.institution.display_name, @course_offering.course.department.institution
+    %span.divider /
+  %li
+    = link_to 'Departments', institution_departments_path(@course_offering.course.department.institution)
+    %span.divider /
+  %li
+    = link_to @course_offering.course.department.name, department_path(@course_offering.course.department)
+    %span.divider /
+  %li
+    = link_to 'Courses', department_courses_path(@course_offering.course.department)
+    %span.divider /
+  %li
+    = link_to @course_offering.course.department_name_and_number, course_path(@course_offering.course)
+    %span.divider /
+  %li
+    = link_to 'Offerings', course_course_offerings_path(@course_offering.course)
+    %span.divider /
+  %li.active
+    = @course_offering.crn
+  %li.pull-right
+    = link_to edit_course_offering_path(@course_offering) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @course_offering.course.department_name_and_number
+  = surround '(', ')' do
+    = @course_offering.crn
+  %small
+    = @course_offering.label

@@ -14,3 +14,9 @@ en:
     formats:
       default: "%m/%d/%Y %l:%M %p"
       time_only: "%l:%M %p"
+
+  activerecord:
+    attributes:
+      course_offering:
+        crn: "CRN"
+        url: "URL"

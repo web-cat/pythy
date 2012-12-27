@@ -1,0 +1,14 @@
+%ul.breadcrumb
+  %li
+    = link_to @course.department.institution.display_name, @course.department.institution
+    %span.divider /
+  %li
+    = link_to @course.department.name, department_path(@course.department)
+    %span.divider /
+  %li
+    = link_to @course.department_name_and_number, course_path(@course)
+    %span.divider /
+  %li.active
+    (new offering)
+
+= render 'form'

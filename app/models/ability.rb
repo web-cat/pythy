@@ -5,11 +5,12 @@ class Ability
     unless user.nil?
       # this permission gives access to all the admin functions
       if user.global_role.can_edit_system_configuration
-        can :manage, User
         can :manage, CourseRole
+        can :manage, Department
         can :manage, GlobalRole
         can :manage, Institution
-        can :manage, Department
+        can :manage, Term
+        can :manage, User
       end
 
       if user.global_role.can_manage_all_courses
@@ -23,15 +24,16 @@ class Ability
       # a person with create access can create courses, of course
       if user.global_role.can_create_courses
         can :create, CourseOffering
+        can :manage, CourseEnrollment
       end
 
       # in all other cases, the ability to manage a course depends on the user's
       # individual course role
-      can :manage, CourseOffering do |course|
-        enrollment = CourseEnrollments.where(:user_id => user.id,
-                                             :course_id => course.id).first
-        enrollment.course_role.can_manage_course
-      end
+      #can :manage, CourseOffering do |course|
+      #  enrollment = CourseEnrollment.where(:user_id => user.id,
+      #                                       :course_id => course.id).first
+      #  enrollment.course_role.can_manage_course
+      #end
       # # the user can only update themself
       # can :update, User do |target_user|
       #   target_user == user

@@ -5,19 +5,12 @@
   %li
     = link_to @course.department.name, department_path(@course.department)
     %span.divider /
+  %li
+    = link_to @course.department_name_and_number, course_path(@course)
+    %span.divider /
   %li.active
-    = @course.department_name_and_number
+    (all offerings)
   %li.pull-right
-    = link_to edit_course_path(@course) do
-      %i.icon-pencil
-      Edit...
-
-%h2.page-header
-  = @course.department_name_and_number
-  %small
-    = @course.name
-
-%p
-  = link_to 'Create a new offering of this course...', new_course_course_offering_path(@course)
+    = link_to 'New...', new_course_course_offering_path(@course)
 
 = render partial: 'course_offerings/index', locals: { course_offerings: @grouped_offerings }
