@@ -8,7 +8,6 @@ Pythy::Application.routes.draw do
 
   resources :authentications
   resources :assignment_offerings
-  resources :course_offerings
   resources :terms
 
   match 'activity(/:action)', controller: 'activity_logs',
@@ -36,6 +35,7 @@ Pythy::Application.routes.draw do
     resources :departments do
       resources :courses do
         resources :assignments
+        resources :course_offerings
       end
     end
   end
