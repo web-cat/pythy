@@ -1,5 +1,9 @@
 class CourseRolesController < ApplicationController
+
   load_and_authorize_resource
+
+
+  # -------------------------------------------------------------
   # GET /course_roles
   # GET /course_roles.json
   def index
@@ -9,6 +13,8 @@ class CourseRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /course_roles/1
   # GET /course_roles/1.json
   def show
@@ -18,6 +24,8 @@ class CourseRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /course_roles/new
   # GET /course_roles/new.json
   def new
@@ -27,10 +35,14 @@ class CourseRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # GET /course_roles/1/edit
   def edit
   end
 
+
+  # -------------------------------------------------------------
   # POST /course_roles
   # POST /course_roles.json
   def create
@@ -45,6 +57,8 @@ class CourseRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # PUT /course_roles/1
   # PUT /course_roles/1.json
   def update
@@ -59,6 +73,8 @@ class CourseRolesController < ApplicationController
     end
   end
 
+
+  # -------------------------------------------------------------
   # DELETE /course_roles/1
   # DELETE /course_roles/1.json
   def destroy
@@ -72,4 +88,5 @@ class CourseRolesController < ApplicationController
       end
     end
   end
+
 end
