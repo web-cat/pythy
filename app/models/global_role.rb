@@ -6,7 +6,13 @@ class GlobalRole < ActiveRecord::Base
                   :can_manage_all_courses,
                   :can_create_courses
 
-  validates :name, uniqueness: true
+  validates :name, presence: true, uniqueness: true
+  
+  with_options if: :builtin?, on: :update, changeable: false do |builtin|
+    builtin.validates :can_edit_system_configuration
+    builtin.validates :can_manage_all_courses
+    builtin.validates :can_create_courses
+  end
 
   before_destroy :check_builtin?
 

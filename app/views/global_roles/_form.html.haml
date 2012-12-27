@@ -3,9 +3,12 @@
   = f.text_field :name, 'Name'
 
   = f.label 'Permissions' do |controls|
-    = controls.check_box :can_create_courses, 'Create courses'
-    = controls.check_box :can_manage_all_courses, 'Manage all courses'
-    = controls.check_box :can_edit_system_configuration, 'Edit system configuration'
+    = controls.check_box :can_create_courses, 'Create courses', disabled: @global_role.builtin?
+    = controls.check_box :can_manage_all_courses, 'Manage all courses', disabled: @global_role.builtin?
+    = controls.check_box :can_edit_system_configuration, 'Edit system configuration', disabled: @global_role.builtin?
+    - if @global_role.builtin?
+      %span.help-block
+        Permissions cannot be changed for built-in roles.
 
   = f.actions do 
     = f.submit

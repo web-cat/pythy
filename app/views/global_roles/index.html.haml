@@ -4,19 +4,30 @@
   %li.pull-right
     = link_to 'New...', new_global_role_path
 
-= render :partial => "flashbar"
+%h2 Global Roles
+%p
+  Global roles are used to control the permissions that users have
+  system-wide.
 
 %table.table.table-striped.table-bordered
   %thead
     %tr
-      %th Name
-      %th Actions
+      %th.span5 Name
+      %th.span2 Can edit system configuration?
+      %th.span2 Can manage all courses?
+      %th.span2 Can create courses?
+      %th.span1= icon_tag('cog')
   %tbody
     - @global_roles.each do |role|
       %tr
-        %td= link_to role.name, role
         %td
-          = link_to 'Edit', edit_global_role_path(role)
+          = link_to role.name, role
+          - if role.builtin?
+            %span.muted (built-in)
+        %td= checkmark_if role.can_edit_system_configuration?
+        %td= checkmark_if role.can_manage_all_courses?
+        %td= checkmark_if role.can_create_courses?
+        %td
+          = link_to icon_tag('pencil'), edit_global_role_path(role)
           - unless role.builtin?
-            |
-            = link_to 'Destroy', role, method: :delete, data: { confirm: 'Are you sure?' }
+            = link_to_destroy role
