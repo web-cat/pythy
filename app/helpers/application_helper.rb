@@ -84,10 +84,39 @@ HTML
 
   # -------------------------------------------------------------
   def dropdown_tag
-    # %a.dropdown-toggle{"data-toggle" => "dropdown", :href => "#"}
     content_tag :a, :href => '#', :class => 'dropdown-toggle',
       :'data-toggle' => 'dropdown' do
       yield
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def dropdown_button_tag(*args, &block)
+    if block_given?
+      options = args.first || {}
+      dropdown_button_tag(capture(&block), options)
+    else
+      content = args.first
+      options = args.second || {}
+
+      if options[:class]
+        options[:class] += ' dropdown-toggle'
+      else
+        options[:class] = 'dropdown_toggle'
+      end
+
+      if options[:data]
+        options[:data][:toggle] = 'dropdown'
+      else
+        options[:data] = { toggle: 'dropdown' }
+      end
+
+      options[:href] = '#'
+
+      content_tag :a, options do
+        raw(content + ' <span class="caret"></span>')
+      end
     end
   end
 
@@ -97,6 +126,25 @@ HTML
     content_tag :li, :class => ('active' if params[:controller] == destination.to_s) do
       link_to :controller => destination do
         yield
+      end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def tab_tag(*args, &block)
+    if block_given?
+      pane_id = args.first
+      options = args.second || {}
+      tab_tag(pane_id, capture(&block), options)
+    else
+      pane_id = args[0]
+      content = args[1]
+      options = args[2] || {}
+      active = options.delete(:active)
+
+      content_tag :li, :class => ('active' if active) do
+        link_to content, "\##{pane_id}", data: { toggle: 'tab' }
       end
     end
   end
@@ -129,19 +177,34 @@ HTML
   # error alert at the top (if there are any model errors), and handling
   # shallow nested arguments gracefully (in the case of new vs. edit).
   def pythy_form_for(*args, &block)
-    if args.length == 2
+    options = {}
+
+    if args.length >= 2 && !args[1].is_a?(Hash)
       parent = args[0]
       child = args[1]
       form_args = child.try(:new_record?) ? [parent, child] : child
+
+      options = args[2] if args.length > 2 && args[2].is_a?(Hash)
     else
       parent = nil
       child = args[0]
       form_args = child
+
+      options = args[1] if args.length > 1 && args[1].is_a?(Hash)
+    end
+
+    if options[:html]
+      if options[:html][:class]
+        options[:html][:class] += ' form-horizontal'
+      else
+        options[:html][:class] = 'form-horizontal'
+      end
+    else
+      options[:html] = { class: 'form-horizontal' }
     end
 
     capture do
-      twitter_bootstrap_form_for(form_args,
-        html: { class: 'form-horizontal' }) do |f|
+      twitter_bootstrap_form_for(form_args, options) do |f|
         concat form_errors child
         yield f
       end
@@ -193,19 +256,25 @@ HTML
 
 
   # -------------------------------------------------------------
-  def link_to_destroy(resource)
+  def link_to_destroy(resource, options={})
     name = resource.class.name.humanize
-    link_to icon_tag('remove'), resource, method: :delete, data: {
+
+    options.merge! method: :delete, data: {
       confirm: "Are you sure you want to delete this #{name}?",
       :'yes-class' => 'danger',
     }
+
+    params = options[:params] || {}
+
+    link_to icon_tag('remove'),
+      polymorphic_path(resource, params), options
   end
 
 
   # -------------------------------------------------------------
   def checkmark_if(value)
-    #icon_tag(value ? 'check' : 'check-empty')
-    value && content_tag(:span, raw('&#10003;'), class: 'label label-success') || ''
+    value && content_tag(
+      :span, raw('&#10003;'), class: 'label label-success') || ''
   end
 
 end
