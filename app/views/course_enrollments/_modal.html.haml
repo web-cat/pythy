@@ -1,0 +1,15 @@
+#course_enrollment_modal.modal.hide.fade
+  = pythy_form_for @course_enrollment.course_offering, @course_enrollment,
+    remote: true, html: { class: 'modal-form' } do |f|
+    .modal-header
+      = close_button_tag dismiss: 'modal'
+      %h3 Add Staff Member
+
+    .modal-body
+      #flashbar-placeholder
+      = f.collection_select :user_id, 'User', User.all, :id, :display_name
+      = f.collection_select :course_role_id, 'Role', CourseRole.all, :id, :name
+      = hidden_field_tag :type, @type
+
+    .modal-footer
+      = f.submit

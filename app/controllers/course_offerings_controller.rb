@@ -24,6 +24,8 @@ class CourseOfferingsController < ApplicationController
   # GET /course_offerings/1
   # GET /course_offerings/1.json
   def show
+    @course_enrollments = @course_offering.course_enrollments.page(params[:page])
+
     respond_to do |format|
       format.html # show.html.erb
       format.json { render :json => @course_offering }
