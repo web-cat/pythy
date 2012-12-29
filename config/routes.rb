@@ -29,13 +29,13 @@ Pythy::Application.routes.draw do
   resources :global_roles
   resources :course_roles
 
-  resources :course_enrollments
-
   resources :institutions, shallow: true do
     resources :departments do
       resources :courses do
         resources :assignments
-        resources :course_offerings
+        resources :course_offerings do
+          resources :course_enrollments
+        end
       end
     end
   end
