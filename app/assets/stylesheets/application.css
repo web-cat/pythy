@@ -12,4 +12,5 @@
  *= require codemirror/codemirror.css
  *= require eternicode/bootstrap-datepicker/datepicker.css
  *= require bootstrap_and_overrides
+ *= require global
  */
