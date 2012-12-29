@@ -12,6 +12,7 @@
 //
 //= require jquery
 //= require jquery_ujs
+//= require jquery.remotipart
 //= require twitter/bootstrap/bootstrap
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
 //= require codemirror/codemirror

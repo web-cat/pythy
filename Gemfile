@@ -46,6 +46,7 @@ gem 'delayed_job_active_record'
 gem 'daemon'
 gem 'delocalize'
 gem 'kaminari'
+gem 'remotipart'
 
 gem 'omniauth'
 gem 'omniauth-facebook'
