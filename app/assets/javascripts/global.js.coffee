@@ -23,6 +23,21 @@ $ ->
         item
     )
 
+  # -------------------------------------------------------------
+  # Add submit-on-immediate-change behavior (with a short timeout) to
+  # search forms.
+  $('form.form-search input[type=search]').keyup ->
+    $this = $(this)
+
+    if ($this.data('change-timeout'))
+      window.clearTimeout $this.data('change-timeout')
+
+    timeout = window.setTimeout ->
+      $this.closest('form').submit()
+    , 250
+
+    $this.data('change-timeout', timeout)
+
 
 # -------------------------------------------------------------
 window.pythy =
