@@ -1,13 +1,25 @@
-%ul.breadcrumb
-  %li.active
-    Users
+.row
+  .span9
+    %ul.breadcrumb
+      %li.active
+        Users
+  .span3
+    = index_search_form
 
-%table.table.table-striped.table-bordered
+%table.table.table-striped.table-bordered.table-condensed
   %thead
     %tr
-      %th.span4 E-mail
       %th.span4 Full Name
+      %th.span4 E-mail
       %th.span3 Role
       %th.span1= icon_tag('cog')
-  %tbody
-    = render @users
+  %tbody#users
+    - if @users.empty?
+      %td{ colspan: 3 }
+        .alert There are no users.
+    - else
+      = render @users
+
+- unless @users.empty?
+  #users_paginator
+    = paginate @users, remote: true

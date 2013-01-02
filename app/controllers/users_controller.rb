@@ -6,10 +6,13 @@ class UsersController < ApplicationController
   # GET /users
   # GET /users.json
   def index
+    @query = params[:query]
+    @users = @users.search(@query).alphabetical.page(params[:page])
+
     respond_to do |format|
       format.html # index.html.erb
+      format.js
       format.json do
-        query = params[:query]
         if query
           emails = User.all_emails(query)
           render json: emails
@@ -91,6 +94,42 @@ class UsersController < ApplicationController
       format.html { redirect_to users_url }
       format.json { head :no_content }
     end
+  end
+
+
+  # -------------------------------------------------------------
+  # GET /users/1/impersonate
+  def impersonate
+    if current_user
+      session[:original_user] = current_user.id
+      
+      original_timestamp = @user.current_sign_in_at
+      original_ip = @user.current_sign_in_ip
+
+      sign_out :user if current_user 
+      sign_in @user
+
+      @user.current_sign_in_at = original_timestamp
+      @user.current_sign_in_ip = original_ip
+      @user.save
+    end
+
+    redirect_to root_path
+  end
+
+
+  # -------------------------------------------------------------
+  # GET /users/unimpersonate
+  def unimpersonate
+    if session[:original_user]
+      user = User.find(session[:original_user])
+      session[:original_user] = nil
+
+      sign_out :user if current_user 
+      sign_in user
+    end
+
+    redirect_to root_path
   end
 
 end

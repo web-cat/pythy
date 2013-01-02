@@ -1,7 +1,14 @@
 %tr
-  %td= link_to user.email, user
-  %td= full_name_or_none(user, muted: true)
+  %td
+    = full_name_or_none(user, muted: true, query: true)
+  %td
+    = link_to user do
+      = query_highlight(user.email)
   %td= user.global_role.name
   %td
-    = link_to icon_tag('pencil'), edit_user_path(user)
-    = link_to_destroy user
+    %span.dropdown
+      = link_to icon_tag('cog'), '#', data: { toggle: 'dropdown' }
+      %ul.dropdown-menu.pull-right
+        %li= link_to icon_tag('pencil') + ' Edit...', edit_user_path(user)
+        %li= link_to_destroy user, text: true
+        %li= link_to icon_tag('user') + ' Impersonate...', impersonate_user_path(user)

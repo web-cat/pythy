@@ -266,7 +266,10 @@ HTML
 
     params = options[:params] || {}
 
-    link_to icon_tag('remove'),
+    text = icon_tag('remove')
+    text += ' Delete...' if options.delete(:text)
+
+    link_to text,
       polymorphic_path(resource, params), options
   end
 
@@ -275,6 +278,23 @@ HTML
   def checkmark_if(value)
     value && content_tag(
       :span, raw('&#10003;'), class: 'label label-success') || ''
+  end
+
+
+  # -------------------------------------------------------------
+  def index_search_form
+    render(partial: 'index_search')
+  end
+
+
+  # -------------------------------------------------------------
+  def query_highlight(text)
+    if @query
+      highlight(text, @query,
+        highlighter: '<span class="query-highlight">\1</span>')
+    else
+      text
+    end
   end
 
 end

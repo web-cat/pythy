@@ -62,18 +62,18 @@
               = dropdown_tag do
                 %i.icon-user.icon-large
                 %span.hidden-phone
-                  = current_user.email
+                  - if session[:original_user]
+                    %span.impersonation= current_user.display_name
+                  - else
+                    = current_user.display_name
                 %i.icon-caret-down
                 %ul.dropdown-menu
-                  %li
-                    %a{href: "#"}
-                      %i.icon-cog
-                      Account settings 
+                  %li= link_to icon_tag('cog') + ' Account Settings', '#'
                   %li.divider
-                  %li
-                    = link_to destroy_user_session_path, method: :delete do
-                      %i.icon-signout
-                      Sign out 
+                  - if session[:original_user]
+                    %li= link_to icon_tag('signout') + ' Unimpersonate', unimpersonate_users_path
+                  - else 
+                    %li= link_to icon_tag('signout') + 'Sign Out', destroy_user_session_path, method: :delete
     #main-container.container
       #main-container-inner
         = yield

@@ -21,6 +21,10 @@ class Ability
       # everyone can read course offerings
       can :read, CourseOffering
 
+      # This ability allows admins impersonating other users to revert
+      # back to their original user.
+      can :unimpersonate, User
+
       # a person with create access can create courses, of course
       if user.global_role.can_create_courses
         can :create, CourseOffering

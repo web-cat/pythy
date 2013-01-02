@@ -24,12 +24,27 @@ class User < ActiveRecord::Base
     :recoverable, :trackable, :validatable
 
   # Setup accessible (or protected) attributes for your model
-  attr_accessible :full_name, :email, :password, :password_confirmation,
-    :remember_me, :global_role_id, :institution_id, :course_offerings,
+  attr_accessible :first_name, :last_name, :email,
+    :password, :password_confirmation, :remember_me,
+    :global_role_id, :institution_id, :course_offerings,
     :course_enrollments
 
   before_create :set_default_role
-#  before_save :get_institution
+  before_save :get_institution
+
+  paginates_per 15
+
+  scope :search, lambda { |query|
+    unless query.blank?
+      arel = self.arel_table
+      pattern = "%#{query}%"
+      where(arel[:email].matches(pattern).or(
+            arel[:last_name].matches(pattern).or(
+            arel[:first_name].matches(pattern))))
+    end
+  }
+
+  scope :alphabetical, order('last_name asc, first_name asc, email asc')
 
 
   #~ Class methods ............................................................
@@ -42,6 +57,20 @@ class User < ActiveRecord::Base
 
 
   #~ Instance methods .........................................................
+
+  # -------------------------------------------------------------
+  def full_name
+    if !last_name.blank? && !first_name.blank?
+      "#{last_name}, #{first_name}"
+    elsif !last_name.blank?
+      last_name
+    elsif !first_name.blank?
+      first_name
+    else
+      nil
+    end
+  end
+
 
   # -------------------------------------------------------------
   # Gets the user's "display name", which is their full name if it is in the
@@ -68,7 +97,7 @@ class User < ActiveRecord::Base
   # Populates the instition relationship by looking up an institution with
   # the e-mail domain of the user's e-mail address.
   def get_institution
-    if email =~ /@(.*)$/
+    if !institution && email =~ /@(.*)$/
       domain = $1
       self.institution = Institution.where(domain: domain).first
     end
@@ -77,7 +106,7 @@ class User < ActiveRecord::Base
   # -------------------------------------------------------------
   # Overrides the built-in password required method to allow for users
   # to be updated without errors
-  # taked from: http://www.chicagoinformatics.com/index.php/2012/09/user-administration-for-devise/
+  # taken from: http://www.chicagoinformatics.com/index.php/2012/09/user-administration-for-devise/
   def password_required?
     (!password.blank? && !password_confirmation.blank?) || new_record?
   end

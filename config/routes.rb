@@ -25,7 +25,11 @@ Pythy::Application.routes.draw do
     registrations: 'registrations'
   }
 
-  resources :users
+  resources :users do
+    get 'impersonate', on: :member
+    get 'unimpersonate', on: :collection
+  end
+
   resources :global_roles
   resources :course_roles
 
@@ -39,6 +43,9 @@ Pythy::Application.routes.draw do
       end
     end
   end
+
+  match 'course_offering/:course_offering_id/upload_roster/:action',
+    controller: 'upload_roster', as: 'upload_roster'
 
   # Route for viewing code.
   match 'code(/:action)', controller: 'code'
