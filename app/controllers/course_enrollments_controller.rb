@@ -15,8 +15,6 @@ class CourseEnrollmentsController < ApplicationController
   # GET /course_enrollments
   # GET /course_enrollments.json
   def index
-    @course_enrollments = @course_enrollments.page(params[:page])
-
     respond_to do |format|
       format.js
       format.html # index.html.erb

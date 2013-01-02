@@ -28,6 +28,7 @@ class CourseOfferingsController < ApplicationController
 
     respond_to do |format|
       format.html # show.html.erb
+      format.js
       format.json { render :json => @course_offering }
     end
   end
@@ -91,7 +92,7 @@ class CourseOfferingsController < ApplicationController
     @course_offering.destroy
 
     respond_to do |format|
-      format.html { redirect_to course_offerings_url }
+      format.html { redirect_to course_offerings_url(@course_offering.course) }
       format.json { head :no_content }
     end
   end
