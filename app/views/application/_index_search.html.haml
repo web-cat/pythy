@@ -1,0 +1,5 @@
+= form_tag url_for(action: 'index'), remote: true, method: :get, class: 'form-search breadcrumb-hang', autocomplete: 'off' do
+  .input-append
+    = search_field_tag :query, nil, class: 'input-medium input-small search-query', placeholder: 'Search...'
+    = button_tag type: 'submit', class: 'btn' do
+      = icon_tag('search')
