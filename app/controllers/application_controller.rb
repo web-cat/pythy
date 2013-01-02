@@ -6,10 +6,21 @@ class ApplicationController < ActionController::Base
     render :text => exception, :status => 500
   end
 
-  rescue_from CanCan::AccessDenied do |exception|
-    flash[:error] = "You do not have access to that resource."
-    redirect_to root_url
+  # -------------------------------------------------------------
+  unless Rails.application.config.consider_all_requests_local
+    rescue_from Exception,
+      with: lambda { |exception| render_error 500, exception }
+    
+    rescue_from ActionController::RoutingError,
+      ActionController::UnknownController,
+      ::AbstractController::ActionNotFound,
+      ActiveRecord::RecordNotFound,
+      with: lambda { |exception| render_error 404, exception }
+
+    rescue_from CanCan::AccessDenied,
+      with: lambda { |exception| render_error 403, exception }
   end
+
 
   protect_from_forgery
 
@@ -26,6 +37,12 @@ class ApplicationController < ActionController::Base
   end
 
 
+  # -------------------------------------------------------------
+  def not_found
+    raise ActionController::RoutingError.new('Not Found')
+  end
+
+
   private
 
   # -------------------------------------------------------------
@@ -33,6 +50,25 @@ class ApplicationController < ActionController::Base
   # frame the application with.
   def determine_layout
     current_user ? 'logged_in' : 'not_logged_in'
+  end
+
+
+  # -------------------------------------------------------------
+  def render_error(status, exception)
+    # For 500s, log the error.
+    # TODO: Send admin users an e-mail with the trace.
+    if status == 500
+      logger.error "Unhandled Exception: #{exception.message}"
+      exception.backtrace.each { |line| logger.error "  #{line}" }
+    end
+
+    respond_to do |format|
+      format.html do
+        render template: "errors/error_#{status}",
+          layout: 'layouts/plain', status: status
+      end
+      format.all { render nothing: true, status: status }
+    end
   end
 
 end

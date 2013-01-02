@@ -2,6 +2,10 @@
 // upload roster controller is invoked via Ajax, the styles would
 // never get loaded.
 
+body.setup {
+  padding-top: 60px;
+}
+
 #roster-preview-wrapper {
   width: 100%;
   overflow: auto;

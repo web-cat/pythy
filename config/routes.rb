@@ -60,4 +60,8 @@ Pythy::Application.routes.draw do
   # Default route when a user is not logged in.
   root to: 'landing#index'
 
+  unless Rails.application.config.consider_all_requests_local
+    match '*not_found', to: 'errors#error_404'
+  end
+
 end
