@@ -6,5 +6,7 @@ $('body').append(
 $('#course_enrollment_modal').on 'hidden', ->
   $('#course_enrollment_modal').remove()
 
+$('#course_enrollment_modal #enroll-users-button').button('loading')
+
 # Display the dialog.
 $('#course_enrollment_modal').modal('show')
