@@ -4,7 +4,8 @@ class CourseOffering < ActiveRecord::Base
 
   belongs_to  :term
 
-  has_many    :course_enrollments
+  has_many    :course_enrollments, include: [:course_role, :user],
+              order: 'course_roles.id asc, users.last_name asc, users.first_name asc'
 
   has_many    :users, through: :course_enrollments do
 
