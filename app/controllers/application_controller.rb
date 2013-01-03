@@ -44,12 +44,8 @@ class ApplicationController < ActionController::Base
 
 
   # -------------------------------------------------------------
-  def course_offering_home_path(offering)
-    course = offering.course
-    term = offering.term
-    institution = course.department.institution
-
-    "/home/#{institution.url_part}/#{term.url_part}/#{course.url_part}/#{offering.crn}"
+  def modal_form_errors(model)
+    render template: 'application/modal_form_errors', locals: { model: model }
   end
 
 

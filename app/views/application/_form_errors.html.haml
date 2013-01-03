@@ -1,11 +1,12 @@
-- if model.errors.any?
-  .alert.alert-block.alert-danger
-    %p
-      %strong
-        The
-        = model.class.name.humanize
-        could not be saved due to the following errors:
+#form_errors
+  - if model.errors.any?
+    .alert.alert-block.alert-danger
+      %p
+        %strong
+          The
+          = model.class.name.humanize
+          could not be saved due to the following errors:
 
-    %ul
-      - model.errors.full_messages.each do |msg|
-        %li= msg
+      %ul
+        - model.errors.full_messages.each do |msg|
+          %li= msg
