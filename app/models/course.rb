@@ -18,9 +18,15 @@ class Course < ActiveRecord::Base
   #~ Class methods ............................................................
 
   # -------------------------------------------------------------
-  def self.from_path_component(path)
-    if path =~ /(?<department>[a-z0-9]+)-(?<course_number>[a-z0-9]+)/
-      nil
+  def self.from_path_component(path, institution)
+    match = /(?<department>[a-z0-9]+)-(?<course_number>[a-z0-9]+)/.match(path)
+    if match
+      joins(:department).where(<<-SQL ,
+        departments.url_part = ? and
+        courses.number = ? and
+        departments.institution_id = ?
+        SQL
+        match[:department], match[:course_number], institution.id)
     else
       where('1 = 0')
     end
@@ -35,6 +41,29 @@ class Course < ActiveRecord::Base
   #
   def department_name_and_number
   	"#{department.abbreviation} #{number}"
+  end
+
+
+  # -------------------------------------------------------------
+  def offering_with_crn(crn, term)
+    course_offerings.where(crn: crn, term_id: term.id).first
+  end
+
+
+  # -------------------------------------------------------------
+  def offerings_for_user(user, term)
+    if user.global_role.can_manage_all_courses?
+      course_offerings.where(term_id: term.id)
+    else
+      course_offerings.joins(:course_enrollments).where(
+        'course_offerings.term_id = ? and course_enrollments.user_id = ?',
+        term.id, user.id)
+    end
+  end
+
+  # -------------------------------------------------------------
+  def url_part
+    "#{department.url_part}-#{number}"
   end
 
 end

@@ -73,4 +73,10 @@ class Term < ActiveRecord::Base
     "#{season_name} #{year}"
   end
 
+
+  # -------------------------------------------------------------
+  def url_part
+    "#{SEASON_PATH_NAMES.rassoc(season).first}-#{year}"
+  end
+
 end

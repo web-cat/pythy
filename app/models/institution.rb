@@ -27,6 +27,14 @@ class Institution < ActiveRecord::Base
     }
 
 
+  #~ Class methods ............................................................
+
+  # -------------------------------------------------------------
+  def self.from_path_component(component)
+    where(url_part: component)
+  end
+
+
   #~ Instance methods .........................................................
 
   private
