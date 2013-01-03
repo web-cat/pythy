@@ -50,8 +50,11 @@ Pythy::Application.routes.draw do
   match 'course_offering/:course_offering_id/upload_roster/:action',
     controller: 'upload_roster', as: 'upload_roster'
 
-  # Route for viewing code.
-  match 'code(/:action)', controller: 'code'
+  # Route for viewing code. The constraints allow project and file names to
+  # include dots, which would normally be interpreted by Rails' router as a
+  # format indicator.
+  match 'code(/:institution(/:term(/:course(/:crn(/:rest)))))' => 'code#edit',
+    constraints: { rest: /.+/ }
 
   match 'home(/:institution(/:term(/:course(/:crn))))' => 'home#index'
 
