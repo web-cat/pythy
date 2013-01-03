@@ -49,8 +49,9 @@ table.examples {
   td:first-child {
     width: 100%;
   }
-  td:last-child {
+  td:nth-child(2) {
     white-space: nowrap;
     color: #888;
+    text-align: right;
   }
 }
