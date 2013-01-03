@@ -73,9 +73,13 @@ class ApplicationController < ActionController::Base
     end
 
     respond_to do |format|
+      format.js do
+        render template: "errors/error_modal",
+          locals: { status: status }
+      end
       format.html do
         render template: "errors/error_#{status}",
-          layout: 'layouts/plain', status: status
+          layout: 'layouts/error', status: status
       end
       format.all { render nothing: true, status: status }
     end

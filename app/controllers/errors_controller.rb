@@ -1,6 +1,6 @@
 class ErrorsController < ApplicationController
 
-  layout 'plain'
+  layout 'error'
 
 
   # -------------------------------------------------------------

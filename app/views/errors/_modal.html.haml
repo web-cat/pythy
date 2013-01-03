@@ -1,0 +1,5 @@
+#error_modal.modal.modal-wide.hide
+  .modal-body
+    = render template: "errors/error_#{status}"
+  .modal-footer
+    = button_tag 'Close', class: 'btn btn-primary', data: { dismiss: 'modal' }

@@ -2,22 +2,19 @@
 - bc.add_filter   { |line| line.gsub(Rails.root.to_s, '') }
 - bc.add_silencer { |line| line =~ /\/gems\// }
 - backtrace = bc.clean($!.backtrace)
-%p
-.row
-  .span10.offset1
-    .well
-      %h2 Internal Server Error
-      %p
-        There was an internal server error when processing this request.
-        The system administrator has been notified of the problem.
 
-      - if current_user && current_user.global_role.can_edit_system_configuration
-        %hr
-        %h4 Exception
-        %pre.alert.alert-danger
-          = $!.message
-        %h4 Backtrace
-        %pre{ style: 'overflow: auto; white-space: nowrap' }
-          - backtrace.each do |frame|
-            = frame
-            %br
+%h2 Internal Server Error
+%p
+  There was an internal server error when processing this request.
+  The system administrator has been notified of the problem.
+
+- if current_user && current_user.global_role.can_edit_system_configuration
+  %hr
+  %h4 Exception
+  %pre.alert.alert-danger
+    = $!.message
+  %h4 Backtrace
+  %pre{ style: 'overflow: auto; white-space: nowrap' }
+    - backtrace.each do |frame|
+      = frame
+      %br
