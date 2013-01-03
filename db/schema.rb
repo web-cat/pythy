@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20121224211905) do
+ActiveRecord::Schema.define(:version => 20130103133018) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -162,6 +162,12 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.string   "name"
   end
 
+  create_table "system_configurations", :force => true do |t|
+    t.string   "storage_path"
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
+  end
+
   create_table "terms", :force => true do |t|
     t.integer  "year"
     t.integer  "season"
@@ -185,8 +191,9 @@ ActiveRecord::Schema.define(:version => 20121224211905) do
     t.datetime "created_at",                             :null => false
     t.datetime "updated_at",                             :null => false
     t.integer  "institution_id"
-    t.string   "full_name"
     t.integer  "global_role_id"
+    t.string   "first_name"
+    t.string   "last_name"
   end
 
   add_index "users", ["email"], :name => "index_users_on_email", :unique => true

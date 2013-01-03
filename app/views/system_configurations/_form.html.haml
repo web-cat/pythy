@@ -1,0 +1,13 @@
+= pythy_form_for @system_configuration, url: system_configuration_path do |f|
+
+  = f.text_field :storage_path, class: 'input-xxlarge' do
+    .help-block
+      The path on the server where user data files (such as repositories for
+      saved code) are stored.
+      %span.text-error
+        Be careful if you change this after the system has already been in
+        use.
+      You will need to move the old storage location to the new one manually.
+
+  = f.actions do
+    = f.submit

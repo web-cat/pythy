@@ -6,6 +6,8 @@ Pythy::Application.routes.draw do
 
   match '/auth/:provider/callback' => 'authentications#create'
 
+  resource :system_configuration, except: :destroy
+
   resources :authentications
   resources :assignment_offerings
   resources :terms

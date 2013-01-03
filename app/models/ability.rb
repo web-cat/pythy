@@ -5,6 +5,7 @@ class Ability
     unless user.nil?
       # this permission gives access to all the admin functions
       if user.global_role.can_edit_system_configuration
+        can :manage, SystemConfiguration
         can :manage, CourseRole
         can :manage, Department
         can :manage, GlobalRole

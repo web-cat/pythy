@@ -58,6 +58,7 @@
                 %li.divider
                 = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
                 = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
+                = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
             %li.dropdown
               = dropdown_tag do
                 %i.icon-user.icon-large
