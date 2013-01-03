@@ -11,6 +11,7 @@ class Ability
         can :manage, Institution
         can :manage, Term
         can :manage, User
+        can :manage, ExampleRepository # FIXME make this right
       end
 
       if user.global_role.can_manage_all_courses
