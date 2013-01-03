@@ -41,8 +41,8 @@ Pythy::Application.routes.draw do
         resources :assignments
         resources :course_offerings do
           resources :course_enrollments
+          resources :example_repositories, path: 'examples'
         end
-        resources :example_repositories, path: 'examples'
       end
     end
   end
@@ -53,7 +53,7 @@ Pythy::Application.routes.draw do
   # Route for viewing code.
   match 'code(/:action)', controller: 'code'
 
-  match 'home(/:institution(/:term(/:course)))' => 'home#index'
+  match 'home(/:institution(/:term(/:course(/:crn))))' => 'home#index'
 
   # Default route when a user is logged in.
   authenticated :user do

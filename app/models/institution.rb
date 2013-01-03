@@ -37,6 +37,14 @@ class Institution < ActiveRecord::Base
 
   #~ Instance methods .........................................................
 
+  # -------------------------------------------------------------
+  def storage_path
+    File.join(
+      SystemConfiguration.first.storage_path,
+      url_part)
+  end
+
+
   private
 
   # -------------------------------------------------------------

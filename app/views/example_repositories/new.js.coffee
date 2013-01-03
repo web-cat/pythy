@@ -3,8 +3,8 @@ $('body').append(
   '<%= escape_javascript(render partial: "modal") %>')
 
 # Ensure that the dialog gets removed from the DOM when it is closed.
-$('#example_repository_modal').on 'hidden', ->
-  $('#example_repository_modal').remove()
+$('#example_repositories_modal').on 'hidden', ->
+  $('#example_repositories_modal').remove()
 
 # Display the dialog.
-$('#example_repository_modal').modal('show')
+$('#example_repositories_modal').modal('show')

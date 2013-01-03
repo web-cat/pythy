@@ -1,8 +1,8 @@
 class ExampleRepositoriesController < ApplicationController
 
-  load_and_authorize_resource :course
+  load_and_authorize_resource :course_offering
   load_and_authorize_resource :example_repository,
-    through: :course, shallow: true
+    through: :course_offering, shallow: true
 
 
   # -------------------------------------------------------------
@@ -29,7 +29,7 @@ class ExampleRepositoriesController < ApplicationController
         format.html { redirect_to @example_repository, notice: 'Example repository was successfully created.' }
         format.json { render json: @example_repository, status: :created, location: @example_repository }
       else
-        format.js
+        format.js   { modal_form_errors @example_repository }
         format.html { render action: "new" }
         format.json { render json: @example_repository.errors, status: :unprocessable_entity }
       end

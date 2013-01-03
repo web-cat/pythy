@@ -1,4 +1,11 @@
-.row-fluid
+%h2
+  = @course.department_name_and_number
+  %small
+    = @offerings.first.term.display_name
+    = surround '(', ')' do
+      = raw @offerings.map { |o| link_to_if(o.crn.to_s != params[:crn], o.crn, course_offering_home_path(o)) }.join(', ')
+
+.row
   .span7
     %h3 Recent Work
     -# if recent work
@@ -21,7 +28,8 @@
       The course instructor hasn't made any assignments available yet.        
     
     %h3 Instructor Examples
-    = link_to 'Create a new example...', new_course_example_repository_path(@course), class: 'btn btn-success btn-block', remote: true
-    %table.example
+    = link_to 'Create a new example...', new_course_offering_example_repository_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
+    %table.examples
       %tbody#example_repositories
-        = render(@course.example_repositories) || render(partial: 'example_repositories/empty')
+        -# FIXME should be the union of all offerings' examples below
+        = render(@offerings.first.example_repositories) || render(partial: 'example_repositories/empty')

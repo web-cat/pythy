@@ -8,7 +8,6 @@ class Course < ActiveRecord::Base
   belongs_to  :department
   has_many    :course_offerings
   has_many    :assignments
-  has_many    :example_repositories
 
   attr_accessible :department_id, :name, :number
 

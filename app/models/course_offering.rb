@@ -1,14 +1,12 @@
 class CourseOffering < ActiveRecord::Base
 
   belongs_to  :course
-
   belongs_to  :term
 
+  has_many    :example_repositories
   has_many    :course_enrollments, include: [:course_role, :user],
               order: 'course_roles.id asc, users.last_name asc, users.first_name asc'
-
   has_many    :users, through: :course_enrollments do
-
     def staff
       joins('INNER JOIN `course_roles` ON `course_enrollments`.`course_role_id` = `course_roles`.`id`').
       where(CourseEnrollment::SQL_HAS_ANY_PERMISSIONS)
@@ -18,7 +16,6 @@ class CourseOffering < ActiveRecord::Base
       joins('INNER JOIN `course_roles` ON `course_enrollments`.`course_role_id` = `course_roles`.`id`').
       where(CourseEnrollment::SQL_HAS_NO_PERMISSIONS)
     end
-
   end
 
   attr_accessible :course_id, :crn, :label, :term_id, :url
@@ -74,6 +71,16 @@ class CourseOffering < ActiveRecord::Base
   #
   def students
     users.students
+  end
+
+
+  # -------------------------------------------------------------
+  def storage_path
+    File.join(
+      course.department.institution.storage_path,
+      term.url_part,
+      course.url_part,
+      crn.to_s)
   end
 
 end

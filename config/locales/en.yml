@@ -13,6 +13,7 @@ en:
         - :default
     formats:
       default: "%m/%d/%Y %l:%M %p"
+      date_only: "%m/%d/%Y"
       time_only: "%l:%M %p"
 
   activerecord:
