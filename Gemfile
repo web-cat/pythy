@@ -47,6 +47,7 @@ gem 'daemon'
 gem 'delocalize'
 gem 'kaminari'
 gem 'remotipart'
+gem 'git'
 
 gem 'omniauth'
 gem 'omniauth-facebook'
