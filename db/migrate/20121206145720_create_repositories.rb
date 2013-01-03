@@ -11,7 +11,7 @@ class CreateRepositories < ActiveRecord::Migration
       # when type == 'ExampleRepository'
       t.integer :course_id
 
-      # when type == 'PersonalRepository'
+      # when type == 'PersonalRepository' or 'ExampleRepository'
       t.string :name
 
       # when type == 'ScratchpadRepository', no extra columns yet
