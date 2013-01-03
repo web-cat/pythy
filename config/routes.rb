@@ -40,6 +40,7 @@ Pythy::Application.routes.draw do
         resources :course_offerings do
           resources :course_enrollments
         end
+        resources :example_repositories, path: 'examples'
       end
     end
   end

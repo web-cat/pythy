@@ -1,0 +1,13 @@
+#example_repository_modal.modal.hide.fade
+  = pythy_form_for @example_repository.course, @example_repository,
+    remote: true, html: { class: 'modal-form' } do |f|
+    .modal-header
+      = close_button_tag dismiss: 'modal'
+      %h3 New Example
+
+    .modal-body
+      #flashbar-placeholder
+      = f.text_field :name, class: 'input-xlarge'
+
+    .modal-footer
+      = f.submit
