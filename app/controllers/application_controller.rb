@@ -43,6 +43,16 @@ class ApplicationController < ActionController::Base
   end
 
 
+  # -------------------------------------------------------------
+  def course_offering_home_path(offering)
+    course = offering.course
+    term = offering.term
+    institution = course.department.institution
+
+    "/home/#{institution.url_part}/#{term.url_part}/#{course.url_part}/#{offering.crn}"
+  end
+
+
   private
 
   # -------------------------------------------------------------

@@ -1,36 +1,27 @@
-- if course_exists?
-  .row-fluid
-    .span7
-      %h3 Recent Work
-      -# if recent work
-      = render partial: 'started_assignment'
-      = render partial: 'started_assignment'
-      -# else
-      %div.alert.alert-info
-        You haven't started any assignments yet in this course. As you
-        work on assignments, they will be listed here, with the most
-        recent work shown at the top.
+.row-fluid
+  .span7
+    %h3 Recent Work
+    -# if recent work
+    = render partial: 'started_assignment'
+    = render partial: 'started_assignment'
+    -# else
+    %div.alert.alert-info
+      You haven't started any assignments yet in this course. As you
+      work on assignments, they will be listed here, with the most
+      recent work shown at the top.
 
-    .span5
-      %h3 Not Yet Started
-      -# if assignments exist
-      = render partial: 'not_started_assignment'
-      = render partial: 'not_started_assignment'
-      -# else
-      %div.alert.alert-info
-        The course instructor hasn't made any assignments available yet.        
-      
-      %h3 Instructor Examples
-      -# if examples exist
-      %table.examples
-        %tbody
-          %tr
-            %td
-              %a{href: '#'} Linked Lists
-            %td
-              02/12/2013
-      -# else
-      %div.alert.alert-info
-        The course instructor hasn't made any examples available yet.
-- else
-  = render partial: 'not_found'
+  .span5
+    %h3 Not Yet Started
+    = link_to 'Create a new assignment...', '#', class: 'btn btn-success btn-block'
+    -# if assignments exist
+    = render partial: 'not_started_assignment'
+    = render partial: 'not_started_assignment'
+    -# else
+    %div.alert.alert-info
+      The course instructor hasn't made any assignments available yet.        
+    
+    %h3 Instructor Examples
+    = link_to 'Create a new example...', new_course_example_repository_path(@course), class: 'btn btn-success btn-block', remote: true
+    %table.example
+      %tbody#example_repositories
+        = render(@course.example_repositories) || render(partial: 'example_repositories/empty')

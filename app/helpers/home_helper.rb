@@ -2,7 +2,7 @@ module HomeHelper
 
   # -------------------------------------------------------------
   def course_exists?
-    @term.exists? && @course
+    @institution && @term && @course
   end
 
 end
