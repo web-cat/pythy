@@ -6,4 +6,10 @@ class Repository < ActiveRecord::Base
 
   validates :user_id, presence: true
 
+
+  # -------------------------------------------------------------
+  def open
+    Git.open(git_path)
+  end
+
 end
