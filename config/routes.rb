@@ -54,8 +54,9 @@ Pythy::Application.routes.draw do
   # include dots, which would normally be interpreted by Rails' router as a
   # format indicator.
   code_pattern = 'code(/:institution(/:term(/:course(/:crn(/:rest)))))'
-  match code_pattern => 'code#edit', via: :get, constraints: { rest: /.+/ }
+  match code_pattern => 'code#show', via: :get, constraints: { rest: /.+/ }
   match code_pattern => 'code#update', via: :put, constraints: { rest: /.+/ }
+  match code_pattern => 'code#message', via: :post, constraints: { rest: /.+/ }
 
   match 'home(/:institution(/:term(/:course(/:crn))))' => 'home#index'
 

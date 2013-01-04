@@ -1,0 +1,21 @@
+- title raw @page_title
+.clearfix
+  .pull-left
+    = raw @page_title
+  .pull-right
+    %span#save-indicator.text-success.hide
+      Saved
+
+    .btn-group
+      = button_tag id: 'run', class: 'btn btn-success' do
+        = icon_tag('play') + ' Run'
+      - if @repository.is_a? AssignmentRepository
+        = button_tag id: 'check', class: 'btn' do
+          = icon_tag('check') + ' Check'
+
+= text_area_tag :codearea
+%pre#output
+
+- if can? :update, @repository
+  %script
+    $(function() { pythy.code.startAutoSaving(); });
