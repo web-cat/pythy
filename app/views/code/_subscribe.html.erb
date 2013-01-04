@@ -1,0 +1,6 @@
+<script type="text/javascript">
+$(function() {
+  var controller = new CodeController(
+    '<%= @subscribe_channel %>', <%= can? :update, @repository %>);
+});
+</script>

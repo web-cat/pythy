@@ -2,12 +2,13 @@ class CodeController < FriendlyUrlController
 
   DEFAULT_FILE = 'main.py'
 
-  SUPPORTED_MESSAGES = %w(add_user)
+  ALLOWED_MESSAGES = %w(add_user resync)
 
   before_filter :find_repository
 
   # -------------------------------------------------------------
   def show
+    @subscribe_channel = subscribe_channel
   end
 
 
@@ -39,8 +40,7 @@ class CodeController < FriendlyUrlController
 
     respond_to do |format|
       if committed
-        Juggernaut.publish 'code_updated', { code: code },
-          except: request.headers['X-Session-ID']
+        publish action: 'code_updated', code: code
         format.js
       else
         format.js { render nothing: true }
@@ -52,13 +52,15 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   def message
     message = params[:message].to_s
-    if SUPPORTED_MESSAGES.include? message
+    if ALLOWED_MESSAGES.include? message
       send message
     else
       not_found
     end
   end
 
+
+  private
 
   # -------------------------------------------------------------
   # Called when a new user opens the code controller for a particular
@@ -68,9 +70,7 @@ class CodeController < FriendlyUrlController
 
     begin
       code = File.read(path)
-
-      Juggernaut.publish 'code_updated', { code: code },
-        except: request.headers['X-Session-ID']
+      publish action: 'code_updated', code: code
     rescue
     end
     
@@ -80,7 +80,43 @@ class CodeController < FriendlyUrlController
   end
 
 
-  private
+  # -------------------------------------------------------------
+  def resync
+    path = File.join(@repository.git_path, @filename)
+
+    begin
+      code = File.read(path)
+      self_publish action: 'code_updated', code: code
+    rescue
+    end
+    
+    respond_to do |format|
+      format.js { render nothing: true }
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def subscribe_channel
+    id = @repository.source_repository ? @repository.source_repository.id :
+      @repository.id
+    "#{@repository.class.name}_#{id}"
+  end
+
+
+  # -------------------------------------------------------------
+  def publish(options = {})
+    Juggernaut.publish subscribe_channel, options,
+      except: request.headers['X-Session-ID']
+  end
+
+
+  # -------------------------------------------------------------
+  def self_publish(options = {})
+    Juggernaut.publish subscribe_channel, options,
+      only: request.headers['X-Session-ID']
+  end
+
 
   # -------------------------------------------------------------
   def find_repository
@@ -91,7 +127,10 @@ class CodeController < FriendlyUrlController
       @filename = parts.length > 2 ? parts[2] : DEFAULT_FILE
 
       @repository = ExampleRepository.find_by_id(id)
-      @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+
+      if @repository
+        @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+      end
     end
 
     # Make sure the user has access to read the repository, or raise a

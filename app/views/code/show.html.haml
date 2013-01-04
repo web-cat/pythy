@@ -7,6 +7,12 @@
       Saved
 
     .btn-group
+      = button_tag id: 'sync', class: 'btn btn-warning hide',
+        rel: 'tooltip', title: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.',
+        data: { placement: 'bottom' } do
+        = icon_tag('refresh') + ' Sync'
+
+    .btn-group
       = button_tag id: 'run', class: 'btn btn-success' do
         = icon_tag('play') + ' Run'
       - if @repository.is_a? AssignmentRepository
@@ -16,6 +22,4 @@
 = text_area_tag :codearea
 %pre#output
 
-- if can? :update, @repository
-  %script
-    $(function() { pythy.code.startAutoSaving(); });
+= render partial: 'subscribe'
