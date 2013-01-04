@@ -1,7 +1,7 @@
 !!!
 %html
   %head
-    %title Pythy
+    %title!= content_for?(:title) ? 'Pythy &ndash; ' + content_for(:title) : 'Pythy'
     = stylesheet_link_tag 'application', media: 'all'
     = controller_stylesheet_link_tag
     = javascript_include_tag 'application'
