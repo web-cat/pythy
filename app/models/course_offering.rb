@@ -31,6 +31,12 @@ class CourseOffering < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  def other_concurrent_offerings
+    course.course_offerings.where('term_id = ? and id != ?', term.id, id)
+  end
+
+
+  # -------------------------------------------------------------
   # Public: Gets the path to the directory where repositories and other
   # resources for this CourseOffering will be stored.
   #
