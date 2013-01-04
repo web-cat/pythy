@@ -158,8 +158,10 @@ ActiveRecord::Schema.define(:version => 20130103133018) do
     t.datetime "created_at",             :null => false
     t.datetime "updated_at",             :null => false
     t.integer  "assignment_offering_id"
-    t.integer  "course_id"
+    t.integer  "course_offering_id"
     t.string   "name"
+    t.text     "description"
+    t.integer  "source_repository_id"
   end
 
   create_table "system_configurations", :force => true do |t|
