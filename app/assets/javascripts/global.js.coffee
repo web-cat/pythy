@@ -1,5 +1,9 @@
 $ ->
   # -------------------------------------------------------------
+  # Enable tooltips.
+  $('[rel=tooltip]').tooltip()
+
+  # -------------------------------------------------------------
   # Create datepickers.
   $('input.datepicker').datepicker(
     autoclose: true,
