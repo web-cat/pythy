@@ -28,7 +28,8 @@
       The course instructor hasn't made any assignments available yet.        
     
     %h3 Instructor Examples
-    = link_to 'Create a new example...', new_course_offering_example_repository_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
+    - if can? :manage, @offerings.first
+      = link_to 'Create a new example...', new_course_offering_example_repository_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
     %table.examples
       %tbody#example_repositories
         -# FIXME should be the union of all offerings' examples below

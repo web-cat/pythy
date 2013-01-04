@@ -23,6 +23,20 @@ class ExampleRepositoriesController < ApplicationController
   def create
     @example_repository.user = current_user
 
+    # Create the dependent repositories as well.
+    # TODO Handle errors when saving linked repos.
+    if params[:add_to_all_offerings]
+      @example_repository.course_offering.other_concurrent_offerings.each do |offering|
+        if can? :manage, offering
+          linked_repository = @example_repository.linked_repositories.build(
+            params[:example_repository])
+          linked_repository.course_offering = offering
+          linked_repository.user = @example_repository.user
+          linked_repository.save
+        end
+      end
+    end
+
     respond_to do |format|
       if @example_repository.save
         format.js
