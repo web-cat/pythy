@@ -1,9 +1,10 @@
-# Place all the behaviors and hooks related to the matching controller here.
-# All this logic will automatically be available in application.js.
-# You can use CoffeeScript in this file: http://jashkenas.github.com/coffee-script/
-
 # Document ready handler:
 $ ->
+  sendChangeRequest = () ->
+    value = codeArea.getValue()
+    #socket.emit('update', { code: value }) # FIXME
+    $.ajax type: 'PUT', url: window.location.href, data: { code: value }
+
   # Convert the text area to a CodeMirror widget.
   codeArea = CodeMirror.fromTextArea $('#codearea')[0],
     mode: { name: "python", version: 3, singleLineStringErrors: false },
@@ -13,6 +14,14 @@ $ ->
     tabSize: 2,
     tabMode: "shift",
     matchBrackets: true
+
+  changeWasRemote = false
+  timerHandle = null
+  codeArea.on "change", (_editor, change) ->
+    if (!changeWasRemote)
+      if (timerHandle)
+        clearTimeout(timerHandle)
+      timerHandle = setTimeout(sendChangeRequest, 500)
 
   # These functions are scoped inside the handler so that they can easily
   # access the CodeMirror object.
@@ -49,7 +58,6 @@ $ ->
       when 'output'
         handleOutput data.text
       when 'success'
-        alert 'success reported'
         console.log(data)
         # TODO Do something when the code successfully executes
         ;
@@ -61,7 +69,7 @@ $ ->
         type = data.error.type
         error = type + ": " + message
         
-        if data.error.start? and data.error.start?
+        if data.error.start? and data.error.end?
           start = { line : data.error.start.line-1, ch: data.error.start.ch }
           end = { line: data.error.end.line-1, ch: data.error.end.ch }
           marker = document.createElement("div")

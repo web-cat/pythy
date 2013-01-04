@@ -1,3 +1,4 @@
+# FIXME Fix this path
 importScripts 'http://localhost:3000/assets/internal/skulpt-uncomp.js'
 
 # Function: output

@@ -53,8 +53,9 @@ Pythy::Application.routes.draw do
   # Route for viewing code. The constraints allow project and file names to
   # include dots, which would normally be interpreted by Rails' router as a
   # format indicator.
-  match 'code(/:institution(/:term(/:course(/:crn(/:rest)))))' => 'code#edit',
-    constraints: { rest: /.+/ }
+  code_pattern = 'code(/:institution(/:term(/:course(/:crn(/:rest)))))'
+  match code_pattern => 'code#edit', via: :get, constraints: { rest: /.+/ }
+  match code_pattern => 'code#update', via: :put, constraints: { rest: /.+/ }
 
   match 'home(/:institution(/:term(/:course(/:crn))))' => 'home#index'
 
