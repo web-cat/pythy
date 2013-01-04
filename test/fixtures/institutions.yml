@@ -3,7 +3,11 @@
 vt:
   domain: vt.edu
   display_name: Virginia Tech
+  abbreviation: VT
+  url_part: vt
 
 test_institution:
   domain: test.edu
   display_name: Test Institution
+  abbreviation: Test
+  url_part: test

@@ -1,15 +1,22 @@
 # Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
 
-one:
-  name: MyString
-  description: MyText
-  can_create_courses: false
+admin_role:
+  name: Administrator
+  builtin: true
+  can_create_courses: true
+  can_manage_all_courses: true
+  can_edit_system_configuration: true
+
+instructor_role:
+  name: Instructor
+  builtin: true
+  can_create_courses: true
   can_manage_all_courses: false
   can_edit_system_configuration: false
 
-two:
-  name: MyString
-  description: MyText
+regular_role:
+  name: Regular User
+  builtin: true
   can_create_courses: false
   can_manage_all_courses: false
   can_edit_system_configuration: false

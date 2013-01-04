@@ -1,11 +1,11 @@
 # Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
 
-one:
-  user: 
-  course_offering: 
-  course_role: 
+test_teacher_in_cs1064_12345:
+  user: test_teacher
+  course_offering: cs1064_12345
+  course_role: lead_instructor_role
 
-two:
-  user: 
-  course_offering: 
-  course_role: 
+test_student_in_cs1064_12345:
+  user: test_student
+  course_offering: cs1064_12345
+  course_role: student_role

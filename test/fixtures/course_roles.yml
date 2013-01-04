@@ -1,19 +1,19 @@
 # Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
 
-one:
-  name: MyString
-  can_manage_course: false
-  can_manage_assignments: false
-  can_grade_submissions: false
-  can_view_other_submissions: false
-  can_manage_course: false
-  builtin: false
+lead_instructor_role:
+  name: Lead Instructor
+  can_manage_course: true
+  can_manage_assignments: true
+  can_grade_submissions: true
+  can_view_other_submissions: true
+  can_manage_course: true
+  builtin: true
 
-two:
-  name: MyString
+student_role:
+  name: Student
   can_manage_course: false
   can_manage_assignments: false
   can_grade_submissions: false
   can_view_other_submissions: false
   can_manage_course: false
-  builtin: false
+  builtin: true

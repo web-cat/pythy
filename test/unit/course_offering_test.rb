@@ -2,21 +2,23 @@ require 'test_helper'
 
 class CourseOfferingTest < ActiveSupport::TestCase
 
+  # -------------------------------------------------------------
   def setup
-    @offering = course_offerings(:cs1064_98765)
+    @offering = course_offerings(:cs1064_12345)
   end
 
 
-  test "has student enrolled" do
-  	assert @offering.students.where(:username => 'test_student').exists?
+  # -------------------------------------------------------------
+  test "has course enrollment for test student" do
+    assert @offering.course_enrollments.where(
+      users: { email: 'test_student@vt.edu' }).exists?
   end
 
-  test "has teacher as staff" do
-  	assert @offering.staff.where(:username => 'test_teacher').exists?
-  end
 
-  test "has grader as staff" do
-    assert @offering.staff.where(:username => 'test_grader').exists?
+  # -------------------------------------------------------------
+  test "has course enrollment for test teacher" do
+    assert @offering.course_enrollments.where(
+      users: { email: 'test_teacher@vt.edu' }).exists?
   end
 
 end

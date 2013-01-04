@@ -1,13 +1,13 @@
 # Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
 
-cs1124_12345:
+cs1064_12345:
   course: cs1124
   term: spring2013
   crn: 12345
   label: MWF 11:00
   url: http://courses.cs.vt.edu/cs1124
 
-cs1064_98765:
+cs1064_12346:
   course: cs1064
   term: spring2013
   crn: 98765

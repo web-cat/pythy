@@ -2,6 +2,3 @@
 
 one:
   storage_path: MyString
-
-two:
-  storage_path: MyString
