@@ -4,7 +4,7 @@ class ExampleRepository < Repository
 
   belongs_to :source_repository, class_name: 'ExampleRepository'
   has_many :linked_repositories, class_name: 'ExampleRepository',
-    foreign_key: 'source_repository_id'
+    foreign_key: 'source_repository_id', dependent: :destroy
 
   attr_accessible :name, :course_offering_id, :description
 
