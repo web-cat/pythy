@@ -152,8 +152,17 @@ class Ability
   #
   # user - the user
   #
-  def process_repositories(user)
+  def process_repositories(user)    
     # TODO implement.
+
+    can :read, ExampleRepository do |repository|
+      can? :read, repository.course_offering
+    end
+
+    can :manage, ExampleRepository do |repository|
+      can? :manage, repository.course_offering
+    end
+
   end
 
 end
