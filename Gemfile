@@ -48,6 +48,8 @@ gem 'delocalize'
 gem 'kaminari'
 gem 'remotipart'
 gem 'git'
+gem 'juggernaut'
+gem 'redis'
 
 gem 'omniauth'
 gem 'omniauth-facebook'
