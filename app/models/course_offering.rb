@@ -4,19 +4,11 @@ class CourseOffering < ActiveRecord::Base
   belongs_to  :term
 
   has_many    :example_repositories
+
   has_many    :course_enrollments, include: [:course_role, :user],
               order: 'course_roles.id asc, users.last_name asc, users.first_name asc'
-  has_many    :users, through: :course_enrollments do
-    def staff
-      joins('INNER JOIN `course_roles` ON `course_enrollments`.`course_role_id` = `course_roles`.`id`').
-      where(CourseEnrollment::SQL_HAS_ANY_PERMISSIONS)
-    end
 
-    def students
-      joins('INNER JOIN `course_roles` ON `course_enrollments`.`course_role_id` = `course_roles`.`id`').
-      where(CourseEnrollment::SQL_HAS_NO_PERMISSIONS)
-    end
-  end
+  has_many    :users, through: :course_enrollments
 
   attr_accessible :course_id, :crn, :label, :term_id, :url
 
@@ -25,56 +17,24 @@ class CourseOffering < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
-  # Public: Gets the CourseEnrollments for all users associated with the
-  # course offering who have a role that qualifies them as "staff" (that
-  # is, any user who has at least one elevated permission).
+  # Public: Gets a relation representing all Users who are allowed to
+  # manage this CourseOffering.
   #
-  # Returns a relation representing CourseEnrollments for all staff users
-  # in the course offering.
+  # Returns a relation representing all Users who are allowed to manage
+  # this CourseOffering.
   #
-  def staff_enrollments
-    course_enrollments.staff
+  def managers
+    User.joins(:course_enrollments => :course_role).where(
+      course_enrollments: { course_offering_id: id },
+      course_roles: { can_manage_course: true })
   end
 
 
   # -------------------------------------------------------------
-  # Public: Gets all staff Users in the course offering. This is a shortcut
-  # (and faster, SQL-wise) for retrieving the `staff_enrollments` relation
-  # and then retrieving the User from each of those.
+  # Public: Gets the path to the directory where repositories and other
+  # resources for this CourseOffering will be stored.
   #
-  # Returns a relation representing all staff Users in the course offering.
-  #
-  def staff
-    users.staff
-  end
-
-
-  # -------------------------------------------------------------
-  # Public: Gets the CourseEnrollments for all users associated with the
-  # course offering who have a role that qualifies them as "student" (that
-  # is, any user who has no elevated permissions).
-  #
-  # Returns a relation representing CourseEnrollments for all student
-  # users in the course offering.
-  #
-  def student_enrollments
-    course_enrollments.students
-  end
-
-
-  # -------------------------------------------------------------
-  # Public: Gets all student Users in the course offering. This is a shortcut
-  # (and faster, SQL-wise) for retrieving the `student_enrollments` relation
-  # and then retrieving the User from each of those.
-  #
-  # Returns a relation representing all student Users in the course offering.
-  #
-  def students
-    users.students
-  end
-
-
-  # -------------------------------------------------------------
+  # Returns the path to the CourseOffering's storage directory.
   def storage_path
     File.join(
       course.department.institution.storage_path,

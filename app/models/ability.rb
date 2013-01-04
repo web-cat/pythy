@@ -1,84 +1,159 @@
+# =============================================================================
+# The Ability class is used by CanCan to control how users with various roles
+# can access resources in Pythy.
+#
 class Ability
+
   include CanCan::Ability
 
+  # -------------------------------------------------------------
+  # Public: Initialize the Ability with the permissions of the specified
+  # User.
+  #
+  # user - the user
+  #
   def initialize(user)
-    unless user.nil?
-      # this permission gives access to all the admin functions
-      if user.global_role.can_edit_system_configuration
-        can :manage, SystemConfiguration
-        can :manage, CourseRole
-        can :manage, Department
-        can :manage, GlobalRole
-        can :manage, Institution
-        can :manage, Term
-        can :manage, User
-        can :manage, ExampleRepository # FIXME make this right
-      end
-
-      if user.global_role.can_manage_all_courses
-        can :manage, Course
-        can :manage, CourseOffering
-      end
-
-      # everyone can read course offerings
-      can :read, CourseOffering
-
+    if user
       # This ability allows admins impersonating other users to revert
       # back to their original user.
       can :unimpersonate, User
 
-      # a person with create access can create courses, of course
-      if user.global_role.can_create_courses
-        can :create, CourseOffering
-        can :manage, CourseEnrollment
+      # A user should only be able to update himself or herself (assuming no
+      # other permissions granted below by the global role).
+      can :update, User do |target_user|
+        target_user == user
       end
 
-      # in all other cases, the ability to manage a course depends on the user's
-      # individual course role
-      #can :manage, CourseOffering do |course|
-      #  enrollment = CourseEnrollment.where(:user_id => user.id,
-      #                                       :course_id => course.id).first
-      #  enrollment.course_role.can_manage_course
-      #end
-      # # the user can only update themself
-      # can :update, User do |target_user|
-      #   target_user == user
+      process_global_role user
+      process_courses user
+      process_assignments user
+      process_repositories user
+    end
+  end
 
+
+  private
+
+  # -------------------------------------------------------------
+  # Private: Grant permissions from the user's global role.
+  #
+  # user - the user
+  #
+  def process_global_role(user)
+    # Grant management access to most things through the
+    # GlobalRole.can_edit_system_configuration? permission.
+    #
+    # TODO: This permission does too much. We probably want to separate
+    # out things like ActivityLog, SystemConfiguration, User, and the roles
+    # from Department and Institution, for example.
+    if user.global_role.can_edit_system_configuration?
+      can :manage, ActivityLog
+      can :manage, CourseRole
+      can :manage, Department
+      can :manage, GlobalRole
+      can :manage, Institution
+      can :manage, Term
+      can :manage, SystemConfiguration
+      can :manage, User
+      can :manage, ExampleRepository # FIXME make this right
     end
 
-    
-    # if user.global_role.can_manage_all_courses
-    #   can :manage, :
+    # Grant broad course management access through the
+    # GlobalRole.can_manage_all_courses? permission.
+    if user.global_role.can_manage_all_courses?
+      can :manage, Course
+      can :manage, CourseOffering
+      can :manage, CourseEnrollment
+    end
 
-    #   # the user can read CourseOfferings WHERE the students table 
-    #   # contains that student's user id
-    #   can :read, CourseOffering, :students => { :id => user.id }
-    #   can :read, CourseOffering, :staff => { :id => user.id }
-    #   can :manage, CourseOffering, :staff => { :id => user.id },
-    #     :course_offering_staff => { :manager => true }
-    # end
-
-    # Define abilities for the passed in user here. For example:
+    # Users with GlobalRole.can_create_courses? permission can create their
+    # new courses and course offerings. The additional actions (updating and
+    # deleting) will be determined by the CourseRole associated with their
+    # enrollment.
     #
-    #   user ||= User.new # guest user (not logged in)
-    #   if user.admin?
-    #     can :manage, :all
-    #   else
-    #     can :read, :all
-    #   end
-    #
-    # The first argument to `can` is the action you are giving the user permission to do.
-    # If you pass :manage it will apply to every action. Other common actions here are
-    # :read, :create, :update and :destroy.
-    #
-    # The second argument is the resource the user can perform the action on. If you pass
-    # :all it will apply to every resource. Otherwise pass a Ruby class of the resource.
-    #
-    # The third argument is an optional hash of conditions to further filter the objects.
-    # For example, here the user can only update published articles.
-    #
-    #   can :update, Article, :published => true
-    #
-    # See the wiki for details: https://github.com/ryanb/cancan/wiki/Defining-Abilities
+    # Notice that once a Course (not an offering) is created, that Course
+    # may be used across multiple terms with multiple offerings, by many
+    # different instructors. For this reason, once a Course is created, it
+    # cannot be destroyed by anyone except someone with the
+    # can_manage_all_courses? permission -- not even the user who originally
+    # created it. Be careful.
+    if user.global_role.can_create_courses?
+      can :create, Course
+      can :create, CourseOffering
+    end
   end
+
+
+  # -------------------------------------------------------------
+  # Private: Process course-related permissions.
+  #
+  # user - the user
+  #
+  def process_courses(user)
+    # A user can manage a CourseOffering if they are enrolled in that
+    # offering and have a CourseRole where can_manage_course? is true.
+
+    can :read, CourseOffering, user.course_offerings do |offering|
+      offering.users.exists?(user)
+    end
+
+    can :manage, CourseOffering, user.managing_course_offerings do |offering|
+      offering.managers.exists?(user)
+    end
+
+    # Likewise, a user can only manage enrollments in a CourseOffering
+    # that they have can_manage_courses? permission in.
+    can :manage, CourseEnrollment do |enrollment|
+       user_enrollment = CourseEnrollment.where(
+         user_id: user.id,
+         course_offering_id: enrollment.course_offering.id).first
+
+       user_enrollment && user_enrollment.course_role.can_manage_course?
+     end
+  end
+
+
+  # -------------------------------------------------------------
+  # Private: Process assignment-related permissions.
+  #
+  # user - the user
+  #
+  def process_assignments(user)
+    # A user can manage an Assignment if they have the
+    # can_manage_assignments? permission in any of the CourseOfferings of
+    # the Course that the assignment belongs to.
+    #
+    # TODO This may need improvement.
+    can :manage, Assignment do |assignment|
+      course = assignment.course
+      course_offerings = course.offerings.joins(:course_enrollments, :course_roles).where(
+        'course_enrollments.user_id = ? && course_role.can_manage_assignments = ?',
+        user.id, true)
+
+      course_offerings.any?
+    end
+
+    # A user can manage an AssignmentOffering in any CourseOffering where
+    # they are enrolled and have the can_manage_assignments? permission.
+    can :manage, AssignmentOffering do |offering|
+      course_offering = offering.course_offering
+
+      user_enrollment = CourseEnrollment.where(
+        user_id: user.id,
+        course_offering_id: course_offering.id).first
+
+      user_enrollment && user_enrollment.course_role.can_manage_assignments?
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  # Private: Process repository-related permissions.
+  #
+  # user - the user
+  #
+  def process_repositories(user)
+    # TODO implement.
+  end
+
 end

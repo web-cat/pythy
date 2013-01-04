@@ -19,24 +19,6 @@ class CourseRole < ActiveRecord::Base
   before_destroy :check_builtin?
 
 
-  SQL_HAS_ANY_PERMISSIONS = <<-SQL
-    `can_manage_course`          = 1 or
-    `can_manage_assignments`     = 1 or
-    `can_grade_submissions`      = 1 or
-    `can_view_other_submissions` = 1
-  SQL
-
-  SQL_HAS_NO_PERMISSIONS = <<-SQL
-    `can_manage_course`          = 0 and
-    `can_manage_assignments`     = 0 and
-    `can_grade_submissions`      = 0 and
-    `can_view_other_submissions` = 0
-  SQL
-
-  scope :elevated, where(SQL_HAS_ANY_PERMISSIONS)
-  scope :unelevated, where(SQL_HAS_NO_PERMISSIONS)
-
-
   # Make sure to run rake db:seed after initial database creation
   # to ensure that the built-in roles with these IDs are created.
   # These IDs should not be referred to directly in most cases;
@@ -75,13 +57,6 @@ class CourseRole < ActiveRecord::Base
 
 
   #~ Instance methods .........................................................
-
-  # -------------------------------------------------------------
-  def elevated?
-    can_manage_course || can_manage_assignments ||
-      can_grade_submissions || can_view_other_submissions
-  end
-
 
   private
 

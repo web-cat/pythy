@@ -10,10 +10,12 @@ class User < ActiveRecord::Base
   belongs_to  :global_role
   
   has_many    :authentications
+
   has_many    :activity_logs
 
-  has_many    :course_offerings, :through => :course_enrollments
   has_many    :course_enrollments
+
+  has_many    :course_offerings, through: :course_enrollments
 
   # Include default devise modules. Others available are:
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
@@ -57,6 +59,24 @@ class User < ActiveRecord::Base
 
 
   #~ Instance methods .........................................................
+
+  # -------------------------------------------------------------
+  # Public: Gets a relation representing all of the CourseOfferings that
+  # this user can manage.
+  #
+  # Returns a relation representing all of the CourseOfferings that this
+  # user can manage
+  #
+  def managing_course_offerings
+    # It seems like I should have been able to do this through the
+    # course_offerings association directly somehow, but writing
+    # course_offerings.joins(...) resulted in a double-join. This seems
+    # to work correctly instead.
+    CourseOffering.joins(:course_enrollments => :course_role).where(
+      course_enrollments: { user_id: id },
+      course_roles: { can_manage_course: true })
+  end
+
 
   # -------------------------------------------------------------
   def full_name
