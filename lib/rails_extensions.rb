@@ -41,6 +41,19 @@ module PythyActiveRecordExtensions
     value.downcase.gsub(/[^[:alnum:]]+/, '-').gsub(/-+$/, '')
   end
 
+
+  # -------------------------------------------------------------
+  # Gets a Redis key with the specified name, prefixed by the model's class
+  # name and database ID as a namespace.
+  #
+  # key - the key suffix (e.g. "foo")
+  #
+  # Returns the namespaced key (e.g. "Model:4:foo")
+  #
+  def redis_key(key)
+    "#{self.class.name}:#{self.id}:#{key}"
+  end
+
 end
 
 ActiveRecord::Base.send(:include, PythyActiveRecordExtensions)
