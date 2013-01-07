@@ -49,7 +49,9 @@ gem 'kaminari'
 gem 'remotipart'
 gem 'git'
 gem 'juggernaut'
+
 gem 'redis'
+gem 'redis-namespace'
 
 gem 'omniauth'
 gem 'omniauth-facebook'
