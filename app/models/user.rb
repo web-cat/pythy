@@ -5,6 +5,8 @@
 # of supporting multiple authenticators in Devise.)
 class User < ActiveRecord::Base
 
+  delegate :can?, :cannot?, :to => :ability
+
   belongs_to  :institution
 
   belongs_to  :global_role
@@ -59,6 +61,12 @@ class User < ActiveRecord::Base
 
 
   #~ Instance methods .........................................................
+
+  # -------------------------------------------------------------
+  def ability
+    @ability ||= Ability.new(self)
+  end
+
 
   # -------------------------------------------------------------
   # Public: Gets a relation representing all of the CourseOfferings that
