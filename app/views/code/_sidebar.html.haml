@@ -1,0 +1,10 @@
+#sidebar
+  #sidebar-toggle
+    #sidebar-toggle-text <<
+  #sidebar-content
+    %h4 Description
+    %p= @repository.description
+
+    - if can? :manage, @repository
+      %h4 Users currently accessing
+      %ul#accessing-users.unstyled

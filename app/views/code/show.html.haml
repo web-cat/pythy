@@ -1,7 +1,10 @@
 - title raw @page_title
 .clearfix
   .pull-left
-    = raw @page_title
+    %span    
+      = raw @page_title
+    %span#user_count
+      (users)
   .pull-right
     %span#save-indicator.text-success.hide
       Saved
@@ -22,4 +25,5 @@
 = text_area_tag :codearea
 %pre#output
 
+= render partial: 'sidebar'
 = render partial: 'subscribe'

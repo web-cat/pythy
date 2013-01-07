@@ -11,14 +11,20 @@ class CodeController
       tabSize: 2,
       tabMode: "shift",
       matchBrackets: true
+    @ignoreChange = false
 
     this._createWorker()
 
     # Register event handlers for widgets.
     $('#run').click (e) => this._runCode()
     $('#sync').click (e) => this._resync()
+    $('#sidebar-toggle').click this.toggleSidebar
 
     this._subscribe()
+
+    setTimeout =>
+      this._sendMessage data: message: 'ping'
+    , 4 * 60 * 1000 + 55 * 1000 # timeout is 5 min, so ping every 4m55s
 
     if @isEditor
       this._trackChangesWithSaving()
@@ -29,39 +35,45 @@ class CodeController
   #~ Private methods ..........................................................
 
   # ---------------------------------------------------------------
+  _sendMessage: (settings) ->
+    settings.url = window.location.href
+    settings.type ||= 'post'
+    $.ajax settings
+
+
+  # ---------------------------------------------------------------
   _trackChangesWithSaving: ->
-    @changeWasRemote = false
     timerHandle = null
     
     @codeArea.on "change", (_editor, change) =>
-      if (!@changeWasRemote)
+      if (!@ignoreChange)
         if (timerHandle)
           clearTimeout(timerHandle)
         timerHandle = setTimeout =>
           this._sendChangeRequest(this)
         , 500
 
-    window.onbeforeunload = (e) ->
+    window.onbeforeunload = (e) =>
       #pythy.code.sendChangeRequest()
-      #$.ajax "/code/remove_user", data: { username: username }
+      this._sendMessage async: false, data: message: 'remove_user'
       null
 
 
   # ---------------------------------------------------------------
   _trackChanges: ->
-    @changeWasRemote = false
-    
     @codeArea.on "change", (_editor, change) =>
-      if !@desynched && !@changeWasRemote
+      if !@desynched && !@ignoreChange
         @desynched = true
+        this._unsubscribeFromCode()
+        this._sendMessage data: message: 'unsync'
         $('#sync').fadeIn('fast')
         $('#sync').tooltip('show')
         setTimeout =>
           $('#sync').tooltip('hide')
         , 8000
 
-    window.onbeforeunload = (e) ->
-      #$.ajax "/code/remove_user", data: { username: username }
+    window.onbeforeunload = (e) =>
+      this._sendMessage async: false, data: message: 'remove_user'
       null
 
 
@@ -70,27 +82,57 @@ class CodeController
     @desynched = false
     $('#sync').fadeOut('fast')
     $('#sync').tooltip('hide')
-    $.post window.location.href, message: 'resync'
+    this._subscribeToCode()
+    this._sendMessage data: message: 'resync'
+
+
+  # ---------------------------------------------------------------
+  updateCode: (code, force) ->
+    if force || !force && !@desynched
+      @ignoreChange = true
+      @codeArea.setValue code
+      @ignoreChange = false
+
+
+  # ---------------------------------------------------------------
+  toggleSidebar: ->
+    sidebar = $('#sidebar')
+    left = parseInt(sidebar.css('marginLeft'), 10)
+    newLeft = if left == 0 then sidebar.outerWidth() else 0
+    newText = if left == 0 then '<<' else '>>'
+    sidebar.animate marginLeft: newLeft, 'fast'
+    $('#sidebar-toggle-text', sidebar).text(newText)
+
+
+  # ---------------------------------------------------------------
+  _handleJuggernautMessage: (data) ->
+    if data.javascript
+      eval data.javascript
 
 
   # ---------------------------------------------------------------
   _subscribe: ->
     @jug = new Juggernaut
+
     $.ajaxSetup beforeSend: (xhr) =>
       xhr.setRequestHeader "X-Session-ID", @jug.sessionID
 
-    @jug.subscribe @channel, (data) =>
-      if data.action == 'code_updated'
-        unless @desynched
-          @changeWasRemote = true
-          @codeArea.setValue data.code
-          @changeWasRemote = false
-      else if data.action == 'user_added'
-        ;
-      else if data.action == 'user_removed'
-        ;
+    this._subscribeToCode()
 
-    $.post window.location.href, message: 'add_user'
+    if @isEditor
+      @jug.subscribe "#{@channel}_users", this._handleJuggernautMessage
+
+    this._sendMessage data: message: 'add_user'
+
+
+  # -------------------------------------------------------------
+  _subscribeToCode: ->
+    @jug.subscribe "#{@channel}_code", this._handleJuggernautMessage
+
+
+  # -------------------------------------------------------------
+  _unsubscribeFromCode: ->
+    @jug.unsubscribe "#{@channel}_code"
 
 
   # -------------------------------------------------------------
@@ -139,6 +181,13 @@ class CodeController
 
 
   # -------------------------------------------------------------
+  _doNotTriggerChange: (func) ->
+    @ignoreChange = true
+    func()
+    @ignoreChange = false
+
+
+  # -------------------------------------------------------------
   _createWorker: ->
     # Create HTML5 web worker to run code in a separate thread, so infinite
     # loops will not cause the entire browser to hang.
@@ -147,18 +196,21 @@ class CodeController
     @worker.addEventListener 'message', (e) =>
       data = e.data
       
-      # Clear gutters markers
-      @codeArea.clearGutter("CodeMirror-linenumbers")
+      this._doNotTriggerChange =>
+        # Clear gutters markers
+        @codeArea.clearGutter("CodeMirror-linenumbers")
 
-      # Clear syntax-highlighting
-      for i in [0..@codeArea.lineCount()] by 1
-        @codeArea.setLine(i, @codeArea.getLine(i))
+        # Clear syntax-highlighting
+        for i in [0..@codeArea.lineCount()] by 1
+          @codeArea.setLine(i, @codeArea.getLine(i))
 
-      # Clear line widgets
-      if @codeArea.lineInfo(0)? and @codeArea.lineInfo(0).widgets?
-        @codeArea.removeLineWidget(@codeArea.lineInfo(0).widgets[0])
+        # Clear line widgets
+        if @codeArea.lineInfo(0)? and @codeArea.lineInfo(0).widgets?
+          @codeArea.removeLineWidget(@codeArea.lineInfo(0).widgets[0])
               
       switch data.event
+        when 'log'
+          console.log data.args
         when 'output'
           this._handleOutput data.text
         when 'success'
@@ -167,28 +219,27 @@ class CodeController
           ;
           this._cleanup()
         when 'error'
-          # alert 'failure reported'
           console.log(data.error)
           
           message = data.error.message
           type = data.error.type
           error = type + ": " + message
-          
-          if data.error.start? and data.error.end?
-            start = { line : data.error.start.line-1, ch: data.error.start.ch }
-            end = { line: data.error.end.line-1, ch: data.error.end.ch }
-            marker = document.createElement("div")
-            marker.className = "error-marker"
-            marker.innerHTML = "● " + (start.line + 1)
-            marker.title = error
-            @codeArea.markText(start, end, "syntax-highlight") 
-            @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
-          
-          else # no line information
-            node = document.createElement("div")
-            node.innerHTML = error
-            node.className = "error-marker"
-            @codeArea.addLineWidget(0, node, {above: true})
+
+          this._doNotTriggerChange =>
+            if data.error.start? and data.error.end?
+              start = { line : data.error.start.line-1, ch: data.error.start.ch }
+              end = { line: data.error.end.line-1, ch: data.error.end.ch }
+              marker = document.createElement("div")
+              marker.className = "error-marker"
+              marker.innerHTML = "● " + (start.line + 1)
+              marker.title = error
+              @codeArea.markText(start, end, "syntax-highlight") 
+              @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
+            else # no line information
+              node = document.createElement("div")
+              node.innerHTML = error
+              node.className = "error-marker"
+              @codeArea.addLineWidget(0, node, {above: true})
 
           # TODO Do something appropriate when the code had an
           # error (syntax or runtime)
