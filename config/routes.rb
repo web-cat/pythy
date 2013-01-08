@@ -9,7 +9,6 @@ Pythy::Application.routes.draw do
   resource :system_configuration, except: :destroy
 
   resources :authentications
-  resources :assignment_offerings
   resources :terms
 
   match 'activity(/:action)', controller: 'activity_logs',
@@ -40,6 +39,7 @@ Pythy::Application.routes.draw do
       resources :courses do
         resources :assignments
         resources :course_offerings do
+          resources :assignment_offerings
           resources :course_enrollments
           resources :example_repositories, path: 'examples'
         end

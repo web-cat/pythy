@@ -35,8 +35,11 @@ ActiveRecord::Schema.define(:version => 20130103133018) do
     t.integer  "creator_id"
     t.string   "short_name"
     t.string   "long_name"
-    t.datetime "created_at", :null => false
-    t.datetime "updated_at", :null => false
+    t.datetime "created_at",                        :null => false
+    t.datetime "updated_at",                        :null => false
+    t.text     "description", :limit => 2147483647
+    t.integer  "course_id"
+    t.string   "url_part"
   end
 
   create_table "authentications", :force => true do |t|
