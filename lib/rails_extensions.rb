@@ -43,8 +43,8 @@ module PythyActiveRecordExtensions
 
 
   # -------------------------------------------------------------
-  # Gets a Redis key with the specified name, prefixed by the model's class
-  # name and database ID as a namespace.
+  # Public: Gets a Redis key with the specified name, prefixed by the model's
+  # class name and database ID as a namespace.
   #
   # key - the key suffix (e.g. "foo")
   #
@@ -52,6 +52,26 @@ module PythyActiveRecordExtensions
   #
   def redis_key(key)
     "#{self.class.name}:#{self.id}:#{key}"
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Gets the name of a server-side events channel for this
+  # model. This allows us to write controllers that can easily publish
+  # events about any kind of object in the system, and have Javascript
+  # code client-side respond to those events immediately.
+  #
+  # suffix - the suffix to attach to the channel name; can be nil
+  #
+  # Returns the subscription channel name (e.g. "Model_4_foo", or
+  # "Model_4" if the suffix is nil).
+  #
+  def event_channel(suffix)
+    if suffix
+      "#{self.class.name}_#{self.id}_#{suffix.to_s}"
+    else
+      "#{self.class.name}_#{self.id}"
+    end
   end
 
 end
