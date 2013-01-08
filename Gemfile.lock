@@ -201,6 +201,7 @@ GEM
     rake (0.9.2.2)
     rdoc (3.12)
       json (~> 1.4)
+    redcarpet (2.2.2)
     redis (3.0.2)
     redis-namespace (1.2.1)
       redis (~> 3.0.0)
@@ -264,6 +265,7 @@ DEPENDENCIES
   quiet_assets
   rails (= 3.2.6)
   rails_admin
+  redcarpet
   redis
   redis-namespace
   remotipart

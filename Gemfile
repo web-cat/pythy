@@ -53,6 +53,8 @@ gem 'juggernaut'
 gem 'redis'
 gem 'redis-namespace'
 
+gem 'redcarpet'
+
 gem 'omniauth'
 gem 'omniauth-facebook'
 gem 'omniauth-ldap', :git => 'git://github.com/web-cat/omniauth-ldap.git'
