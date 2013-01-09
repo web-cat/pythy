@@ -21,7 +21,6 @@
   left: 70%;
   width: 30%;
   margin-left: 30%;
-//  background-color: white;
   background-color: rgba(0, 0, 0, .9);
   color: #eee;
   z-index: 9999;
@@ -37,6 +36,7 @@
     border-top-left-radius: 8px;
     border-bottom-left-radius: 8px;
     text-align: center;
+    cursor: pointer;
 
     #sidebar-toggle-text {
       display: block;
@@ -46,6 +46,7 @@
       height: 20px;
       margin-top: -11px;
       top: 50%;
+      cursor: pointer;
     }
   }
 
