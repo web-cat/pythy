@@ -36,4 +36,4 @@
     %table.examples
       %tbody#example_repositories
         -# FIXME should be the union of all offerings' examples below
-        = render(@offerings.first.example_repositories) || render(partial: 'example_repositories/empty')
+        = render(@examples) || render(partial: 'example_repositories/empty')
