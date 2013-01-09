@@ -11,6 +11,7 @@
  *= require_self
  *= require codemirror/codemirror.css
  *= require eternicode/bootstrap-datepicker/datepicker.css
+//= require smalot/bootstrap-datetimepicker/datetimepicker
  *= require bootstrap_and_overrides
  *= require global
  */

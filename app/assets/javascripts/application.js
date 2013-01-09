@@ -15,6 +15,7 @@
 //= require jquery.remotipart
 //= require twitter/bootstrap/bootstrap
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
+//= require smalot/bootstrap-datetimepicker/bootstrap-datetimepicker
 //= require codemirror/codemirror
 //= require codemirror/util/matchbrackets
 //= require codemirror/mode/python/python

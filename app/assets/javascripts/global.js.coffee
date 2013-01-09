@@ -12,6 +12,14 @@ $ ->
   )
 
   # -------------------------------------------------------------
+  # Create datetimepickers.
+  $('input.datetimepicker').datetimepicker(
+    autoclose: true,
+    todayHighlight: true,
+    todayBtn: true
+  )
+
+  # -------------------------------------------------------------
   # Create typeahead fields.
   $('input.typeahead').each ->
     $this = $(this)
