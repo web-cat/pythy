@@ -63,6 +63,8 @@ class CodeController < FriendlyUrlController
     @repository.connect_user current_user
     users = @repository.connected_users.alphabetical
 
+    code = ''
+
     @repository.read do
       path = File.join(@repository.git_path, @filename)
       code = File.exists?(path) ? File.read(path) : ''
@@ -121,6 +123,8 @@ class CodeController < FriendlyUrlController
     users = @repository.connected_users.alphabetical
 
     begin
+      code = ''
+
       @repository.read do
         path = File.join(@repository.git_path, @filename)
         code = File.exists?(path) ? File.read(path) : ''
