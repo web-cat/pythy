@@ -61,5 +61,9 @@ gem 'juggernaut'
 # Gems for background job support.
 gem 'sidekiq'
 
+# Required for Sidekiq's web-based monitoring interface.
+gem 'sinatra', require: false
+gem 'slim'
+
 # Gems for deployment.
 gem 'capistrano'

@@ -1,8 +1,11 @@
+require 'sidekiq/web'
+
 include ApplicationHelper   # Brings in needs_initial_setup?
 
 Pythy::Application.routes.draw do
 
   mount RailsAdmin::Engine => 'rails_admin'
+  mount Sidekiq::Web, at: '/sidekiq'
 
   match '/auth/:provider/callback' => 'authentications#create'
 
