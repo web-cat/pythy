@@ -3,11 +3,9 @@ source 'https://rubygems.org'
 gem 'rails', '3.2.6'
 gem 'thin'
 
-# Bundle edge Rails instead:
-# gem 'rails', :git => 'git://github.com/rails/rails.git'
-
 group :development, :test do
   gem 'sqlite3', '~> 1.3.4'
+  gem 'mysql'
   gem 'quiet_assets'
 end
 
@@ -15,61 +13,53 @@ group :production do
   gem 'mysql'
 end
 
-gem 'json'
-
 # Gems used only for assets and not required
 # in production environments by default.
 group :assets do
   gem 'sass-rails',   '~> 3.2.3'
   gem 'coffee-rails', '~> 3.2.1'
-
-  # See https://github.com/sstephenson/execjs#readme for more supported runtimes
-  # gem 'therubyracer', :platforms => :ruby
-
   gem 'uglifier', '>= 1.0.3'
 end
 
+# Fundamental gems for view generation and styling.
+gem 'json'
 gem 'haml', '>= 3.1.4'
 gem 'jquery-rails'
 gem 'therubyracer'
 gem 'less-rails'
-gem 'twitter_bootstrap_form_for', :git => 'git://github.com/stouset/twitter_bootstrap_form_for.git', :branch => 'bootstrap-2.0'
-gem 'devise'
-gem 'net-ldap'
-gem 'devise_ldap_authenticatable', :git => 'git://github.com/cschiewek/devise_ldap_authenticatable.git'
-gem 'cancan'
-gem 'fastercsv'
-gem 'rails_admin'
+gem 'twitter_bootstrap_form_for',
+  git: 'git://github.com/stouset/twitter_bootstrap_form_for.git',
+  branch: 'bootstrap-2.0'
 gem 'font-awesome-rails'
-gem 'delayed_job'
-gem 'delayed_job_active_record'
 gem 'daemon'
-gem 'delocalize'
-gem 'kaminari'
-gem 'remotipart'
-gem 'git'
-gem 'juggernaut'
 
-gem 'redis'
-gem 'redis-namespace'
-
-gem 'redcarpet'
-
+# Gems for authentication and authorization.
+gem 'devise'
+gem 'devise_ldap_authenticatable',
+  git: 'git://github.com/cschiewek/devise_ldap_authenticatable.git'
+gem 'net-ldap'
 gem 'omniauth'
 gem 'omniauth-facebook'
-gem 'omniauth-ldap', :git => 'git://github.com/web-cat/omniauth-ldap.git'
+gem 'omniauth-ldap',
+  git: 'git://github.com/web-cat/omniauth-ldap.git'
+gem 'cancan'
 
-# To use ActiveModel has_secure_password
-# gem 'bcrypt-ruby', '~> 3.0.0'
+# Various gems for other features used in Pythy.
+gem 'fastercsv'       # CSV reading/writing
+gem 'kaminari'        # Auto-paginated views
+gem 'remotipart'      # Adds support for remote mulitpart forms (file uploads)
+gem 'redcarpet'       # Markdown renderer
+gem 'rails_admin'     # Turnkey admin interface
+gem 'delocalize'      # Fixes formatting of date/time form fields
+gem 'git'             # Git repository support
 
-# To use Jbuilder templates for JSON
-# gem 'jbuilder'
+# Gems for server-side event support.
+gem 'redis'
+gem 'redis-namespace'
+gem 'juggernaut'
 
-# Use unicorn as the app server
-# gem 'unicorn'
+# Gems for background job support.
+gem 'sidekiq'
 
-# Deploy with Capistrano
+# Gems for deployment.
 gem 'capistrano'
-
-# To use debugger
-# gem 'ruby-debug'
