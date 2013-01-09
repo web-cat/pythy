@@ -3,8 +3,6 @@
   .pull-left
     %span    
       = raw @page_title
-    %span#user_count
-      (users)
   .pull-right
     %span#save-indicator.text-success.hide
       Saved
@@ -20,7 +18,7 @@
         = icon_tag('play') + ' Run'
       - if @repository.is_a? AssignmentRepository
         = button_tag id: 'check', class: 'btn' do
-          = icon_tag('check') + ' Check'
+          = icon_tag('tasks') + ' Check'
 
 = text_area_tag :codearea
 %pre#output
