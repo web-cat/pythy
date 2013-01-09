@@ -49,6 +49,11 @@ class Repository < ActiveRecord::Base
     begin
       @git.commit_all message, author: author
       committed = true
+
+      # Update the updated_at timestamp of the repository with each commit;
+      # this allows us to do fast queries/sorting based on last modified
+      # time without having to go out to the file system.
+      self.touch
     rescue Git::GitExecuteError => e
       # Ignore an exception that says there was nothing to commit; we just
       # silently ignore these. Otherwise, let the exception bubble out.
