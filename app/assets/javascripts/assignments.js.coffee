@@ -1,3 +1,8 @@
-# Place all the behaviors and hooks related to the matching controller here.
-# All this logic will automatically be available in application.js.
-# You can use CoffeeScript in this file: http://jashkenas.github.com/coffee-script/
+$ ->
+  CodeMirror.fromTextArea $('#assignment_description')[0],
+    theme: 'markdown default',
+    mode: { name: "markdown" },
+    lineWrapping: true,
+    indentUnit: 2,
+    tabSize: 2,
+    tabMode: "shift",

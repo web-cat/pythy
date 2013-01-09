@@ -27,6 +27,16 @@ class ExampleRepository < Repository
   end
 
 
+  # -------------------------------------------------------------
+  def event_channel(suffix)
+    if source_repository
+      source_repository.event_channel(suffix)
+    else
+      super
+    end
+  end
+
+
   private
 
   # -------------------------------------------------------------

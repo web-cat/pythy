@@ -126,16 +126,24 @@ class Ability
     # TODO This may need improvement.
     can :manage, Assignment do |assignment|
       course = assignment.course
-      course_offerings = course.offerings.joins(:course_enrollments, :course_roles).where(
-        'course_enrollments.user_id = ? && course_role.can_manage_assignments = ?',
-        user.id, true)
+      course_offerings = course.course_offerings.joins(
+        :course_enrollments => :course_role).where(
+          course_enrollments: { user_id: user.id },
+          course_roles: { can_manage_assignments: true }
+        )
 
       course_offerings.any?
     end
 
     # A user can manage an AssignmentOffering in any CourseOffering where
     # they are enrolled and have the can_manage_assignments? permission.
-    can :manage, AssignmentOffering do |offering|
+
+    relation = AssignmentOffering.joins(
+      :course_offering => { :course_enrollments => :course_role }).where(
+      course_enrollments: { user_id: user.id },
+      course_roles: { can_manage_assignments: true })
+
+    can :manage, AssignmentOffering, relation do |offering|
       course_offering = offering.course_offering
 
       user_enrollment = CourseEnrollment.where(
@@ -161,6 +169,13 @@ class Ability
 
     can :manage, ExampleRepository do |repository|
       can? :manage, repository.course_offering
+    end
+
+
+    # Users can, of course, always read assignment repositories that
+    # contain their own work.
+    can [:read, :update], AssignmentRepository do |repository|
+      repository.user == user
     end
 
   end

@@ -1,0 +1,15 @@
+%ul.breadcrumb
+  %li
+    = link_to @assignment.course.department.institution.display_name, @assignment.course.department.institution
+    %span.divider /
+  %li
+    = link_to @assignment.course.department.name, department_path(@assignment.course.department)
+    %span.divider /
+  %li
+    = link_to @assignment.course.department_name_and_number, @assignment.course
+    %span.divider /
+  %li.active
+    = @assignment.short_name
+    (editing)
+
+= render 'form'

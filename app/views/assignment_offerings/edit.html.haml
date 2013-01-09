@@ -1,0 +1,18 @@
+%ul.breadcrumb
+  %li
+    = link_to @assignment_offering.course_offering.course.department.institution.display_name, @assignment_offering.course_offering.course.department.institution
+    %span.divider /
+  %li
+    = link_to @assignment_offering.course_offering.course.department.name, department_path(@assignment_offering.course_offering.course.department)
+    %span.divider /
+  %li
+    = link_to @assignment_offering.@course_offering.course.department_name_and_number, course_path(@assignment_offering.course_offering.course)
+    %span.divider /
+  %li
+    = link_to @assignment_offering.course_offering.crn, course_offering_path(@assignment_offering.course_offering)
+    %span.divider /
+  %li.active
+    = @assignment_offering.assignment.short_name
+    (editing)
+
+= render 'form'

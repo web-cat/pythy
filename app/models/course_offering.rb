@@ -4,6 +4,7 @@ class CourseOffering < ActiveRecord::Base
   belongs_to  :term
 
   has_many    :example_repositories
+  has_many    :assignment_offerings
 
   has_many    :course_enrollments, include: [:course_role, :user],
               order: 'course_roles.id asc, users.last_name asc, users.first_name asc'
@@ -33,6 +34,13 @@ class CourseOffering < ActiveRecord::Base
   # -------------------------------------------------------------
   def other_concurrent_offerings
     course.course_offerings.where('term_id = ? and id != ?', term.id, id)
+  end
+
+
+  # -------------------------------------------------------------
+  def role_for_user(user)
+    enrollment = course_enrollments.where(user_id: user.id).first
+    enrollment ? enrollment.course_role : nil
   end
 
 

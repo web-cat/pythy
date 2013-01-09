@@ -303,4 +303,15 @@ HTML
     content_for(:title) { page_title }
   end
 
+
+  # -------------------------------------------------------------
+  def datetime_or_none(datetime, empty=nil)
+    empty ||= '(not set)'
+    if datetime
+      l datetime
+    else
+      raw "<span class=\"muted\">#{empty}</span>"
+    end
+  end
+
 end

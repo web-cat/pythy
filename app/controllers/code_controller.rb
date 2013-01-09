@@ -10,7 +10,7 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def show
-    @subscribe_channel = subscribe_channel(nil)
+    @subscribe_channel = @repository.event_channel(nil)
   end
 
 
@@ -21,28 +21,15 @@ class CodeController < FriendlyUrlController
     code = params[:code]
 
     # Update the code in the working copy of the repo.
-    path = File.join(@repository.git_path, @filename)
-    File.open(path, 'w') { |f| f.write(code) }
+    committed = @repository.commit(current_user) do |git|
+      path = File.join(@repository.git_path, @filename)
+      File.open(path, 'w') { |f| f.write(code) }
 
-    git = @repository.open
-    git.add path
-
-    committed = true
-
-    begin
-      git.commit_all "Updated by #{current_user.display_name}",
-        author: "#{current_user.display_name} <#{current_user.email}>"
-    rescue Git::GitExecuteError => e
-      if e.message =~ /nothing to commit/
-        committed = false
-      else
-        raise e
-      end
+      git.add path
     end
 
     respond_to do |format|
       if committed
-        puts "PUSHING THE CODE"
         publish(:code) do
           render_to_string template: 'code/update_code',
             locals: { code: code, force: false }
@@ -76,24 +63,19 @@ class CodeController < FriendlyUrlController
     @repository.connect_user current_user
     users = @repository.connected_users.alphabetical
 
-    path = File.join(@repository.git_path, @filename)
+    @repository.read do
+      path = File.join(@repository.git_path, @filename)
+      code = File.exists?(path) ? File.read(path) : ''
+    end
+    
+    publish(:users) do
+      render_to_string template: 'code/update_user_list',
+        locals: { users: users }
+    end
 
-    begin
-      code = File.read(path)
-      
-      publish(:users) do
-        render_to_string template: 'code/update_user_list',
-          locals: { users: users }
-      end
-
-      respond_to do |format|
-        format.js { render template: 'code/update_code',
-          locals: { code: code, force: true } }
-      end
-    rescue IOError
-      respond_to do |format|
-        format.js { render nothing: true }
-      end      
+    respond_to do |format|
+      format.js { render template: 'code/update_code',
+        locals: { code: code, force: true } }
     end
     
   end
@@ -138,10 +120,11 @@ class CodeController < FriendlyUrlController
     @repository.sync_user current_user
     users = @repository.connected_users.alphabetical
 
-    path = File.join(@repository.git_path, @filename)
-
     begin
-      code = File.read(path)
+      @repository.read do
+        path = File.join(@repository.git_path, @filename)
+        code = File.exists?(path) ? File.read(path) : ''
+      end
 
       publish(:users) do
         render_to_string template: 'code/update_user_list',
@@ -171,22 +154,9 @@ class CodeController < FriendlyUrlController
 
 
   # -------------------------------------------------------------
-  def subscribe_channel(name)
-    id = @repository.source_repository ? @repository.source_repository.id :
-      @repository.id
-
-    if name
-      "#{@repository.class.name}_#{id}_#{name.to_s}"
-    else
-      "#{@repository.class.name}_#{id}"
-    end
-  end
-
-
-  # -------------------------------------------------------------
   def publish(channel, &block)
     options = { javascript: block.call }
-    Juggernaut.publish subscribe_channel(channel), options,
+    Juggernaut.publish @repository.event_channel(channel), options,
       except: request.headers['X-Session-ID']
   end
 
@@ -203,6 +173,24 @@ class CodeController < FriendlyUrlController
 
       if @repository
         @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+      end
+    elsif parts.first == 'assignments'
+      url_part = parts.second
+      @filename = parts.length > 2 ? parts[2] : DEFAULT_FILE
+
+      assignment = AssignmentOffering.joins(:assignment).where(
+        assignments: { url_part: url_part },
+        course_offering_id: @offerings.first.id).first
+
+      relation = AssignmentRepository.where(
+        user_id: current_user.id,
+        assignment_offering_id: assignment.id)
+
+      # Create the repository if it doesn't exist.
+      @repository = relation.first || relation.create
+
+      if @repository
+        #@page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
       end
     end
 

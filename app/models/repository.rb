@@ -16,7 +16,72 @@ class Repository < ActiveRecord::Base
   # Returns the Git repository.
   #
   def open
-    Git.open(git_path)
+    @git = Git.open(git_path)
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Locks (TODO) the repository, yields to the passed in block that
+  # will perform updates to the repository's working directory, and then
+  # commits the changes. The block is passed the Git instance (the underlying
+  # repository object) so that it can perform operations on it, such as
+  # adding files to the index.
+  #
+  # The lock used is a Redis-based mutex, so it will properly lock the
+  # repository across multiple request processes (or even multiple servers
+  # if they all share the same Redis instance).
+  #
+  # Returns true if the repository changed as a result of the commit.
+  #
+  def commit(user, message = nil)
+    open unless @git
+
+    # TODO lock
+    
+    # Yield to the block, which will manipulate the working directory.
+    yield @git
+
+    message ||= "Updated by #{user.display_name}"
+    author = "#{user.display_name} <#{user.email}>"
+
+    # Commit the changes, safely ignoring a possible exception if the
+    # changes actually resulted in no effective change.
+    begin
+      @git.commit_all message, author: author
+      committed = true
+    rescue Git::GitExecuteError => e
+      # Ignore an exception that says there was nothing to commit; we just
+      # silently ignore these. Otherwise, let the exception bubble out.
+      if e.message =~ /nothing to commit/
+        committed = false
+      else
+        raise e
+      end
+    end
+
+    # TODO unlock
+
+    committed
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Locks (TODO) the repository, yields to the passed in block that
+  # will access (read) files in the working directory, and then unlocks the
+  # repository. This method should only be used when reading the repository
+  # contents; changes should use the `commit` method.
+  #
+  # The lock used is a Redis-based mutex, so it will properly lock the
+  # repository across multiple request processes (or even multiple servers
+  # if they all share the same Redis instance).
+  #
+  def read
+    # TODO lock
+    
+    # Yield to the block, which will access the working directory.
+    yield
+
+    # TODO unlock
   end
 
 

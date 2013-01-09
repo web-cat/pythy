@@ -1,0 +1,41 @@
+= pythy_form_for @assignment do |f|
+
+  = f.fieldset 'Assignment Properties' do
+
+    = f.text_field :short_name, class: 'input-large' do
+      .help-block A brief name for the assignment, such as "Project 1".
+    = f.text_field :long_name, class: 'input-xxlarge' do
+      .help-block
+        A more descriptive name for the assignment. The short name and long name will be combined as
+        %strong "Short Name: Long Name"
+        in many displays.
+    = f.text_area :description, rows: 10, class: 'input-xxlarge' do
+      .help-block
+        The full write-up or specification of the assignment. This description will be processed as
+        = link_to 'Markdown-formatted text', 'http://daringfireball.net/projects/markdown/syntax', target: '_blank'
+        to display to students.
+
+  = f.fieldset 'Offerings of This Assignment' do
+    &nbsp;
+    %table.table.table-bordered.table-striped
+      %thead
+        %tr
+          %th Course Offering
+          %th Opens at
+          %th Due at
+          %th Closes at
+      %tbody
+        - @assignment_offerings.each_with_index do |offering, index|
+          %tr
+            %td
+              = offering.course_offering.crn
+              - if offering.course_offering.label
+                = surround '(', ')' do
+                  = offering.course_offering.label
+              = hidden_field_tag "assignment[assignment_offerings_attributes][#{index}][id]", offering.id
+            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][opens_at]", offering.opens_at, class: 'inline datetimepicker'
+            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][due_at]", offering.due_at, class: 'inline datetimepicker'
+            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][closes_at]", offering.closes_at, class: 'inline datetimepicker'
+
+  = f.actions do
+    = f.submit

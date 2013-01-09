@@ -1,0 +1,18 @@
+= pythy_form_for @assignment_offering.course_offering, @assignment_offering do |f|
+
+  = f.fields_for :assignment do |assignment|
+    = assignment.text_field :short_name, class: 'input-large' do
+      .help-block A brief name for the assignment, such as "Project 1".
+    = assignment.text_field :long_name, class: 'input-xxlarge' do
+      .help-block
+        A more descriptive name for the assignment. The short name and long name will be combined as
+        %strong "Short Name: Long Name"
+        in many displays.
+    = assignment.text_area :description, rows: 10, class: 'input-xxlarge' do
+      .help-block
+        The full write-up or specification of the assignment. This description will be processed as
+        = link_to 'Markdown-formatted text', 'http://daringfireball.net/projects/markdown/syntax', target: '_blank'
+        to display to students.
+
+  = f.actions do
+    = f.submit

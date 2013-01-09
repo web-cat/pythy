@@ -12,13 +12,15 @@
 	text-align: left;
 }
 
-.assignment {
-  text-align: left;
+.btn.assignment {
   display: block;
   position: relative;
   padding-left: 6px;
   margin-bottom: 8px;
+}
 
+.assignment {
+  text-align: left;
   .assignment-title {
     font-size: 16px;
     font-weight: 600;

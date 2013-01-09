@@ -1,5 +1,9 @@
-%a.btn.assignment.started
-  .assignment-title Project 1: Stock Market Manipulation
+= link_to code_path(not_started_assignment), class: 'btn btn-block assignment' do
+  .assignment-title
+    = succeed ':' do
+      = not_started_assignment.assignment.short_name
+    = not_started_assignment.assignment.long_name
   .subtext
-    %i.icon-calendar
-    Due in 2 weeks
+    = assignment_date_wrapper(not_started_assignment) do
+      %i.icon-calendar
+      = assignment_date_text(not_started_assignment)

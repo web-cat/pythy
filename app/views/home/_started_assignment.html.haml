@@ -1,9 +1,19 @@
-%a.btn.assignment.started
-  .assignment-title Project 1: Stock Market Manipulation
+= link_to code_path(started_assignment), class: 'btn btn-block assignment started' do
+  .assignment-title
+    = succeed ':' do
+      = started_assignment.assignment.short_name
+    = started_assignment.assignment.long_name
+
   .subtext
-    %i.icon-calendar
-    Due in 2 weeks
-  .subtext Last edited 2 days ago
+    = assignment_date_wrapper(started_assignment) do
+      %i.icon-calendar
+      = assignment_date_text(started_assignment)
+
+  .subtext
+    -# FIXME
+    Last edited 2 days ago
+
   .score-container.btn.btn-inverse
+    -# FIXME
     %span Score:
     .score 97%

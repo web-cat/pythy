@@ -1,0 +1,48 @@
+%ul.breadcrumb
+  %li
+    = link_to @assignment.course.department.institution.display_name, @assignment.course.department.institution
+    %span.divider /
+  %li
+    = link_to @assignment.course.department.name, department_path(@assignment.course.department)
+    %span.divider /
+  %li
+    = link_to @assignment.course.department_name_and_number, @assignment.course
+    %span.divider /
+  %li.active
+    = succeed ':' do
+      = @assignment.short_name
+    = @assignment.long_name
+  %li.pull-right
+    = link_to edit_assignment_path(@assignment) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @assignment.short_name
+  %small
+    = surround '(', ')' do
+      = @assignment.long_name
+
+%h3.page-header Offerings
+%table.table.table-bordered.table-striped
+  %thead
+    %tr
+      %th Course Offering
+      %th Opens at
+      %th Due at
+      %th Closes at
+  %tbody
+    - @assignment_offerings.each do |offering|
+      %tr
+        %td
+          = offering.course_offering.crn
+          - if offering.course_offering.label
+            = surround '(', ')' do
+              = offering.course_offering.label
+        %td= datetime_or_none offering.opens_at
+        %td= datetime_or_none offering.due_at
+        %td= datetime_or_none offering.closes_at
+
+%h3.page-header Description
+.assignment_description
+  = raw @description
