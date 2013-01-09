@@ -19,4 +19,5 @@
 //= require codemirror/codemirror
 //= require codemirror/util/matchbrackets
 //= require codemirror/mode/python/python
+//= require codemirror/mode/markdown/markdown
 //= require global
