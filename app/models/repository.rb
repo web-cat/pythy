@@ -13,10 +13,26 @@ class Repository < ActiveRecord::Base
   # Public: Opens the Git repository corresponding to this Pythy repository
   # object.
   #
-  # Returns the Git repository.
+  # If a block is given, the Git object is passed to the block, and this
+  # method returns the result of the block. Otherwise, this method returns
+  # the Git object.
   #
   def open
-    @git = Git.open(git_path)
+    @git = Git.open(git_path) unless open?
+
+    if block_given?
+      yield @git
+    else
+      @git
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Returns True if the repository is open, otherwise False.
+  #
+  def open?
+    !@git.nil?
   end
 
 
@@ -34,7 +50,7 @@ class Repository < ActiveRecord::Base
   # Returns true if the repository changed as a result of the commit.
   #
   def commit(user, message = nil)
-    open unless @git
+    open
 
     # TODO lock
     
@@ -87,6 +103,18 @@ class Repository < ActiveRecord::Base
     yield
 
     # TODO unlock
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Gets the SHA of the commit that represents the current HEAD of
+  # the repository.
+  #
+  # Returns a String containing the SHA of the repository's HEAD commit.
+  #
+  def head_sha
+    open
+    @git.object('HEAD').sha
   end
 
 

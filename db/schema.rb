@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130103133018) do
+ActiveRecord::Schema.define(:version => 20130109175139) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -19,6 +19,16 @@ ActiveRecord::Schema.define(:version => 20130103133018) do
     t.text     "info"
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
+  end
+
+  create_table "assignment_checks", :force => true do |t|
+    t.integer  "assignment_repository_id"
+    t.integer  "number"
+    t.integer  "status"
+    t.decimal  "overall_score",            :precision => 16, :scale => 8
+    t.text     "extra"
+    t.datetime "created_at",                                              :null => false
+    t.datetime "updated_at",                                              :null => false
   end
 
   create_table "assignment_offerings", :force => true do |t|
@@ -35,9 +45,10 @@ ActiveRecord::Schema.define(:version => 20130103133018) do
     t.integer  "creator_id"
     t.string   "short_name"
     t.string   "long_name"
-    t.datetime "created_at",                        :null => false
-    t.datetime "updated_at",                        :null => false
-    t.text     "description", :limit => 2147483647
+    t.text     "brief_summary"
+    t.text     "description",   :limit => 2147483647
+    t.datetime "created_at",                          :null => false
+    t.datetime "updated_at",                          :null => false
     t.integer  "course_id"
     t.string   "url_part"
   end

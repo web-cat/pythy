@@ -21,4 +21,30 @@ class Assignment < ActiveRecord::Base
     self.url_part = url_part_safe(short_name)
   end
 
+
+  # -------------------------------------------------------------
+  def brief_summary_html
+    @brief_summary_html ||= markdown_renderer.render(brief_summary)
+  end
+
+
+  # -------------------------------------------------------------
+  def description_html
+    @description_html ||= markdown_renderer.render(description)
+  end
+
+
+  private
+
+  # -------------------------------------------------------------
+  def markdown_renderer
+    @markdown ||= Redcarpet::Markdown.new(Redcarpet::Render::HTML,
+      no_intra_emphasis: true,
+      tables: true,
+      fenced_code_blocks: true,
+      autolink: true,
+      strikethrough: true,
+      superscript: true)
+  end
+
 end

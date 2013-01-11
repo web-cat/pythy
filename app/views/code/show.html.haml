@@ -1,27 +1,43 @@
 - title raw @page_title
-.clearfix
-  .pull-left
-    %span    
-      = raw @page_title
-  .pull-right
-    %span#save-indicator.text-success.hide
-      Saved
 
-    .btn-group
-      = button_tag id: 'sync', class: 'btn btn-warning hide',
-        rel: 'tooltip', title: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.',
-        data: { placement: 'bottom' } do
-        = icon_tag('refresh') + ' Sync'
+#summary-area
+  .clearfix
 
-    .btn-group
-      = button_tag id: 'run', class: 'btn btn-success' do
-        = icon_tag('play') + ' Run'
-      - if @repository.is_a? AssignmentRepository
-        = button_tag id: 'check', class: 'btn' do
-          = icon_tag('tasks') + ' Check'
+    .pull-left
+      %h3.slim
+        = raw @page_title
+    .pull-right
+      %span#save-indicator.text-success.hide
+        Saved
 
-= text_area_tag :codearea
-%pre#output
+      .btn-group
+        = button_tag id: 'sync', class: 'btn btn-warning hide',
+          rel: 'tooltip', title: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.',
+          data: { placement: 'bottom' } do
+          = icon_tag('refresh') + ' Sync'
 
+      .btn-group
+        = button_tag id: 'run', class: 'btn btn-success', rel: 'tooltip', title: 'Run your code and see its output' do
+          = icon_tag('play') + ' Run'
+        - if @repository.is_a? AssignmentRepository
+          = button_tag id: 'check', class: 'btn', rel: 'tooltip', title: 'Check your work to see how well you are doing' do
+            = icon_tag('magic') + ' Check'
+          = button_tag id: 'more-options', class: 'btn dropdown-toggle', data: { toggle: 'dropdown' } do
+            = icon_tag('cog')
+            %span.caret
+          %ul.dropdown-menu.pull-right
+            %li
+              %a{ href: '#', id: 'start-over' }
+                = icon_tag('remove') + ' Start over...'
+
+  .summary-content
+    - if @repository.is_a? AssignmentRepository
+      = raw @summary
+      = link_to '(Open the full description in a new tab)', @repository.assignment_offering.assignment, target: '_blank'
+
+#code-area
+  = text_area_tag :codearea
+
+= render partial: 'console'
 = render partial: 'sidebar'
 = render partial: 'subscribe'

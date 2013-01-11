@@ -23,25 +23,34 @@
     = surround '(', ')' do
       = @assignment.long_name
 
-%h3.page-header Offerings
-%table.table.table-bordered.table-striped
-  %thead
-    %tr
-      %th Course Offering
-      %th Opens at
-      %th Due at
-      %th Closes at
-  %tbody
-    - @assignment_offerings.each do |offering|
+.assignment_summary
+  = raw @summary
+
+- if can? :manage, @assignment
+  %h3.page-header Offerings
+  %table.table.table-bordered.table-striped
+    %thead
       %tr
-        %td
-          = offering.course_offering.crn
-          - if offering.course_offering.label
-            = surround '(', ')' do
-              = offering.course_offering.label
-        %td= datetime_or_none offering.opens_at
-        %td= datetime_or_none offering.due_at
-        %td= datetime_or_none offering.closes_at
+        %th Course Offering
+        %th Opens at
+        %th Due at
+        %th Closes at
+    %tbody
+      - @assignment_offerings.each do |offering|
+        %tr
+          %td
+            = offering.course_offering.crn
+            - if offering.course_offering.label
+              = surround '(', ')' do
+                = offering.course_offering.label
+          %td= datetime_or_none offering.opens_at
+          %td= datetime_or_none offering.due_at
+          %td= datetime_or_none offering.closes_at
+- else
+  .alert.alert-info
+    This assignment is due at
+    = succeed '.' do
+      %strong= l @assignment_offerings.first.due_at
 
 %h3.page-header Description
 .assignment_description

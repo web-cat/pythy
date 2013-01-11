@@ -270,3 +270,18 @@ form textarea + .CodeMirror {
 form textarea + .CodeMirror.cm-s-markdown {
   font-family: @sansFontFamily;
 }
+
+// Dark panels give us some nice options for docking sidebars and such.
+// Put this class on such a panel to get the background and text colors;
+// elements placed on these panels will need to have their styling adjusted
+// to look good (e.g., progress bars).
+
+.dark-panel {
+  background-color: rgba(0, 0, 0, 0.9);
+  color: #eee;
+}
+
+.dark-panel .progress {
+  #gradient > .vertical(#060606, #0a0a0a);
+  .box-shadow(inset 0 0px 3px rgba(255,255,255,.4));  
+}

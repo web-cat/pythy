@@ -41,3 +41,27 @@ form.form-search.breadcrumb-hang button[type="submit"] {
   color: #f44;
   text-shadow: 0px 1px 0px black;
 }
+
+table.table.table-bare {
+  td {
+    padding: 2px 0;
+    border: none;
+  }
+}
+
+table.table .progress {
+  margin-bottom: 0;
+}
+
+h1.slim, h2.slim, h3.slim, h4.slim, h5.slim, h6.slim {
+  margin: 0;
+}
+
+.CodeMirror {
+  line-height: 16px;
+}
+
+.CodeMirror-linenumber {
+  padding-top: 1px;
+  font-size: 11px;
+}

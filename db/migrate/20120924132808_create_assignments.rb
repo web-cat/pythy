@@ -5,8 +5,9 @@ class CreateAssignments < ActiveRecord::Migration
       t.integer :course_id
       t.string :short_name
       t.string :long_name
+      t.text :brief_summary
+      t.longtext :description
       t.string :url_part
-      t.text :description
 
       t.timestamps
     end

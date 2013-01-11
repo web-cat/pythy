@@ -1,0 +1,7 @@
+%table.table.table-bare
+  %tbody
+    - repository.assignment_checks.most_recent(10).each do |check|
+      %tr
+        %td= l check.updated_at
+        %td{ style: 'width: 50%' }
+          = score_bar check.overall_score

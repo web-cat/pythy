@@ -11,20 +11,35 @@ class CodeController
       tabSize: 2,
       tabMode: "shift",
       matchBrackets: true
+
+    $(window).resize => this._updateCodeSize()
+    this._updateCodeSize()
+
+    @codeArea.on 'cursorActivity', =>
+      cur = @codeArea.getLineHandle(@codeArea.getCursor().line)
+      if cur != @hlLine
+        if @hlLine
+          @codeArea.removeLineClass @hlLine, 'background', 'active-line'
+        @hlLine = @codeArea.addLineClass(cur, 'background', 'active-line')
+
     @ignoreChange = false
+
+    @console = new InteractiveConsole(this._handleInput)
 
     this._createWorker()
 
     # Register event handlers for widgets.
     $('#run').click (e) => this._runCode()
     $('#sync').click (e) => this._resync()
+    $('#check').click (e) => this._checkCode()
+    $('#start-over').click (e) => this._startOver()
     $('#sidebar-toggle').click this.toggleSidebar
 
     this._subscribe()
 
     setTimeout =>
       this._sendMessage data: message: 'ping'
-    , 4 * 60 * 1000 + 55 * 1000 # timeout is 5 min, so ping every 4m55s
+    , (4 * 60 + 55) * 1000 # timeout is 5 min, so keep-alive every 4m55s
 
     if @isEditor
       this._trackChangesWithSaving()
@@ -35,6 +50,14 @@ class CodeController
   #~ Private methods ..........................................................
 
   # ---------------------------------------------------------------
+  _updateCodeSize: ->
+    $('#code-area').height(
+      $('#main-container').height() -
+      parseInt($('#main-container-inner').css('paddingTop')) -
+        $('#summary-area').height() - 50)
+
+
+  # ---------------------------------------------------------------
   _sendMessage: (settings) ->
     settings.url = window.location.href
     settings.type ||= 'post'
@@ -43,13 +66,14 @@ class CodeController
 
   # ---------------------------------------------------------------
   _trackChangesWithSaving: ->
-    timerHandle = null
+    @timerHandle = null
     
     @codeArea.on "change", (_editor, change) =>
       if (!@ignoreChange)
-        if (timerHandle)
-          clearTimeout(timerHandle)
-        timerHandle = setTimeout =>
+        $('#check').attr 'disabled', 'disabled'
+        if (@timerHandle)
+          clearTimeout(@timerHandle)
+        @timerHandle = setTimeout =>
           this._sendChangeRequest(this)
         , 500
 
@@ -87,6 +111,20 @@ class CodeController
 
 
   # ---------------------------------------------------------------
+  _checkCode: ->
+    this._sendMessage data: message: 'check'
+
+
+  # ---------------------------------------------------------------
+  _startOver: ->
+    pythy.confirm 'If you start over, the work you have done so far
+      will be erased. Are you sure you want to do this?',
+      title: 'Are you sure?'
+      yesClass: 'btn-danger',
+      onYes: => this._sendMessage data: message: 'start_over'
+
+
+  # ---------------------------------------------------------------
   updateCode: (code, force) ->
     if force || !force && !@desynched
       @ignoreChange = true
@@ -95,13 +133,11 @@ class CodeController
 
 
   # ---------------------------------------------------------------
-  toggleSidebar: ->
+  toggleSidebar: (force) ->
     sidebar = $('#sidebar')
     left = parseInt(sidebar.css('marginLeft'), 10)
     newLeft = if left == 0 then sidebar.outerWidth() else 0
-    newText = if left == 0 then '<<' else '>>'
-    sidebar.animate marginLeft: newLeft, 'fast'
-    $('#sidebar-toggle-text', sidebar).text(newText)
+    sidebar.animate marginLeft: newLeft, 100
 
 
   # ---------------------------------------------------------------
@@ -121,6 +157,8 @@ class CodeController
 
     if @isEditor
       @jug.subscribe "#{@channel}_users", this._handleJuggernautMessage
+      @jug.subscribe "#{@channel}_results", this._handleJuggernautMessage
+
 
     this._sendMessage data: message: 'add_user'
 
@@ -159,7 +197,8 @@ class CodeController
       this._createWorker()
     else
       this._setRunButtonStop(true)
-      $('#output').text ''
+      this._clearErrors()
+      @console.clear()
       @worker.postMessage cmd: 'run', code: @codeArea.getValue()
 
 
@@ -170,14 +209,51 @@ class CodeController
 
   # -------------------------------------------------------------
   _handleOutput: (text) ->
-    output = $('#output');
-    output.text(output.text() + text);
+    @console.output text
+
+
+  # -------------------------------------------------------------
+  _handleInput: (text) ->
+    @worker.postMessage cmd: 'input', input: text
+
+
+  # -------------------------------------------------------------
+  _clearErrors: ->
+    if @lastErrorWidget
+      @codeArea.removeLineWidget @lastErrorWidget
 
 
   # -------------------------------------------------------------
   _handleError: (error) ->
-    alert 'Failed! ' + error
-    console.log error
+    # Print the error at the bottom of the console.
+    @console.error error
+
+    # Add a widget to the code window showing the error.
+    this._doNotTriggerChange =>
+      message = error.message
+      type = error.type
+      #error = type + ": " + message
+
+      if error.start
+        error.end ||= error.start
+        if error.start.line == error.end.line && error.start.ch == error.end.ch
+          error.end.ch++
+
+        start = line: error.start.line - 1, ch: error.start.ch
+        end   = line: error.end.line - 1,   ch: error.end.ch
+
+        marker = $('<div class="error-widget"></div>')
+        #marker.innerHTML = "● " + (start.line + 1)
+        marker.text "Error: #{error.message}"
+        @lastErrorWidget = @codeArea.addLineWidget(start.line, marker[0])
+#        @codeArea.markText(start, end, "syntax-highlight") 
+#        @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
+
+
+    # Move the cursor to the error line in the code editor and give it
+    # the focus.
+    @codeArea.setCursor error.start.line - 1, error.start.ch
+    @codeArea.focus()
 
 
   # -------------------------------------------------------------
@@ -195,58 +271,102 @@ class CodeController
 
     @worker.addEventListener 'message', (e) =>
       data = e.data
-      
-      this._doNotTriggerChange =>
-        # Clear gutters markers
-        @codeArea.clearGutter("CodeMirror-linenumbers")
 
-        # Clear syntax-highlighting
-        for i in [0..@codeArea.lineCount()] by 1
-          @codeArea.setLine(i, @codeArea.getLine(i))
-
-        # Clear line widgets
-        if @codeArea.lineInfo(0)? and @codeArea.lineInfo(0).widgets?
-          @codeArea.removeLineWidget(@codeArea.lineInfo(0).widgets[0])
-              
       switch data.event
         when 'log'
           console.log data.args
+        when 'input'
+          @console.promptForInput data.prompt
         when 'output'
           this._handleOutput data.text
         when 'success'
-          console.log(data)
-          # TODO Do something when the code successfully executes
-          ;
+          @console.success()
           this._cleanup()
         when 'error'
-          console.log(data.error)
-          
-          message = data.error.message
-          type = data.error.type
-          error = type + ": " + message
-
-          this._doNotTriggerChange =>
-            if data.error.start? and data.error.end?
-              start = { line : data.error.start.line-1, ch: data.error.start.ch }
-              end = { line: data.error.end.line-1, ch: data.error.end.ch }
-              marker = document.createElement("div")
-              marker.className = "error-marker"
-              marker.innerHTML = "● " + (start.line + 1)
-              marker.title = error
-              @codeArea.markText(start, end, "syntax-highlight") 
-              @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
-            else # no line information
-              node = document.createElement("div")
-              node.innerHTML = error
-              node.className = "error-marker"
-              @codeArea.addLineWidget(0, node, {above: true})
-
-          # TODO Do something appropriate when the code had an
-          # error (syntax or runtime)
-          # handleError data.error
+          this._handleError data.error
           this._cleanup()
     , false
 
 
+# -------------------------------------------------------------
+class InteractiveConsole
+
+  # -------------------------------------------------------------
+  constructor: (onInput) ->
+    @console_content = $("#console-content")
+    @visible = false
+    
+    @inputField = $('<input type="text"/>')
+    @inputField.on 'change', =>
+      @inputField.remove()
+      onInput @inputField.val()
+
+    this._createNewLine()
+
+    $('#console-toggle').click this.toggleConsole
+
+
+  # -------------------------------------------------------------
+  toggleConsole: ->
+    sidebar = $('#console')
+    top = parseInt(sidebar.css('marginTop'), 10)
+    newTop = if top == 0 then sidebar.outerHeight() else 0
+    sidebar.animate marginTop: newTop, 100
+    @visible = (newTop == 0)
+
+
+  # -------------------------------------------------------------
+  clear: ->
+    @console_content.empty()
+    this._createNewLine()
+
+
+  # -------------------------------------------------------------
+  output: (text) ->
+    lines = text.split('\n')
+
+    firstLine = lines.shift()
+    this._addToCurrentLine firstLine
+
+    for line in lines
+      this._createNewLine()
+      this._addToCurrentLine line
+
+    this.toggleConsole() unless @visible
+    
+
+  # -------------------------------------------------------------
+  error: (error) ->
+    this._createNewLine('text-error')
+    this._addToCurrentLine """
+      Your program terminated prematurely because the following error
+      occurred on line #{error.start.line}: #{error.message}
+      """
+
+
+  # -------------------------------------------------------------
+  success: ->
+    this._createNewLine('text-success')
+    this._addToCurrentLine "Your program finished successfully."
+
+
+  # -------------------------------------------------------------
+  promptForInput: (prompt) ->
+    @currentLine.append @inputField
+
+
+  # -------------------------------------------------------------
+  _createNewLine: (classes) ->
+    @currentLine = $('<div class="line"></div>')
+    @currentLine.addClass classes if classes
+    @console_content.append @currentLine
+
+
+  # -------------------------------------------------------------
+  _addToCurrentLine: (text) ->
+    @currentLine.text @currentLine.text() + text
+
+
 # Export
 window.CodeController = CodeController
+window.InteractiveConsole = InteractiveConsole

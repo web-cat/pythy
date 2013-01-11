@@ -1,8 +1,7 @@
 class AssignmentsController < ApplicationController
 
   load_and_authorize_resource :assignment
-  load_and_authorize_resource :course,
-    through: :assignment, shallow: true
+  load_resource :course, through: :assignment, shallow: true
 
 
   # -------------------------------------------------------------
@@ -21,17 +20,11 @@ class AssignmentsController < ApplicationController
   # GET /assignments/1.json
   def show
     @assignment_offerings =
-      @assignment.assignment_offerings.accessible_by(current_ability).
-      order('crn asc')
+      @assignment.assignment_offerings.joins(:course_offering).
+        order('course_offerings.crn asc').select { |ao| can? :read, ao }
 
-    markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML,
-      no_intra_emphasis: true,
-      tables: true,
-      fenced_code_blocks: true,
-      autolink: true,
-      strikethrough: true,
-      superscript: true)
-    @description = markdown.render(@assignment.description)
+    @summary = @assignment.brief_summary_html
+    @description = @assignment.description_html
 
     respond_to do |format|
       format.html # show.html.erb

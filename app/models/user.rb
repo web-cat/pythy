@@ -19,6 +19,8 @@ class User < ActiveRecord::Base
 
   has_many    :course_offerings, through: :course_enrollments
 
+  has_many    :assignment_offerings, through: :course_offerings
+
   # Include default devise modules. Others available are:
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
   # :timeoutable and :omniauthable

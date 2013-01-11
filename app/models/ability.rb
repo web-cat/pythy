@@ -104,12 +104,12 @@ class Ability
     # Likewise, a user can only manage enrollments in a CourseOffering
     # that they have can_manage_courses? permission in.
     can :manage, CourseEnrollment do |enrollment|
-       user_enrollment = CourseEnrollment.where(
-         user_id: user.id,
-         course_offering_id: enrollment.course_offering.id).first
+      user_enrollment = CourseEnrollment.where(
+        user_id: user.id,
+        course_offering_id: enrollment.course_offering.id).first
 
-       user_enrollment && user_enrollment.course_role.can_manage_course?
-     end
+      user_enrollment && user_enrollment.course_role.can_manage_course?
+    end
   end
 
 
@@ -135,15 +135,20 @@ class Ability
       course_offerings.any?
     end
 
+    can :read, Assignment do |assignment|
+      course = assignment.course
+      course_offerings = course.course_offerings.joins(
+        :course_enrollments).where(
+          course_enrollments: { user_id: user.id }
+        )
+
+      course_offerings.any?
+    end
+
     # A user can manage an AssignmentOffering in any CourseOffering where
     # they are enrolled and have the can_manage_assignments? permission.
 
-    relation = AssignmentOffering.joins(
-      :course_offering => { :course_enrollments => :course_role }).where(
-      course_enrollments: { user_id: user.id },
-      course_roles: { can_manage_assignments: true })
-
-    can :manage, AssignmentOffering, relation do |offering|
+    can :manage, AssignmentOffering do |offering|
       course_offering = offering.course_offering
 
       user_enrollment = CourseEnrollment.where(
@@ -151,6 +156,17 @@ class Ability
         course_offering_id: course_offering.id).first
 
       user_enrollment && user_enrollment.course_role.can_manage_assignments?
+    end
+
+    # A user can read an AssignmentOffering in any course offering where
+    # they are enrolled, period.
+
+    can :read, AssignmentOffering do |offering|
+      course_offering = offering.course_offering
+
+      CourseEnrollment.where(
+        user_id: user.id,
+        course_offering_id: course_offering.id).any?
     end
   end
 

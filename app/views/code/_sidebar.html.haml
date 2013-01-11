@@ -1,10 +1,19 @@
-#sidebar
+#sidebar.dark-panel
   #sidebar-toggle
-    #sidebar-toggle-text <<
+    #sidebar-toggle-text
+      = icon_tag('bar-chart')
+      Past Results
   #sidebar-content
-    %h4 Description
-    %p= @repository.description
-
     - if can? :manage, @repository
       %h4 Users currently accessing
       %ul#accessing-users.unstyled
+
+    - if @repository.is_a? AssignmentRepository
+      %h4 Most Recent Results
+      %p
+        %small
+          The list below shows the results of the 10 most recent checks
+          you made of your code. To see the detailed feedback for that
+          check, click the icon to the right of the score bar.
+      #check-results
+        = render partial: 'check_results', locals: { repository: @repository }

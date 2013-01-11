@@ -4,7 +4,7 @@ class CodeController < FriendlyUrlController
 
   DEFAULT_FILE = 'main.py'
 
-  ALLOWED_MESSAGES = %w(add_user remove_user unsync resync ping)
+  ALLOWED_MESSAGES = %w(add_user remove_user unsync resync ping check start_over)
 
   before_filter :find_repository
 
@@ -21,7 +21,7 @@ class CodeController < FriendlyUrlController
     code = params[:code]
 
     # Update the code in the working copy of the repo.
-    committed = @repository.commit(current_user) do |git|
+    @committed = @repository.commit(current_user) do |git|
       path = File.join(@repository.git_path, @filename)
       File.open(path, 'w') { |f| f.write(code) }
 
@@ -29,16 +29,14 @@ class CodeController < FriendlyUrlController
     end
 
     respond_to do |format|
-      if committed
+      if @committed
         publish(:code) do
           render_to_string template: 'code/update_code',
             locals: { code: code, force: false }
         end
-
-        format.js
-      else
-        format.js { render nothing: true }
       end
+
+      format.js
     end
   end
 
@@ -158,6 +156,46 @@ class CodeController < FriendlyUrlController
 
 
   # -------------------------------------------------------------
+  def check
+    @was_changed = @repository.changed_since_last_check?
+
+    if @was_changed
+      assignment_check = @repository.assignment_checks.create(
+        number: @repository.next_assignment_check_number)
+
+      CheckCodeWorker.perform_async(assignment_check.id,
+        request.headers['X-Session-ID'])
+    end
+
+    respond_to do |format|
+      format.js { render template: 'code/check' }
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def start_over
+    begin
+      # FIXME When we support assignments with starter repos, we want to
+      # re-clone that repo instead of just deleting the file.
+      @committed = @repository.commit(current_user, 'Started over.') do |git|
+        path = File.join(@repository.git_path, @filename)
+        FileUtils.rm path
+      end
+
+      respond_to do |format|
+        format.js { render template: 'code/update_code',
+          locals: { code: '', force: true } }
+      end
+    rescue IOError
+      respond_to do |format|
+        format.js { render nothing: true }
+      end
+    end
+  end
+
+
+  # -------------------------------------------------------------
   def publish(channel, &block)
     options = { javascript: block.call }
     Juggernaut.publish @repository.event_channel(channel), options,
@@ -194,7 +232,9 @@ class CodeController < FriendlyUrlController
       @repository = relation.first || relation.create
 
       if @repository
-        #@page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+        a = assignment.assignment
+        @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
+        @summary = a.brief_summary_html
       end
     end
 

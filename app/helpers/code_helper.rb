@@ -15,4 +15,24 @@ module CodeHelper
     end
   end
 
+
+  # -------------------------------------------------------------
+  def score_bar(score)
+    score ||= 0
+
+    if score < 70
+      bar_color = 'progress-danger'
+    elsif score < 90
+      bar_color = 'progress-warning'
+    else
+      bar_color = 'progress-success'
+    end
+
+    content_tag :div, class: "progress progress-striped #{bar_color}" do
+      content_tag :div, class: 'bar', style: "width: #{score}%" do
+        "#{score.round}%"
+      end
+    end
+  end
+
 end
