@@ -5,12 +5,12 @@ gem 'thin'
 
 group :development, :test do
   gem 'sqlite3', '~> 1.3.4'
-  gem 'mysql'
+  gem 'mysql2'
   gem 'quiet_assets'
 end
 
 group :production do
-  gem 'mysql'
+  gem 'mysql2'
 end
 
 # Gems used only for assets and not required
@@ -31,6 +31,7 @@ gem 'twitter_bootstrap_form_for',
   git: 'git://github.com/stouset/twitter_bootstrap_form_for.git',
   branch: 'bootstrap-2.0'
 gem 'font-awesome-rails'
+gem 'codemirror-rails'
 gem 'daemon'
 
 # Gems for authentication and authorization.
@@ -60,6 +61,7 @@ gem 'juggernaut'
 
 # Gems for background job support.
 gem 'sidekiq'
+gem 'sidekiq-failures'
 
 # Required for Sidekiq's web-based monitoring interface.
 gem 'sinatra', require: false

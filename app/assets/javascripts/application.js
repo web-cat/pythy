@@ -16,8 +16,8 @@
 //= require twitter/bootstrap/bootstrap
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
 //= require smalot/bootstrap-datetimepicker/bootstrap-datetimepicker
-//= require codemirror/codemirror
-//= require codemirror/util/matchbrackets
-//= require codemirror/mode/python/python
-//= require codemirror/mode/markdown/markdown
+//= require codemirror
+//= require codemirror/utils/matchbrackets
+//= require codemirror/modes/python
+//= require codemirror/modes/markdown
 //= require global
