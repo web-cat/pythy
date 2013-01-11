@@ -41,6 +41,10 @@ self.addEventListener 'message', (e) =>
             errorInfo.end =
               line: e.args.v[3][1][0],
               ch: e.args.v[3][1][1]
+          else
+            errorInfo.start =
+              line: Sk.currLineNo,
+              ch: Sk.currColNo
         else
           errorInfo =
             type: 'Internal error (' + e.name + ')',
