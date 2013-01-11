@@ -1,7 +1,9 @@
 $ ->
   # -------------------------------------------------------------
   # Enable tooltips.
-  $('[rel=tooltip]').tooltip()
+  $('[rel=tooltip]').tooltip(
+    placement: 'bottom'
+  )
 
   # -------------------------------------------------------------
   # Create datepickers.
@@ -53,9 +55,77 @@ $ ->
 
 # -------------------------------------------------------------
 window.pythy =
+  # -------------------------------------------------------------
   url_part_safe: (value) ->
     value.toLowerCase().replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+$/g, '')
 
+  # -------------------------------------------------------------
+  alert: (message, options = {}) ->
+    okText = options.okText ? 'OK'
+
+    header = if options.title then """
+      <div class="modal-header">
+        <a class="close" data-dismiss="modal">&times;</a>
+        <h3>#{options.title}</h3>
+      </div>
+      """ else ''
+
+    $('body').append(
+      """
+      <div id="pythy-alert-modal" class="modal hide fade">
+        #{header}
+        <div class="modal-body">
+          <p>#{message}</p>
+        </div>
+        <div class="modal-footer">
+          <a href="#" class="btn btn-primary" data-dismiss="modal">#{okText}</a>
+        </div>
+      </div>
+      """)
+
+    $('#pythy-alert-modal').modal().on 'hidden', ->
+      $('#pythy-alert-modal').remove()
+
+
+  # -------------------------------------------------------------
+  confirm: (message, options = {}) ->
+    yesText = options.yesText ? 'Yes'
+    noText = options.noText ? 'No'
+    yesClass = options.yesClass ? 'btn-primary'
+
+    header = if options.title then """
+      <div class="modal-header">
+        <a class="close" data-dismiss="modal">&times;</a>
+        <h3>#{options.title}</h3>
+      </div>
+      """ else ''
+
+    $('body').append(
+      """
+      <div id="pythy-confirm-modal" class="modal hide fade">
+        #{header}
+        <div class="modal-body">
+          <p>#{message}</p>
+        </div>
+        <div class="modal-footer">
+          <a href="#" class="btn" data-dismiss="modal">
+            #{noText}
+          </a>
+          <a href="#" id="pythy-confirm-yes" class="btn #{yesClass}" data-dismiss="modal">
+            #{yesText}
+          </a>
+        </div>
+      </div>
+      """)
+
+    $('#pythy-confirm-modal').modal().on 'hidden', ->
+      $('#pythy-confirm-modal').remove()
+
+    $('#pythy-confirm-yes').click (e) ->
+      options.onYes()
+
+
+# -------------------------------------------------------------
 # TODO convert to Coffeescript
 `$.rails.allowAction = function(element) {
   var message = element.data('confirm');
