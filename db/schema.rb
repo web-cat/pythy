@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130109175139) do
+ActiveRecord::Schema.define(:version => 20130111190807) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -59,6 +59,17 @@ ActiveRecord::Schema.define(:version => 20130109175139) do
     t.string   "uid"
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
+  end
+
+  create_table "check_outcomes", :force => true do |t|
+    t.integer  "assignment_check_id"
+    t.string   "name"
+    t.string   "category"
+    t.integer  "position"
+    t.decimal  "score",               :precision => 16, :scale => 8
+    t.decimal  "possible_score",      :precision => 16, :scale => 8
+    t.datetime "created_at",                                         :null => false
+    t.datetime "updated_at",                                         :null => false
   end
 
   create_table "course_enrollments", :force => true do |t|

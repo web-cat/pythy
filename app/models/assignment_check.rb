@@ -4,6 +4,7 @@ class AssignmentCheck < ActiveRecord::Base
   TIMEOUT = 2
 
   belongs_to :assignment_repository
+  has_many :check_outcomes
 
   attr_accessible :assignment_repository_id, :number,
     :status, :overall_score, :extra
