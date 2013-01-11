@@ -103,4 +103,33 @@ module HomeHelper
     end
   end
 
+
+  # -------------------------------------------------------------
+  def score_tile(check)
+    if check
+      score = check.overall_score || 0
+
+      if score < 70
+        btn_color = 'danger'
+      elsif score < 90
+        btn_color = 'warning'
+      else
+        btn_color = 'success'
+      end
+
+      content_tag :div, class: "score-container btn btn-#{btn_color}" do
+        (content_tag :span, 'Score:') +
+        (content_tag :div, class: 'score' do
+          "#{score.round}%"
+        end)
+      end
+    else
+      content_tag :div, class: "score-container btn btn-inverse" do
+        (content_tag :span, 'Score:') +
+        (content_tag :div, '--%', class: 'score')
+      end
+    end
+  end
+
+
 end

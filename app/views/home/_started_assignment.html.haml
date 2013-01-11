@@ -1,3 +1,6 @@
+- repository = started_assignment.repository_for_user(current_user)
+- most_recent_check = repository.assignment_checks.most_recent
+
 = link_to code_path(started_assignment), class: 'btn btn-block assignment started' do
   .assignment-title
     = succeed ':' do
@@ -10,10 +13,8 @@
       = assignment_date_text(started_assignment)
 
   .subtext
-    -# FIXME
-    Last edited 2 days ago
+    Last edited
+    = distance_of_time_in_words_to_now(repository.updated_at)
+    ago
 
-  .score-container.btn.btn-inverse
-    -# FIXME
-    %span Score:
-    .score 97%
+  = score_tile(most_recent_check)

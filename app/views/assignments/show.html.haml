@@ -1,21 +1,22 @@
 %ul.breadcrumb
   %li
-    = link_to @assignment.course.department.institution.display_name, @assignment.course.department.institution
+    = link_to_if can?(:edit, @assignment), @assignment.course.department.institution.display_name, @assignment.course.department.institution
     %span.divider /
   %li
-    = link_to @assignment.course.department.name, department_path(@assignment.course.department)
+    = link_to_if can?(:edit, @assignment), @assignment.course.department.name, department_path(@assignment.course.department)
     %span.divider /
   %li
-    = link_to @assignment.course.department_name_and_number, @assignment.course
+    = link_to_if can?(:edit, @assignment), @assignment.course.department_name_and_number, @assignment.course
     %span.divider /
   %li.active
     = succeed ':' do
       = @assignment.short_name
     = @assignment.long_name
-  %li.pull-right
-    = link_to edit_assignment_path(@assignment) do
-      %i.icon-pencil
-      Edit...
+  - if can? :edit, @assignment
+    %li.pull-right
+      = link_to edit_assignment_path(@assignment) do
+        %i.icon-pencil
+        Edit...
 
 %h2
   = @assignment.short_name
@@ -27,7 +28,6 @@
   = raw @summary
 
 - if can? :manage, @assignment
-  %h3.page-header Offerings
   %table.table.table-bordered.table-striped
     %thead
       %tr
@@ -37,7 +37,7 @@
         %th Closes at
     %tbody
       - @assignment_offerings.each do |offering|
-        %tr
+        %tr{ class: offering.visible? ? nil : 'warning' }
           %td
             = offering.course_offering.crn
             - if offering.course_offering.label
@@ -52,6 +52,5 @@
     = succeed '.' do
       %strong= l @assignment_offerings.first.due_at
 
-%h3.page-header Description
 .assignment_description
   = raw @description

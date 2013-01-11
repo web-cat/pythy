@@ -1,3 +1,7 @@
-// Place all the styles related to the Assignments controller here.
-// They will automatically be included in application.css.
-// You can use Sass (SCSS) here: http://sass-lang.com/
+#assignment_brief_summary_control_group .CodeMirror {
+  height: 120px;
+}
+
+#assignment_description_control_group .CodeMirror {
+  height: 300px;
+}

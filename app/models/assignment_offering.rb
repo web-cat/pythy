@@ -3,6 +3,8 @@ class AssignmentOffering < ActiveRecord::Base
   belongs_to  :assignment
   belongs_to  :course_offering
 
+  has_many    :assignment_repositories
+
   accepts_nested_attributes_for :assignment
 
   attr_accessible :assignment_id, :assignment_attributes,
@@ -30,6 +32,12 @@ class AssignmentOffering < ActiveRecord::Base
   # -------------------------------------------------------------
   def effectively_due_at
     due_at || closes_at
+  end
+
+
+  # -------------------------------------------------------------
+  def repository_for_user(user)
+    assignment_repositories.where(user_id: user.id).first
   end
 
 end

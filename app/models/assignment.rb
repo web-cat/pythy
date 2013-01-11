@@ -5,8 +5,8 @@ class Assignment < ActiveRecord::Base
 
   has_many    :assignment_offerings
 
-  attr_accessible :creator_id, :long_name, :short_name, :description,
-    :assignment_offerings_attributes
+  attr_accessible :creator_id, :long_name, :short_name,
+    :brief_summary, :description, :assignment_offerings_attributes
 
   accepts_nested_attributes_for :assignment_offerings
 
@@ -23,8 +23,15 @@ class Assignment < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
-  def brief_summary_html
-    @brief_summary_html ||= markdown_renderer.render(brief_summary)
+  def brief_summary_html(options = {})
+    summary = brief_summary
+
+    if options[:link]
+      puts summary
+      summary.sub! /\n*$/, " <a href='#{options[:link]}' target='_blank'>(Click here to open the full description in a new tab.)</a>"
+    end
+
+    @brief_summary_html ||= markdown_renderer.render(summary)
   end
 
 

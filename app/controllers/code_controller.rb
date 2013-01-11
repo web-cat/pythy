@@ -11,6 +11,14 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   def show
     @subscribe_channel = @repository.event_channel(nil)
+
+    if @repository.is_a? AssignmentRepository
+      a = @repository.assignment_offering.assignment
+      @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
+      @summary = a.brief_summary_html(link: assignment_path(a))
+    elsif @repository.is_a? ExampleRepository
+      @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+    end
   end
 
 
@@ -212,10 +220,6 @@ class CodeController < FriendlyUrlController
       @filename = parts.length > 2 ? parts[2] : DEFAULT_FILE
 
       @repository = ExampleRepository.find_by_id(id)
-
-      if @repository
-        @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
-      end
     elsif parts.first == 'assignments'
       url_part = parts.second
       @filename = parts.length > 2 ? parts[2] : DEFAULT_FILE
@@ -230,12 +234,6 @@ class CodeController < FriendlyUrlController
 
       # Create the repository if it doesn't exist.
       @repository = relation.first || relation.create
-
-      if @repository
-        a = assignment.assignment
-        @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
-        @summary = a.brief_summary_html
-      end
     end
 
     # Make sure the user has access to read the repository, or raise a

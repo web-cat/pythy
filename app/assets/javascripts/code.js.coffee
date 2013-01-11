@@ -15,6 +15,8 @@ class CodeController
     $(window).resize => this._updateCodeSize()
     this._updateCodeSize()
 
+    # Highlight the line the cursor is currently on (and kill the
+    # highlighting when the editor doesn't have the focus).
     @codeArea.on 'cursorActivity', =>
       cur = @codeArea.getLineHandle(@codeArea.getCursor().line)
       if cur != @hlLine
@@ -22,9 +24,21 @@ class CodeController
           @codeArea.removeLineClass @hlLine, 'background', 'active-line'
         @hlLine = @codeArea.addLineClass(cur, 'background', 'active-line')
 
+    @codeArea.on 'blur', =>
+      if @hlLine
+        @codeArea.removeLineClass @hlLine, 'background', 'active-line'
+
+
     @ignoreChange = false
 
     @console = new InteractiveConsole(this._handleInput)
+
+    # $('html').click (e) =>
+    #   this.toggleSidebar('close')
+    #   @console.toggleConsole('close')
+
+    # $('#sidebar').click (e) => e.stopPropagation()
+    # $('#console').click (e) => e.stopPropagation()
 
     this._createWorker()
 
@@ -133,10 +147,17 @@ class CodeController
 
 
   # ---------------------------------------------------------------
-  toggleSidebar: (force) ->
+  toggleSidebar: (action) ->
     sidebar = $('#sidebar')
     left = parseInt(sidebar.css('marginLeft'), 10)
-    newLeft = if left == 0 then sidebar.outerWidth() else 0
+
+    newLeft = if action == 'open'
+        0
+      else if action == 'close'
+        sidebar.outerWidth()
+      else
+        if left == 0 then sidebar.outerWidth() else 0
+
     sidebar.animate marginLeft: newLeft, 100
 
 
@@ -242,13 +263,11 @@ class CodeController
         start = line: error.start.line - 1, ch: error.start.ch
         end   = line: error.end.line - 1,   ch: error.end.ch
 
-        marker = $('<div class="error-widget"></div>')
-        #marker.innerHTML = "● " + (start.line + 1)
-        marker.text "Error: #{error.message}"
-        @lastErrorWidget = @codeArea.addLineWidget(start.line, marker[0])
+        widget = $('<div class="error-widget"></div>')
+        widget.text "Error: #{error.message}"
+        @lastErrorWidget = @codeArea.addLineWidget(start.line, widget[0])
 #        @codeArea.markText(start, end, "syntax-highlight") 
 #        @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
-
 
     # Move the cursor to the error line in the code editor and give it
     # the focus.
@@ -307,10 +326,17 @@ class InteractiveConsole
 
 
   # -------------------------------------------------------------
-  toggleConsole: ->
+  toggleConsole: (action) ->
     sidebar = $('#console')
     top = parseInt(sidebar.css('marginTop'), 10)
-    newTop = if top == 0 then sidebar.outerHeight() else 0
+
+    newTop = if action == 'open'
+        0
+      else if action == 'close'
+        sidebar.outerHeight()
+      else
+        if top == 0 then sidebar.outerHeight() else 0
+
     sidebar.animate marginTop: newTop, 100
     @visible = (newTop == 0)
 

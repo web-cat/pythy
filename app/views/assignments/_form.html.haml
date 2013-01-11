@@ -9,11 +9,14 @@
         A more descriptive name for the assignment. The short name and long name will be combined as
         %strong "Short Name: Long Name"
         in many displays.
+    = f.text_area :brief_summary, rows: 5, class: 'input-xxlarge' do
+      .help-block
+        A brief summary of the assignment that will be displayed at the top of the code page when students are working on the assignment. Think of this as a lead-in or quick instructions.This text will be processed as
+        = link_to 'Markdown-formatted text.', 'http://daringfireball.net/projects/markdown/syntax', target: '_blank'
     = f.text_area :description, rows: 10, class: 'input-xxlarge' do
       .help-block
         The full write-up or specification of the assignment. This description will be processed as
-        = link_to 'Markdown-formatted text', 'http://daringfireball.net/projects/markdown/syntax', target: '_blank'
-        to display to students.
+        = link_to 'Markdown-formatted text.', 'http://daringfireball.net/projects/markdown/syntax', target: '_blank'
 
   = f.fieldset 'Offerings of This Assignment' do
     &nbsp;
@@ -33,9 +36,9 @@
                 = surround '(', ')' do
                   = offering.course_offering.label
               = hidden_field_tag "assignment[assignment_offerings_attributes][#{index}][id]", offering.id
-            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][opens_at]", offering.opens_at, class: 'inline datetimepicker'
-            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][due_at]", offering.due_at, class: 'inline datetimepicker'
-            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][closes_at]", offering.closes_at, class: 'inline datetimepicker'
+            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][opens_at]", (l(offering.opens_at) rescue nil), class: 'inline datetimepicker'
+            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][due_at]", (l(offering.due_at) rescue nil), class: 'inline datetimepicker'
+            %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][closes_at]", (l(offering.closes_at) rescue nil), class: 'inline datetimepicker'
 
   = f.actions do
     = f.submit

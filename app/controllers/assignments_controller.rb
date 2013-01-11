@@ -48,8 +48,8 @@ class AssignmentsController < ApplicationController
   # GET /assignments/1/edit
   def edit
     @assignment_offerings =
-      @assignment.assignment_offerings.accessible_by(current_ability).
-      order('crn asc')
+      @assignment.assignment_offerings.joins(:course_offering).
+        order('course_offerings.crn asc').select { |ao| can? :manage, ao }
   end
 
 

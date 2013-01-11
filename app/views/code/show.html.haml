@@ -33,7 +33,6 @@
   .summary-content
     - if @repository.is_a? AssignmentRepository
       = raw @summary
-      = link_to '(Open the full description in a new tab)', @repository.assignment_offering.assignment, target: '_blank'
 
 #code-area
   = text_area_tag :codearea
