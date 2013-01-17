@@ -66,4 +66,14 @@ class Course < ActiveRecord::Base
     "#{department.url_part}-#{number}"
   end
 
+
+  # -------------------------------------------------------------
+  # Public: Gets the path to the directory where repositories and other
+  # resources for this Course will be stored.
+  #
+  # Returns the path to the Course's storage directory.
+  def storage_path
+    File.join(department.institution.storage_path, url_part)
+  end
+
 end

@@ -17,25 +17,33 @@ module HomeHelper
 
 
   # -------------------------------------------------------------
-  def code_path(model)
+  def code_path(model, path=nil)
     path_parts = []
+    path_parts.unshift path if path
 
-    if model.is_a?(ExampleRepository)
-      # TODO use a friendlier name
-      path_parts.unshift model.id.to_s
-      path_parts.unshift 'example'
-      model = model.course_offering
-    elsif model.is_a?(AssignmentOffering)
-      path_parts.unshift model.assignment.url_part
-      path_parts.unshift 'assignments'
-      model = model.course_offering
-    end
+    if model.is_a?(AssignmentReferenceRepository)
+        path_parts.unshift model.assignment.url_part
+        path_parts.unshift 'assignments'
+        path_parts.unshift model.assignment.course.url_part
+        model = model.assignment.course.department.institution
+    else
+      if model.is_a?(ExampleRepository)
+        # TODO use a friendlier name
+        path_parts.unshift model.id.to_s
+        path_parts.unshift 'example'
+        model = model.course_offering
+      elsif model.is_a?(AssignmentOffering)
+        path_parts.unshift model.assignment.url_part
+        path_parts.unshift 'assignments'
+        model = model.course_offering
+      end
 
-    if model.is_a?(CourseOffering)
-      path_parts.unshift model.crn.to_s
-      path_parts.unshift model.course.url_part
-      path_parts.unshift model.term.url_part
-      model = model.course.department.institution
+      if model.is_a?(CourseOffering)
+        path_parts.unshift model.crn.to_s
+        path_parts.unshift model.course.url_part
+        path_parts.unshift model.term.url_part
+        model = model.course.department.institution
+      end
     end
 
     if model.is_a?(Institution)

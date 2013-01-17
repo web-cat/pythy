@@ -52,8 +52,8 @@ class CourseOffering < ActiveRecord::Base
   def storage_path
     File.join(
       course.department.institution.storage_path,
-      term.url_part,
       course.url_part,
+      term.url_part,
       crn.to_s)
   end
 
