@@ -1,3 +1,5 @@
+$('#check').button('reset')
+
 <% if assignment_check.status == AssignmentCheck::COMPLETED %>
 $('#check-results').html(
   '<%= j render partial: "code/check_results",

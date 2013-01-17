@@ -23,7 +23,7 @@
           = button_tag id: 'save', class: 'btn', rel: 'tooltip', title: 'Save the changes to this file' do
             = icon_tag('save') + ' Save'
         - if @repository.is_a? AssignmentRepository
-          = button_tag id: 'check', class: 'btn', rel: 'tooltip', title: 'Check your work to see how well you are doing' do
+          = button_tag id: 'check', class: 'btn', rel: 'tooltip', title: 'Check your work to see how well you are doing', data: { :'loading-text' => "#{icon_tag('spinner icon-spin')} Checking..." } do
             = icon_tag('magic') + ' Check'
           = button_tag id: 'more-options', class: 'btn dropdown-toggle', data: { toggle: 'dropdown' } do
             = icon_tag('cog')
