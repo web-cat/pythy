@@ -2,12 +2,29 @@ class CheckOutcome < ActiveRecord::Base
 
   belongs_to :assignment_check
 
-  attr_accessible :name, :category, :position, :score, :possible_score
+  attr_accessible :name, :description, :category, :position, :score,
+    :possible_score, :detail
+
+  serialize :detail, Hash
 
 
   # -------------------------------------------------------------
   def percentage_score
     100 * score / possible_score
+  end
+
+
+  # -------------------------------------------------------------
+  def hint?
+    detail['reason'] && detail['reason'] =~ /Hint:/
+  end
+
+
+  # -------------------------------------------------------------
+  def hint
+    if detail['reason'] && detail['reason'] =~ /Hint:\s*(.*)$/
+      $1
+    end
   end
 
 end

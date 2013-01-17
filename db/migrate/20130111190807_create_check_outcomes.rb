@@ -4,10 +4,12 @@ class CreateCheckOutcomes < ActiveRecord::Migration
     create_table :check_outcomes do |t|
       t.integer :assignment_check_id
       t.string :name
+      t.string :description
       t.string :category
       t.integer :position
       t.decimal :score, precision: 16, scale: 8
       t.decimal :possible_score, precision: 16, scale: 8
+      t.text :detail
       t.timestamps
     end
   end
