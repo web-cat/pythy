@@ -2,6 +2,7 @@ class AssignmentCheck < ActiveRecord::Base
 
   COMPLETED = 1
   TIMEOUT = 2
+  FAILED = 3
 
   belongs_to :assignment_repository
   has_many :check_outcomes
