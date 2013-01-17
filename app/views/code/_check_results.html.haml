@@ -2,6 +2,10 @@
   %tbody
     - repository.assignment_checks.most_recent(10).each do |check|
       %tr
-        %td= l check.updated_at
+        %td
+          = link_to l(check.updated_at), code_check_results_link(check), method: :post, remote: true
         %td{ style: 'width: 50%' }
-          = score_bar check.overall_score
+          - if check.status == AssignmentCheck::COMPLETED
+            = score_bar check.overall_score
+          - elsif check.status == AssignmentCheck::TIMEOUT
+            %small.text-error Timed out

@@ -4,7 +4,7 @@ class CodeController < FriendlyUrlController
 
   DEFAULT_FILE = 'main.py'
 
-  ALLOWED_MESSAGES = %w(add_user remove_user unsync resync ping check start_over)
+  ALLOWED_MESSAGES = %w(add_user remove_user unsync resync ping check start_over check_results)
 
   before_filter :find_repository
 
@@ -14,6 +14,10 @@ class CodeController < FriendlyUrlController
 
     if @repository.is_a? AssignmentRepository
       a = @repository.assignment_offering.assignment
+      @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
+      @summary = a.brief_summary_html(link: assignment_path(a))
+    elsif @repository.is_a? AssignmentReferenceRepository
+      a = @repository.assignment
       @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
       @summary = a.brief_summary_html(link: assignment_path(a))
     elsif @repository.is_a? ExampleRepository
@@ -186,19 +190,35 @@ class CodeController < FriendlyUrlController
     begin
       # FIXME When we support assignments with starter repos, we want to
       # re-clone that repo instead of just deleting the file.
-      @committed = @repository.commit(current_user, 'Started over.') do |git|
+      @repository.start_over
+
+      code = ''
+      @repository.read do
         path = File.join(@repository.git_path, @filename)
-        FileUtils.rm path
+        code = File.exists?(path) ? File.read(path) : ''
       end
 
       respond_to do |format|
         format.js { render template: 'code/update_code',
-          locals: { code: '', force: true } }
+          locals: { code: code, force: true } }
       end
     rescue IOError
       respond_to do |format|
         format.js { render nothing: true }
       end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  # Called when a new user opens the code controller for a particular
+  # repository.
+  def check_results
+    assignment_check = AssignmentCheck.find(params[:check])
+
+    respond_to do |format|
+      format.js { render template: 'code/check_results',
+        locals: { assignment_check: assignment_check } }
     end
   end
 
@@ -213,27 +233,62 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def find_repository
-    parts = params[:rest].split('/')
+    parts = @rest.split('/')
 
     if parts.first == 'example'
       id = parts.second
-      @filename = parts.length > 2 ? parts[2] : DEFAULT_FILE
+      @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
 
       @repository = ExampleRepository.find_by_id(id)
     elsif parts.first == 'assignments'
-      url_part = parts.second
-      @filename = parts.length > 2 ? parts[2] : DEFAULT_FILE
+      if @term
+        # It's a student trying to access their person repository
+        # for an assignment.
 
-      assignment = AssignmentOffering.joins(:assignment).where(
-        assignments: { url_part: url_part },
-        course_offering_id: @offerings.first.id).first
+        url_part = parts.second
+        @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
 
-      relation = AssignmentRepository.where(
-        user_id: current_user.id,
-        assignment_offering_id: assignment.id)
+        assignment = AssignmentOffering.joins(:assignment).where(
+          assignments: { url_part: url_part },
+          course_offering_id: @offerings.first.id).first
 
-      # Create the repository if it doesn't exist.
-      @repository = relation.first || relation.create
+        relation = AssignmentRepository.where(
+          user_id: current_user.id,
+          assignment_offering_id: assignment.id)
+
+        # Create the repository if it doesn't exist.
+        # TODO improve permission checks
+        @repository = relation.first || relation.create
+      else
+        # It's an instructor trying to access the reference repository
+        # for an assignment.
+
+        url_part = parts.second
+        @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
+
+        assignment = Assignment.where(url_part: url_part).first
+
+        if assignment
+          relation = AssignmentReferenceRepository.where(
+            assignment_id: assignment.id)
+
+          # Create the repository if it doesn't exist.
+          # TODO improve permission checks
+          @repository = relation.first
+
+          if @repository.nil? && can?(:edit, assignment)
+            @repository = relation.create(user_id: current_user.id)
+          end
+        end
+      end
+    end
+
+    # Prevent access to dot-files.
+    # TODO maybe allow instructors to do this, though
+    parts = @filename.split('/')
+    if (parts.count { |item| item =~ /^\./ }) > 0
+      not_found
+      return
     end
 
     # Make sure the user has access to read the repository, or raise a

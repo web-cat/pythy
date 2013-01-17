@@ -2,6 +2,14 @@ body {
   overflow: hidden;
 }
 
+#file-bar {
+  margin: 0 -10px;
+
+  .nav {
+    margin-bottom: 0;
+  }
+}
+
 #code-area {
   margin: 0 -10px;
   border-top: 1px solid #aaa;
@@ -25,6 +33,12 @@ body {
   }
 }
 
+table td p.hint {
+  font-size: 12px;
+  font-style: italic;
+  margin-bottom: 0;
+}
+
 .syntax-highlight{
   background-color: yellow;
 }
@@ -33,11 +47,11 @@ body {
   background-color: #def;
 }
 
-.error-marker{
+.error-marker {
   color: #f00;
 }
 
-.empty{
+.empty {
   background-color: none;
 }
 
@@ -141,8 +155,35 @@ body {
       line-height: 17px;
     }
 
+    input[type='text'] {
+      border: none;
+      outline: none;
+      box-shadow: none;
+      color: #5ab7dd;
+      padding: 0 0;
+      margin: -2px 0 0 0;
+      background-color: rgba(255, 255, 255, 0.2);
+      font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", 
+        "Bitstream Vera Sans Mono", "Courier New", monospace;
+    }
+
+    .text-info {
+      padding: 0;
+    }
+
     .line.error {
       color: red;
     }
   }
+}
+
+.outcomes-header {
+  margin-bottom: 6px;
+}
+
+.score-label {
+  vertical-align: middle;
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 600;
 }

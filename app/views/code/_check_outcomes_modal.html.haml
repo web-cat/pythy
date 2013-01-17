@@ -1,0 +1,34 @@
+#check_outcomes_modal.modal.hide.fade
+  .modal-header
+    = close_button_tag dismiss: 'modal'
+    %h3 Assignment Check Results
+
+  .modal-body
+    .outcomes-header.clearfix
+      .pull-left
+        The results of your
+        %strong= assignment_check.number.ordinalize
+        check at
+        %strong
+          = succeed ':' do
+            = l assignment_check.created_at
+      = score_tile_label(assignment_check)
+
+    %table.table.table-condensed.table-bordered.table-striped
+      %thead
+        %tr
+          %th Test
+          %th Result
+      %tbody
+        - assignment_check.check_outcomes.each do |outcome|
+          %tr
+            %td
+              = outcome.description || outcome.name
+              - if outcome.hint?
+                %p.hint
+                  %strong Hint:
+                  = outcome.hint
+            %td{ valign: 'top' }= outcome_bar outcome
+
+  .modal-footer
+    = button_tag 'Close', class: 'btn btn-primary', data: { dismiss: 'modal' }

@@ -19,6 +19,9 @@
       .btn-group
         = button_tag id: 'run', class: 'btn btn-success', rel: 'tooltip', title: 'Run your code and see its output' do
           = icon_tag('play') + ' Run'
+        - if @repository.is_a? AssignmentReferenceRepository
+          = button_tag id: 'save', class: 'btn', rel: 'tooltip', title: 'Save the changes to this file' do
+            = icon_tag('save') + ' Save'
         - if @repository.is_a? AssignmentRepository
           = button_tag id: 'check', class: 'btn', rel: 'tooltip', title: 'Check your work to see how well you are doing' do
             = icon_tag('magic') + ' Check'
@@ -31,8 +34,49 @@
                 = icon_tag('remove') + ' Start over...'
 
   .summary-content
-    - if @repository.is_a? AssignmentRepository
+    - if @repository.is_a?(AssignmentRepository) || @repository.is_a?(AssignmentReferenceRepository)
       = raw @summary
+
+- # TODO improve the logic used to control the visibility for this;
+- # we probably want certain repositories to have "advanced file controls"
+- # enabled and some to have them disabled
+- #
+- # FIXME I'm seriously not proud of this code, but deadlines are approaching.
+- # I'm putting this comment here so future generations don't think this is
+- # how I usually roll. This UI right now only supports a two-level-deep file
+- # organization with folders at the top level and files in those folders. I
+- # deem it good enough for me to set up assignments I need for class.
+- if @repository.is_a? AssignmentReferenceRepository
+  #file-bar
+    %ul.nav.nav-pills
+      %li.disabled
+        %a Files:
+      - @repository.ls('.').each do |e|
+        - if File.directory?(File.join(@repository.git_path, e))
+          - children = @repository.ls(e)
+          %li.dropdown
+            %a.dropdown-toggle{ href: '#', data: { toggle: 'dropdown' } }
+              = icon_tag('folder-open-alt')
+              = e
+              %span.caret
+            %ul.dropdown-menu
+              - unless children.empty?
+                - children.each do |child|
+                  %li
+                    %a{ href: code_path(@repository, File.join(e, child)) }
+                      = icon_tag('file')
+                      = child
+                %li.divider
+              %li
+                %a#create-file{ href: '#', data: { dir: e } } Create a new file...
+              %li
+                %a#upload-file{ href: '#', data: { dir: e } } Upload a file...
+        - else
+          %li
+            %a{ href: code_path(@repository, e) }
+              = icon_tag('file')
+              = e
+
 
 #code-area
   = text_area_tag :codearea

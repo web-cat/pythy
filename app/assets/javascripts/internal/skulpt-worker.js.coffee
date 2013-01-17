@@ -1,54 +1,98 @@
-# FIXME Fix this path
-importScripts 'http://localhost:3000/assets/internal/skulpt-uncomp.js?time=' + new Date().getTime()
+# FIXME Have this use the compressed version in production.
+importScripts '/assets/internal/skulpt-uncomp.js'
 
-# Function: output
+# ---------------------------------------------------------------
+# Called by Skulpt when a Python statement generates output to stdout; e.g.
+# a print statement.
 #
-# text (string): output received from the Python code, for example from
-#   a print statement
+# text (string): output received from the Python code
 #
 output = (text) ->
   self.postMessage event: 'output', text: text
 
+# ---------------------------------------------------------------
+# Called by Skulpt when input is requested from stdin; e.g. by calling the
+# input function.
+#
+# prompt (string): the prompt to be displayed where the text is to be entered
+input = (prompt) ->
+  Sk.asyncCall('input', prompt)
 
-# Configure Skulpt for the first time.
-Sk.configure output: output
 
+# ---------------------------------------------------------------
+# Used for debugging to send log messages out of the worker and back to the
+# browser's console.
+#
 Sk.LOG = (args) ->
+  if typeof(args) is 'string'
+    toLog = args
+  else
+    toLog = JSON.stringify(args)
+
   self.postMessage event: 'log', args: args
 
-# Register listener for messages from the client (browser) thread.
+
+# ---------------------------------------------------------------
+# Executes a function in the "context" of Skulpt, meaning that it will be
+# wrapped in a try/catch block that allows runtime and syntax errors to be
+# communicated back to the browser, and also for asynchronous calls to be
+# properly dispatched
+#
+executeInSkulpt = (fn) ->
+  try
+    fn()
+    self.postMessage event: 'success'
+  catch e
+    if e instanceof AsyncResultRequest
+      self.postMessage event: 'async_call', functionName: e.name, args: e.args
+    else if e.tp$name
+      errorInfo =
+        type: e.tp$name,
+        message: e.args.v[0].v
+
+      if e.args.v.length > 3
+        if typeof(e.args.v[3]) is 'number'
+          errorInfo.start =
+            line: e.args.v[3],
+            ch: e.args.v[4]
+        else
+          errorInfo.start =
+            line: e.args.v[3][0][0],
+            ch: e.args.v[3][0][1]
+          errorInfo.end =
+            line: e.args.v[3][1][0],
+            ch: e.args.v[3][1][1]
+      else
+        errorInfo.start =
+          line: Sk.currLineNo,
+          ch: Sk.currColNo
+
+      self.postMessage event: 'error', error: JSON.parse(JSON.stringify(errorInfo))
+    else
+      errorInfo =
+        type: 'Internal error (' + e.name + ')',
+        message: e.message
+
+      self.postMessage event: 'error', error: JSON.parse(JSON.stringify(errorInfo))
+
+
+# ---------------------------------------------------------------
+# Configure Skulpt and register the listener for messages from the
+# client (browser) thread.
+#
+Sk.configure output: output, input: input
+
 self.addEventListener 'message', (e) =>
   data = e.data
 
   switch data.cmd
-    when 'run'
+    when 'resume'
+      executeInSkulpt =>
+        Sk.sendAsyncResult data.returnValue
 
+    when 'run'
       code = data.code
 
-      try
+      executeInSkulpt =>
         Sk.importMainWithBody "<stdin>", false, code
-        self.postMessage event: 'success'
-      catch e
-        if e.tp$name
-          errorInfo =
-            type: e.tp$name,
-            message: e.args.v[0].v
-
-          if e.args.v.length > 3
-            errorInfo.start =
-              line: e.args.v[3][0][0],
-              ch: e.args.v[3][0][1]
-            errorInfo.end =
-              line: e.args.v[3][1][0],
-              ch: e.args.v[3][1][1]
-          else
-            errorInfo.start =
-              line: Sk.currLineNo,
-              ch: Sk.currColNo
-        else
-          errorInfo =
-            type: 'Internal error (' + e.name + ')',
-            message: e.message
-
-        self.postMessage event: 'error', error: errorInfo
 , false

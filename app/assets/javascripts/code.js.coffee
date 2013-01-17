@@ -31,7 +31,7 @@ class CodeController
 
     @ignoreChange = false
 
-    @console = new InteractiveConsole(this._handleInput)
+    @console = new InteractiveConsole()
 
     # $('html').click (e) =>
     #   this.toggleSidebar('close')
@@ -162,9 +162,12 @@ class CodeController
 
 
   # ---------------------------------------------------------------
-  _handleJuggernautMessage: (data) ->
-    if data.javascript
-      eval data.javascript
+  _jugMessageHandler: (self) ->
+    (data) ->
+      if data.javascript
+        eval data.javascript
+      else if data.message
+        self._sendMessage data: data
 
 
   # ---------------------------------------------------------------
@@ -177,16 +180,15 @@ class CodeController
     this._subscribeToCode()
 
     if @isEditor
-      @jug.subscribe "#{@channel}_users", this._handleJuggernautMessage
-      @jug.subscribe "#{@channel}_results", this._handleJuggernautMessage
-
+      @jug.subscribe "#{@channel}_users", this._jugMessageHandler(this)
+      @jug.subscribe "#{@channel}_results", this._jugMessageHandler(this)
 
     this._sendMessage data: message: 'add_user'
 
 
   # -------------------------------------------------------------
   _subscribeToCode: ->
-    @jug.subscribe "#{@channel}_code", this._handleJuggernautMessage
+    @jug.subscribe "#{@channel}_code", this._jugMessageHandler(this)
 
 
   # -------------------------------------------------------------
@@ -213,6 +215,7 @@ class CodeController
   # -------------------------------------------------------------
   _runCode: ->
     if $('#run').data('running')
+      @console.terminate()
       @worker.terminate()
       this._cleanup()
       this._createWorker()
@@ -231,11 +234,6 @@ class CodeController
   # -------------------------------------------------------------
   _handleOutput: (text) ->
     @console.output text
-
-
-  # -------------------------------------------------------------
-  _handleInput: (text) ->
-    @worker.postMessage cmd: 'input', input: text
 
 
   # -------------------------------------------------------------
@@ -269,10 +267,10 @@ class CodeController
 #        @codeArea.markText(start, end, "syntax-highlight") 
 #        @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
 
-    # Move the cursor to the error line in the code editor and give it
-    # the focus.
-    @codeArea.setCursor error.start.line - 1, error.start.ch
-    @codeArea.focus()
+        # Move the cursor to the error line in the code editor and give it
+        # the focus.
+        @codeArea.setCursor error.start.line - 1, error.start.ch
+        @codeArea.focus()
 
 
   # -------------------------------------------------------------
@@ -292,10 +290,12 @@ class CodeController
       data = e.data
 
       switch data.event
+        when 'async_call'
+          if data.functionName == 'input'
+            @console.promptForInput data.args[0], (value) =>
+              @worker.postMessage cmd: 'resume', returnValue: value
         when 'log'
           console.log data.args
-        when 'input'
-          @console.promptForInput data.prompt
         when 'output'
           this._handleOutput data.text
         when 'success'
@@ -315,10 +315,8 @@ class InteractiveConsole
     @console_content = $("#console-content")
     @visible = false
     
-    @inputField = $('<input type="text"/>')
-    @inputField.on 'change', =>
-      @inputField.remove()
-      onInput @inputField.val()
+    @inputField = $('<input type="text" class="input-xlarge"
+      placeholder=" Type something..."/>')
 
     this._createNewLine()
 
@@ -358,27 +356,61 @@ class InteractiveConsole
       this._createNewLine()
       this._addToCurrentLine line
 
-    this.toggleConsole() unless @visible
+    this.toggleConsole('open')
     
 
   # -------------------------------------------------------------
   error: (error) ->
     this._createNewLine('text-error')
-    this._addToCurrentLine """
-      Your program terminated prematurely because the following error
-      occurred on line #{error.start.line}: #{error.message}
-      """
+
+    if error.start
+      this._addToCurrentLine """
+        Your program ended prematurely because the following error
+        occurred on line #{error.start.line}: #{error.message}
+        """
+    else
+      this._addToCurrentLine """
+        Your program ended prematurely because the following error
+        occurred: #{error.message}
+        """
 
 
   # -------------------------------------------------------------
   success: ->
     this._createNewLine('text-success')
     this._addToCurrentLine "Your program finished successfully."
+    
+    # TODO Implement interactive console
+    #" You can now interactively type Python statements below to further test your code."
+    #
+    #this._createNewLine()
+    #askCommand = =>
+    #  this.promptForInput '', askCommand
+    #
+    #this.promptForInput '', askCommand
 
 
   # -------------------------------------------------------------
-  promptForInput: (prompt) ->
+  terminate: ->
+    @inputField.remove()
+    this._createNewLine('text-warning')
+    this._addToCurrentLine "You manually ended your program."
+
+
+  # -------------------------------------------------------------
+  promptForInput: (prompt, callback) ->
+    this.toggleConsole('open')
+    this._addToCurrentLine prompt
+    @inputField.val('')
     @currentLine.append @inputField
+    @inputField.focus()
+
+    @inputField.unbind('change').change =>
+      text = @inputField.val()
+      @inputField.remove()
+      this._addToCurrentLine(text, 'text-info')
+      this._createNewLine()
+      callback text
 
 
   # -------------------------------------------------------------
@@ -389,8 +421,12 @@ class InteractiveConsole
 
 
   # -------------------------------------------------------------
-  _addToCurrentLine: (text) ->
-    @currentLine.text @currentLine.text() + text
+  _addToCurrentLine: (text, classes) ->
+    if classes
+      newSpan = $("<span class=\"#{classes}\"></span>").text(text)
+      @currentLine.append(newSpan)
+    else
+      @currentLine.append(text)
 
 
 # Export
