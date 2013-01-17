@@ -194,6 +194,14 @@ class Ability
       repository.user == user
     end
 
+
+    # Users can manage the assignment reference repositories for assignments
+    # that they can manage.
+    # TODO probably make it so that only the creator can manage but other
+    # instructors can edit
+    can :manage, AssignmentReferenceRepository do |repository|
+      can? :manage, repository.assignment
+    end
   end
 
 end

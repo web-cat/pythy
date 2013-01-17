@@ -4,6 +4,7 @@ class Assignment < ActiveRecord::Base
   belongs_to  :course
 
   has_many    :assignment_offerings
+  has_one     :assignment_reference_repository
 
   attr_accessible :creator_id, :long_name, :short_name,
     :brief_summary, :description, :assignment_offerings_attributes
