@@ -9,8 +9,12 @@ Pythy::Application.configure do
   # Log error messages when you accidentally call methods on nil.
   config.whiny_nils = true
 
-  # Show full error reports and disable caching
-  config.consider_all_requests_local       = true
+  # Normally this is set to true in development, which would cause the Rails
+  # default exception trace pages to show up when errors occur. Since we have
+  # created our own error pages, we want to see those in development as well.
+  config.consider_all_requests_local = false
+
+  # Disable caching
   config.action_controller.perform_caching = false
 
   # Don't care if the mailer can't send
