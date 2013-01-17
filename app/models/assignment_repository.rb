@@ -53,9 +53,24 @@ class AssignmentRepository < Repository
 
   # -------------------------------------------------------------
   def next_assignment_check_number
-    last_number = assignment_checks.where('number is not null').
-      order('number desc').limit(1).select(:number).first.number || 0
-    last_number + 1
+    last_check = assignment_checks.where('number is not null').
+      order('number desc').limit(1).select(:number).first
+    last_number = last_check ? last_check.number + 1 : 1
+  end
+
+
+  # -------------------------------------------------------------
+  def start_over
+    commit(user, 'Started over.') do |git|
+      Dir.entries(git_path) do |entry|
+        if entry !~ /\./
+          FileUtils.rm_r File.join(git_path, entry)
+        end
+      end
+
+      copy_starter_files
+      git.add '.'
+    end
   end
 
 
@@ -68,7 +83,19 @@ class AssignmentRepository < Repository
     unless File.exists?(path)
       FileUtils.mkdir_p path
       Git.init(path)
+
+      commit(user, 'Initial repository setup.') do |git|
+        copy_starter_files
+        git.add '.'
+      end
     end
+  end
+
+
+  # -------------------------------------------------------------
+  def copy_starter_files
+    ref_repo = assignment_offering.assignment.assignment_reference_repository
+    ref_repo.copy_starter_files_to git_path
   end
 
 end
