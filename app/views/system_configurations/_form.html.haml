@@ -9,5 +9,12 @@
         use.
       You will need to move the old storage location to the new one manually.
 
+  = f.text_field :work_path, class: 'input-xxlarge' do
+    .help-block
+      The path on the server where user code is copied when it is executed
+      to check it against the instructor's reference tests. Putting this in
+      a separate, small partition can help prevent run-away code from
+      adversely affecting the performance of the rest of the system.
+
   = f.actions do
     = f.submit

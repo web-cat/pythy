@@ -1,6 +1,6 @@
 class SystemConfigurationsController < ApplicationController
 
-  load_and_authorize_resource singleton: true, except: :edit
+  before_filter :load_and_authorize_system_configuration
 
 
   # -------------------------------------------------------------
@@ -28,9 +28,6 @@ class SystemConfigurationsController < ApplicationController
   # -------------------------------------------------------------
   # GET /system_configuration/edit
   def edit
-    @system_configuration =
-      SystemConfiguration.first || SystemConfiguration.new
-    authorize! :edit, @system_configuration
   end
 
 
@@ -69,6 +66,16 @@ class SystemConfigurationsController < ApplicationController
         format.json { render json: @system_configuration.errors, status: :unprocessable_entity }
       end
     end
+  end
+
+
+  private
+
+  # -------------------------------------------------------------
+  def load_and_authorize_system_configuration
+    @system_configuration =
+      SystemConfiguration.first || SystemConfiguration.new
+    authorize! :edit, @system_configuration
   end
 
 end

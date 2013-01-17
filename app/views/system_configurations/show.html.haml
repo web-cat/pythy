@@ -1,0 +1,18 @@
+%ul.breadcrumb
+  %li.active
+    System Configuration
+  - if can? :edit, @system_configuration
+    %li.pull-right
+      = link_to edit_system_configuration_path(@system_configuration) do
+        %i.icon-pencil
+        Edit...
+
+%table.table.table-bordered.table-striped
+  %tr
+    %th Storage path
+    %td
+      %tt= @system_configuration.storage_path
+  %tr
+    %th Working area
+    %td
+      %tt= @system_configuration.work_path
