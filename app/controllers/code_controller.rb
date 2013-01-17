@@ -233,7 +233,7 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def find_repository
-    parts = @rest.split('/')
+    parts = @rest ? @rest.split('/') : []
 
     if parts.first == 'example'
       id = parts.second
@@ -285,7 +285,7 @@ class CodeController < FriendlyUrlController
 
     # Prevent access to dot-files.
     # TODO maybe allow instructors to do this, though
-    parts = @filename.split('/')
+    parts = @filename ? @filename.split('/') : []
     if (parts.count { |item| item =~ /^\./ }) > 0
       not_found
       return
