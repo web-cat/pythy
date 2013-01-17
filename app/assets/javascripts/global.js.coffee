@@ -2,7 +2,8 @@ $ ->
   # -------------------------------------------------------------
   # Enable tooltips.
   $('[rel=tooltip]').tooltip(
-    placement: 'bottom'
+    placement: 'bottom',
+    container: 'body'
   )
 
   # -------------------------------------------------------------
