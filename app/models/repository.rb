@@ -107,6 +107,13 @@ class Repository < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  def ls(path)
+    open
+    list = Dir.entries(File.join(git_path, path)).reject { |e| e =~ /^\./ }
+  end
+
+
+  # -------------------------------------------------------------
   # Public: Gets the SHA of the commit that represents the current HEAD of
   # the repository.
   #
