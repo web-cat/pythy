@@ -27,8 +27,7 @@ class Assignment < ActiveRecord::Base
   def brief_summary_html(options = {})
     summary = brief_summary
 
-    if options[:link]
-      puts summary
+    if options[:link] && !description.blank?
       summary.sub! /\n*$/, " <a href='#{options[:link]}' target='_blank'>(Click here to open the full description in a new tab.)</a>"
     end
 
