@@ -11,24 +11,16 @@
 
 .row
   .span7
-    %h3 Recent Work
+    %h3 Assignments
 
-    #started_assignments
-      = render(partial: 'home/started_assignment', collection: @started_assignments) || render(partial: 'home/no_started_assignments')
+    %p
+      = link_to 'Create a new assignment...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
+
+    #assignments
+      = render(partial: 'home/instructor_assignment', collection: @assignments) || render(partial: 'home/no_assignments')
+    
 
   .span5
-    %h3 Not Yet Started
-
-    -# FIXME This isn't right, but I'm not sure yet how to ask Cancan whether
-    -# the current ability can create new assignment offerings for a course
-    -# offering.
-    - if @offerings.first.role_for_user(current_user).try(:can_manage_assignments?)
-      %p
-        = link_to 'Create a new assignment...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
-
-    #not_started_assignments
-      = render(partial: 'home/not_started_assignment', collection: @not_started_assignments) || render(partial: 'home/no_assignments')
-    
     %h3 Instructor Examples
     - if can? :manage, @offerings.first
       %p

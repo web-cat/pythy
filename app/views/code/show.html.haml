@@ -34,8 +34,7 @@
                 = icon_tag('remove') + ' Start over...'
 
   .summary-content
-    - if @repository.is_a?(AssignmentRepository) || @repository.is_a?(AssignmentReferenceRepository)
-      = raw @summary
+    = raw @summary
 
 - # TODO improve the logic used to control the visibility for this;
 - # we probably want certain repositories to have "advanced file controls"

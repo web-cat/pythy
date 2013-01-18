@@ -1,7 +1,7 @@
 - bc = ActiveSupport::BacktraceCleaner.new
 - bc.add_filter   { |line| line.gsub(Rails.root.to_s, '') }
 - bc.add_silencer { |line| line =~ /\/gems\// }
-- backtrace = bc.clean($!.backtrace)
+- backtrace = $! && bc.clean($!.backtrace)
 
 %h2 Resource Not Found
 %div
@@ -10,11 +10,12 @@
 
 - if current_user && current_user.global_role.can_edit_system_configuration
   %hr
-  %h4 Exception
-  %pre.alert.alert-danger
-    = $!.message
-  %h4 Backtrace
-  %pre{ style: 'overflow: auto; white-space: nowrap' }
-    - backtrace.each do |frame|
-      = frame
-      %br
+  - if $!
+    %h4 Exception
+    %pre.alert.alert-danger
+      = $!.message
+    %h4 Backtrace
+    %pre{ style: 'overflow: auto; white-space: nowrap' }
+      - backtrace.each do |frame|
+        = frame
+        %br

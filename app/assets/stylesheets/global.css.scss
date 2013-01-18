@@ -1,27 +1,5 @@
-// This would be better in upload_roster.css.scss, but since the
-// upload roster controller is invoked via Ajax, the styles would
-// never get loaded.
-
-body.setup {
+body.setup, body.landing {
   padding-top: 60px;
-}
-
-#roster-preview-wrapper {
-  width: 100%;
-  overflow: auto;
-}
-
-#roster-preview thead select {
-  width: auto;
-  margin-bottom: 0;
-}
-
-#roster-preview tbody td {
-  width: 8em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
 }
 
 form.form-search.breadcrumb-hang {
@@ -64,4 +42,27 @@ h1.slim, h2.slim, h3.slim, h4.slim, h5.slim, h6.slim {
 .CodeMirror-linenumber {
   padding-top: 1px;
   font-size: 11px;
+}
+
+
+// This would be better in upload_roster.css.scss, but since the
+// upload roster controller is invoked via Ajax, the styles would
+// never get loaded.
+
+#roster-preview-wrapper {
+  width: 100%;
+  overflow: auto;
+}
+
+#roster-preview thead select {
+  width: auto;
+  margin-bottom: 0;
+}
+
+#roster-preview tbody td {
+  width: 8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
 }

@@ -1,0 +1,18 @@
+- # FIXME Obviously, this page needs a lot more work. Students won't see it,
+- # though, so it's good enough for now.
+
+%h2
+  Your Courses
+
+%p
+  You are enrolled in the following courses:
+
+%table.table.table-striped.table-bordered
+  %tbody
+    - current_user.course_offerings.each do |offering|
+      %tr
+        %td
+          = link_to home_path(offering) do
+            = offering.course.department_name_and_number
+            = surround '(', ')' do
+              = offering.crn
