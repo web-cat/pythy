@@ -1,5 +1,6 @@
 class AssignmentsController < ApplicationController
 
+  before_filter :authenticate_user!
   load_and_authorize_resource :assignment
   load_resource :course, through: :assignment, shallow: true
 

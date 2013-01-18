@@ -1,5 +1,7 @@
 class TermsController < ApplicationController
 
+  before_filter :authenticate_user!
+
   # -------------------------------------------------------------
   # GET /terms
   # GET /terms.json

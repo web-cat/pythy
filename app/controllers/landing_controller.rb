@@ -1,6 +1,6 @@
 class LandingController < ApplicationController
 
-  layout 'setup'
+  layout 'not_logged_in'
 
   def index
   end

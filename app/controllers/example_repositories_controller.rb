@@ -1,5 +1,6 @@
 class ExampleRepositoriesController < ApplicationController
 
+  before_filter :authenticate_user!
   load_and_authorize_resource :course_offering
   load_and_authorize_resource :example_repository,
     through: :course_offering, shallow: true

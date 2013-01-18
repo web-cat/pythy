@@ -1,5 +1,6 @@
 class CourseOfferingsController < ApplicationController
 
+  before_filter :authenticate_user!
   load_and_authorize_resource :course
   load_and_authorize_resource :course_offering,
     through: :course, shallow: true

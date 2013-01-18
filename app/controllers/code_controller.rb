@@ -6,6 +6,7 @@ class CodeController < FriendlyUrlController
 
   ALLOWED_MESSAGES = %w(add_user remove_user unsync resync ping check start_over check_results)
 
+  before_filter :authenticate_user!
   before_filter :find_repository
 
   # -------------------------------------------------------------
@@ -22,6 +23,7 @@ class CodeController < FriendlyUrlController
       @summary = a.brief_summary_html(link: assignment_path(a))
     elsif @repository.is_a? ExampleRepository
       @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+      @summary = @repository.description
     end
   end
 

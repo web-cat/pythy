@@ -1,5 +1,7 @@
 class ActivityLogsController < ApplicationController
 
+  before_filter :authenticate_user!
+
   # -------------------------------------------------------------
   # GET /activity
   # GET /activity.json

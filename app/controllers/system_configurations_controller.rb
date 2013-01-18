@@ -1,5 +1,6 @@
 class SystemConfigurationsController < ApplicationController
 
+  before_filter :authenticate_user!
   before_filter :load_and_authorize_system_configuration
 
 
