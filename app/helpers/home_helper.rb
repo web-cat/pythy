@@ -140,4 +140,14 @@ module HomeHelper
   end
 
 
+  # -------------------------------------------------------------
+  def can_manage_anything?
+    can?(:manage, User) ||
+    can?(:manage, Institution) ||
+    can?(:manage, Term) ||
+    can?(:manage, GlobalRole) ||
+    can?(:manage, CourseRole) ||
+    can?(:manage, SystemConfiguration)
+  end
+
 end

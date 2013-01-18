@@ -7,6 +7,7 @@
     = javascript_include_tag 'application'
     = javascript_include_tag 'errors'
     = csrf_meta_tags
+    = favicon_link_tag '/favicon.png', type: 'image/png'
   %body.setup
     .navbar.navbar-inverse.navbar-fixed-top
       .navbar-inner
@@ -22,13 +23,13 @@
                   - else
                     = current_user.display_name
                 %i.icon-caret-down
-                %ul.dropdown-menu
-                  %li= link_to icon_tag('cog') + ' Account Settings', '#'
-                  %li.divider
-                  - if session[:original_user]
-                    %li= link_to icon_tag('signout') + ' Unimpersonate', unimpersonate_users_path
-                  - else 
-                    %li= link_to icon_tag('signout') + 'Sign Out', destroy_user_session_path, method: :delete
+              %ul.dropdown-menu
+                %li= link_to icon_tag('cog') + ' Account Settings', '#'
+                %li.divider
+                - if session[:original_user]
+                  %li= link_to icon_tag('signout') + ' Unimpersonate', unimpersonate_users_path
+                - else 
+                  %li= link_to icon_tag('signout') + ' Sign Out', destroy_user_session_path, method: :delete
     .container
       .row
         .span10.offset1

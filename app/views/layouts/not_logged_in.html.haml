@@ -7,6 +7,7 @@
     = javascript_include_tag 'application'
     = controller_javascript_include_tag
     = csrf_meta_tags
+    = favicon_link_tag '/favicon.png', type: 'image/png'
   %body.landing
     #main-container.container
       = render partial: "flashbar"

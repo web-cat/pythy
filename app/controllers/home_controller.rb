@@ -38,7 +38,23 @@ class HomeController < FriendlyUrlController
         end
       end
     else
-      not_found
+      offerings = current_user.course_offerings
+
+      if offerings.count == 0
+        respond_to do |format|
+          format.html do
+            render 'index_no_courses'
+          end
+        end
+      elsif offerings.count == 1
+        respond_to do |format|
+          format.html do
+            redirect_to view_context.course_offering_home_path(offerings.first)
+          end
+        end
+      else        
+        not_found
+      end
     end
   end
 

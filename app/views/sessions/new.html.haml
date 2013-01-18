@@ -1,7 +1,8 @@
+
 = twitter_bootstrap_form_for resource, :as => resource_name, :url => session_path(resource_name), :html => { :class => 'form-horizontal'} do |f|
   = devise_error_messages!
 
-  = f.fieldset 'Pythy Sign In' do
+  = f.fieldset 'Sign in to Pythy' do
     = f.text_field :email
     = f.password_field :password
 

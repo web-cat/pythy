@@ -38,25 +38,26 @@
             / %i.icon-bar-chart.icon-large
             /  %span.hidden-phone Grade 
             %li
-              %a{href: '#'}
+              %a{href: 'http://interactivepython.org/courselib/static/thinkcspy/index.html', target: '_blank' }
                 %i.icon-book.icon-large
                 %span.hidden-phone Book
           %ul.nav.pull-right
             / FIXME this menu should disappear if no permissions are met (pending figuring
             / out the best way to replace that similarly-functioning if statement below)
-            %li.dropdown          
-              = dropdown_tag do
-                %i.icon-wrench.icon-large
-                %i.icon-caret-down
-              %ul.dropdown-menu
-                %li.nav-header Manage
-                = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
-                = menu_link_to_if can?(:manage, Institution), icon_tag('sitemap') + ' Institutions', institutions_path
-                = menu_link_to_if can?(:manage, Term), icon_tag('calendar') + ' Terms', terms_path                
-                %li.divider
-                = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
-                = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
-                = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
+            - if can_manage_anything?
+              %li.dropdown          
+                = dropdown_tag do
+                  %i.icon-wrench.icon-large
+                  %i.icon-caret-down
+                %ul.dropdown-menu
+                  %li.nav-header Manage
+                  = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
+                  = menu_link_to_if can?(:manage, Institution), icon_tag('sitemap') + ' Institutions', institutions_path
+                  = menu_link_to_if can?(:manage, Term), icon_tag('calendar') + ' Terms', terms_path                
+                  %li.divider
+                  = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
+                  = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
+                  = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
             %li.dropdown
               = dropdown_tag do
                 %i.icon-user.icon-large
@@ -66,13 +67,13 @@
                   - else
                     = current_user.display_name
                 %i.icon-caret-down
-                %ul.dropdown-menu
-                  %li= link_to icon_tag('cog') + ' Account Settings', '#'
-                  %li.divider
-                  - if session[:original_user]
-                    %li= link_to icon_tag('signout') + ' Unimpersonate', unimpersonate_users_path
-                  - else 
-                    %li= link_to icon_tag('signout') + 'Sign Out', destroy_user_session_path, method: :delete
+              %ul.dropdown-menu
+                %li= link_to icon_tag('cog') + ' Account Settings', '#'
+                %li.divider
+                - if session[:original_user]
+                  %li= link_to icon_tag('signout') + ' Unimpersonate', unimpersonate_users_path
+                - else 
+                  %li= link_to icon_tag('signout') + ' Sign Out', destroy_user_session_path, method: :delete
     #main-container.container
       #main-container-inner
         = yield
