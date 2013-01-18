@@ -23,9 +23,9 @@
           = button_tag id: 'save', class: 'btn', rel: 'tooltip', title: 'Save the changes to this file' do
             = icon_tag('save') + ' Save'
         - if @repository.is_a? AssignmentRepository
-          = button_tag id: 'check', class: 'btn', rel: 'tooltip', title: 'Check your work to see how well you are doing', data: { :'loading-text' => "#{icon_tag('spinner icon-spin')} Checking..." } do
+          = button_tag id: 'check', class: 'btn', rel: 'tooltip', disabled: @repository.assignment_offering.closed?, title: 'Check your work to see how well you are doing', data: { :'loading-text' => "#{icon_tag('spinner icon-spin')} Checking..." } do
             = icon_tag('magic') + ' Check'
-          = button_tag id: 'more-options', class: 'btn dropdown-toggle', data: { toggle: 'dropdown' } do
+          = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
             = icon_tag('cog')
             %span.caret
           %ul.dropdown-menu.pull-right

@@ -169,9 +169,10 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def check
+    @closed = @repository.assignment_offering.closed?
     @was_changed = @repository.changed_since_last_check?
 
-    if @was_changed
+    if !@closed && @was_changed
       assignment_check = @repository.assignment_checks.create(
         number: @repository.next_assignment_check_number)
 
