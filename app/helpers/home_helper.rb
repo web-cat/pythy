@@ -2,17 +2,33 @@ module HomeHelper
 
   # -------------------------------------------------------------
   def course_exists?
-    @institution && @term && @course
+    @institution && @course && @term
   end
 
 
   # -------------------------------------------------------------
-  def course_offering_home_path(offering)
-    course = offering.course
-    term = offering.term
-    institution = course.department.institution
+  def home_path(model)
+    path_parts = []
 
-    "/home/#{institution.url_part}/#{term.url_part}/#{course.url_part}/#{offering.crn}"
+    if model.is_a?(CourseOffering)
+      path_parts.unshift model.crn.to_s
+      path_parts.unshift model.term.url_part
+      model = model.course
+    end
+
+    if model.is_a?(Course)
+      path_parts.unshift model.url_part
+      model = model.department.institution
+    end
+
+    if model.is_a?(Institution)
+      path_parts.unshift model.url_part
+      model = nil
+    end
+
+    path_parts.unshift 'home'
+
+    '/' + File.join(path_parts)
   end
 
 
@@ -40,8 +56,8 @@ module HomeHelper
 
       if model.is_a?(CourseOffering)
         path_parts.unshift model.crn.to_s
-        path_parts.unshift model.course.url_part
         path_parts.unshift model.term.url_part
+        path_parts.unshift model.course.url_part
         model = model.course.department.institution
       end
     end
