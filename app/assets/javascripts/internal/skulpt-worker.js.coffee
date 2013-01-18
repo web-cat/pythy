@@ -1,5 +1,6 @@
 # FIXME Have this use the compressed version in production.
 importScripts '/assets/internal/skulpt-uncomp.js'
+importScripts '/assets/internal/builtin.js'
 
 # ---------------------------------------------------------------
 # Called by Skulpt when a Python statement generates output to stdout; e.g.
@@ -19,6 +20,13 @@ input = (prompt) ->
   Sk.asyncCall('input', prompt)
 
 
+builtinRead = (file) ->
+  if Sk.builtinFiles is undefined || Sk.builtinFiles['files'][file] is undefined
+    throw "File not found: '" + x + "'"
+  else
+    Sk.builtinFiles['files'][file]
+
+
 # ---------------------------------------------------------------
 # Used for debugging to send log messages out of the worker and back to the
 # browser's console.
@@ -30,6 +38,7 @@ Sk.LOG = (args) ->
     toLog = JSON.stringify(args)
 
   self.postMessage event: 'log', args: args
+
 
 
 # ---------------------------------------------------------------
@@ -80,7 +89,7 @@ executeInSkulpt = (fn) ->
 # Configure Skulpt and register the listener for messages from the
 # client (browser) thread.
 #
-Sk.configure output: output, input: input
+Sk.configure output: output, input: input, read: builtinRead
 
 self.addEventListener 'message', (e) =>
   data = e.data
