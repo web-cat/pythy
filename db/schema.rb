@@ -64,10 +64,12 @@ ActiveRecord::Schema.define(:version => 20130111190807) do
   create_table "check_outcomes", :force => true do |t|
     t.integer  "assignment_check_id"
     t.string   "name"
+    t.string   "description"
     t.string   "category"
     t.integer  "position"
     t.decimal  "score",               :precision => 16, :scale => 8
     t.decimal  "possible_score",      :precision => 16, :scale => 8
+    t.text     "detail"
     t.datetime "created_at",                                         :null => false
     t.datetime "updated_at",                                         :null => false
   end
@@ -154,20 +156,22 @@ ActiveRecord::Schema.define(:version => 20130111190807) do
 
   create_table "repositories", :force => true do |t|
     t.string   "type"
+    t.string   "name"
+    t.text     "description"
     t.integer  "user_id"
     t.datetime "created_at",             :null => false
     t.datetime "updated_at",             :null => false
     t.integer  "assignment_offering_id"
     t.integer  "course_offering_id"
-    t.string   "name"
-    t.text     "description"
+    t.integer  "assignment_id"
     t.integer  "source_repository_id"
   end
 
   create_table "system_configurations", :force => true do |t|
-    t.string   "storage_path"
-    t.datetime "created_at",   :null => false
-    t.datetime "updated_at",   :null => false
+    t.string   "storage_path", :default => ""
+    t.string   "work_path",    :default => ""
+    t.datetime "created_at",                   :null => false
+    t.datetime "updated_at",                   :null => false
   end
 
   create_table "terms", :force => true do |t|
