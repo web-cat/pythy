@@ -54,6 +54,12 @@ namespace :deploy do
     run "touch #{File.join(current_path, 'tmp', 'restart.txt')}"
   end
 
+  # -------------------------------------------------------------
+  desc "load the database with seed data"
+  task :seed do
+    run "cd #{release_path} && bundle exec rake db:seed RAILS_ENV=#{stage}"
+  end
+
 end
 
 #
