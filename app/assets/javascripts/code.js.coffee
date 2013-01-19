@@ -173,7 +173,7 @@ class CodeController
 
   # ---------------------------------------------------------------
   _subscribe: ->
-    @jug = new Juggernaut
+    @jug = new Juggernaut secure: (window.location.protocol == 'https:')
 
     $.ajaxSetup beforeSend: (xhr) =>
       xhr.setRequestHeader "X-Session-ID", @jug.sessionID
