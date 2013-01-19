@@ -2,5 +2,3 @@
   %li
     = user_list_item_tag(@repository, user) do
       = user.full_name
-      = surround '(', ')' do
-        = user.email
