@@ -74,7 +74,7 @@ class CheckCodeWorker
       gather_results
     end
 
-    #cleanup_work_area
+    cleanup_work_area
   end
 
 
