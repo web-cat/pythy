@@ -121,7 +121,7 @@ class CheckCodeWorker
       f.write <<-END
 import sys
 import os
-sys.path.insert(0, '/Users/allevato')
+sys.path.insert(0, '#{File.join(Rails.root, 'python')}')
 sys.path.insert(0, 'lib')
 sys.path.insert(0, 'test')
 
