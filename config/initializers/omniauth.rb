@@ -4,5 +4,6 @@ Rails.application.config.middleware.use OmniAuth::Builder do
     :port => 636,
     :method => :ssl,
     :base => 'ou=People,dc=vt,dc=edu',
-    :uid => 'uupid'
+    :uid => 'uupid',
+    :name_proc => Proc.new { |name| name.gsub /@.*$/, '' }
 end

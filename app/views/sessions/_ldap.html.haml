@@ -1,9 +1,10 @@
-= twitter_bootstrap_form_for resource, :as => resource_name, :url => '/auth/ldap/callback', :html => { :class => 'form-horizontal' } do |f|
+= twitter_bootstrap_form_for resource, :as => resource_name,
+  :url => '/auth/ldap/callback', :html => { :class => 'form-horizontal' } do |f|
   = devise_error_messages!
 
   .control-group
     .control-label
-      %label{:for => 'username'} Username
+      %label{:for => 'username'} VT PID
     .controls
       = text_field_tag :username, nil, :id => 'username'
   .control-group

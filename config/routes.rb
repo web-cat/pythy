@@ -8,14 +8,7 @@ Pythy::Application.routes.draw do
   mount Sidekiq::Web, at: '/sidekiq'
 
   match '/auth/:provider/callback' => 'authentications#create'
-
-  resource :system_configuration, except: :destroy
-
   resources :authentications
-  resources :terms
-
-  match 'activity(/:action)', controller: 'activity_logs',
-    as: 'activity_logs'
 
   # Provide the initial setup routes if the User table is empty.
   scope constraints: ->(req) { needs_initial_setup? } do
@@ -34,6 +27,12 @@ Pythy::Application.routes.draw do
     get 'unimpersonate', on: :collection
   end
 
+  resource :system_configuration, except: :destroy
+
+  match 'activity(/:action)', controller: 'activity_logs',
+    as: 'activity_logs'
+
+  resources :terms
   resources :global_roles
   resources :course_roles
 

@@ -1,6 +1,6 @@
 class AuthenticationsController < ApplicationController
 
-  before_filter :authenticate_user!
+  before_filter :authenticate_user!, except: :create
 
   # -------------------------------------------------------------
   # GET /authentications
@@ -12,9 +12,7 @@ class AuthenticationsController < ApplicationController
   # -------------------------------------------------------------
   # POST /authentications
   def create    
-    #render :text => request.env["omniauth.auth"].to_yaml
-
-    omniauth = request.env["omniauth.auth"]
+    omniauth = request.env['omniauth.auth']
     provider = omniauth['provider']
     uid = omniauth['uid']
 
@@ -33,23 +31,20 @@ class AuthenticationsController < ApplicationController
       current_user.authentications.create(:provider => provider, :uid => uid)
 
       flash[:notice] = "Authentication successful."
-      redirect_to authentications_url
+      redirect_to root_url
     else
       # Didn't find an authentication and no user is currently logged in.
-      # This means we need to create the user and the authentication,
-      # then log them in.
-      user = User.new
+      # First, let's see if a user with the e-mail address exists; they
+      # might have been uploaded in a course roster. If no user was found,
+      # we need to create the user.
+
+      user = find_user(omniauth) || User.new
       authentication = user.authentications.build(:provider => provider, :uid => uid)
       authentication.apply_omniauth(user, omniauth)
-
       user.save!
-        flash[:notice] = "Signed in successfully."
-        sign_in_and_redirect(:user, user)
-      #else
-#
-#        session[:omniauth] = omniauth.except('extra')
-#        redirect_to new_user_registration_url
-#      end
+
+      flash[:notice] = "Signed in successfully."
+      sign_in_and_redirect(:user, user)
     end
   end
 
@@ -62,6 +57,34 @@ class AuthenticationsController < ApplicationController
 
     flash[:notice] = "Successfully destroyed authentication."
     redirect_to authentications_url
+  end
+
+
+  private
+
+  # -------------------------------------------------------------
+  def find_user(omniauth)
+    # FIXME This method contains some Virginia Tech specific hacks (mainly due
+    # to the fact that I'm unsure about whether the roll files downloaded from
+    # Banner list the student's preferred e-mail alias or their PID@vt.edu.
+    # We'll need to move this code out of here permanently at some point.
+
+    extra = omniauth['info']['extra']
+    main_email = omniauth['info']['email']
+
+    if main_email =~ /@(.*)$/
+      domain = $1
+    end
+
+    emails = []
+    emails << main_email
+
+    extra = omniauth['extra']
+    if extra && extra['raw_info'].uupid
+      emails << "#{extra['raw_info'].uupid.first}@#{domain}"
+    end
+
+    User.find_by_email(emails)
   end
 
 end
