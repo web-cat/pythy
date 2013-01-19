@@ -1,6 +1,6 @@
-:verbose: false
-:pidfile: ./tmp/pids/sidekiq.pid
-:namespace: pythy:<%= stage %>:sidekiq
+:verbose:      false
+:pidfile:      ./tmp/pids/sidekiq.pid
+:namespace:    pythy:<%= stage %>:sidekiq
 :concurrency:  25
 :queues:
   - [default, 5]
