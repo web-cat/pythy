@@ -27,7 +27,7 @@ set :deploy_via,           :remote_cache
 set :ssh_options,          { forward_agent: true }
 
 set :development_database, "#{application}_dev"
-set :development_database, "#{application}_staging"
+set :staging_database,     "#{application}_staging"
 set :test_database,        "#{application}_test"
 set :production_database,  "#{application}"
 
