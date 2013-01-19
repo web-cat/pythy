@@ -57,7 +57,7 @@ namespace :deploy do
   # -------------------------------------------------------------
   desc "load the database with seed data"
   task :seed do
-    run "cd #{release_path} && bundle exec rake db:seed RAILS_ENV=#{stage}"
+    run "cd #{current_path} && bundle exec rake db:seed RAILS_ENV=#{stage}"
   end
 
 end
