@@ -13,5 +13,6 @@
  *= require eternicode/bootstrap-datepicker/datepicker.css
 //= require smalot/bootstrap-datetimepicker/datetimepicker
  *= require bootstrap_and_overrides
+ *= require font-awesome
  *= require global
  */
