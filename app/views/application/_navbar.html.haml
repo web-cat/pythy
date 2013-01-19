@@ -3,7 +3,7 @@
     .container
       = link_to 'Pythy', root_url, class: 'brand'
       %ul.nav
-        - if @term
+        - if (controller_name == 'home' || controller_name == 'code') && @term
           %li.dropdown
             = dropdown_tag do
               = icon_tag('home icon-large')
