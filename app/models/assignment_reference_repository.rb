@@ -6,6 +6,8 @@ class AssignmentReferenceRepository < Repository
 
   belongs_to :assignment
 
+  attr_accessible :assignment_id
+
   after_create :create_git_repo
 
 

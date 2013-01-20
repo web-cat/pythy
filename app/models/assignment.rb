@@ -15,6 +15,7 @@ class Assignment < ActiveRecord::Base
   validates :long_name, presence: true
 
   before_validation :set_url_part
+  after_create :create_reference_repository
 
 
   # -------------------------------------------------------------
@@ -52,6 +53,14 @@ class Assignment < ActiveRecord::Base
       autolink: true,
       strikethrough: true,
       superscript: true)
+  end
+
+
+  # -------------------------------------------------------------
+  def create_reference_repository
+    AssignmentReferenceRepository.create(
+      assignment_id: id,
+      user_id: creator.id)
   end
 
 end

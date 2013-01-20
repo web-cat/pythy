@@ -55,7 +55,10 @@ class AssignmentOfferingsController < ApplicationController
   # POST /assignment_offerings.json
   def create
     @assignment = @assignment_offering.assignment
+
+    @assignment.course = @assignment_offering.course_offering.course
     @assignment.creator = current_user
+    @assignment.save!
 
     # Create in all offerings if checked.
     if params[:add_to_all_offerings]
