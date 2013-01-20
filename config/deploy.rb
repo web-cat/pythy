@@ -1,5 +1,4 @@
 require 'bundler/capistrano'
-require 'sidekiq/capistrano'
 
 #
 # Set up the stages that we can deploy to. The default is 'staging', so that
@@ -8,6 +7,7 @@ require 'sidekiq/capistrano'
 set :stages,               %w(staging production)
 set :default_stage,        'staging'
 require 'capistrano/ext/multistage'
+require 'sidekiq/capistrano'
 
 #
 # Instance-specific settings. Change these if deploying to a different
