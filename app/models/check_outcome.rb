@@ -15,14 +15,20 @@ class CheckOutcome < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  def reason
+    detail['reason']
+  end
+
+
+  # -------------------------------------------------------------
   def hint?
-    detail['reason'] && detail['reason'] =~ /Hint:/i
+    reason && reason =~ /Hint:/i
   end
 
 
   # -------------------------------------------------------------
   def hint
-    if detail['reason'] && detail['reason'] =~ /Hint:\s*(.*)$/i
+    if reason && reason =~ /Hint:\s*(.*)$/i
       $1
     end
   end

@@ -9,3 +9,5 @@
             = score_bar check.overall_score
           - elsif check.status == AssignmentCheck::TIMEOUT
             %small.text-error Timed out
+          - elsif check.status == AssignmentCheck::FAILED
+            %small.text-error Internal error

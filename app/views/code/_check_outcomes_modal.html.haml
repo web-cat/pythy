@@ -24,10 +24,9 @@
           %tr
             %td
               = outcome.description || outcome.name
-              - if outcome.hint?
+              - if outcome.reason
                 %p.hint
-                  %strong Hint:
-                  = outcome.hint
+                  = outcome.reason
             %td{ valign: 'top' }= outcome_bar outcome
 
   .modal-footer

@@ -47,8 +47,13 @@ class CheckCodeWorker
       end
     rescue Timeout::Error
       @assignment_check.status = AssignmentCheck::TIMEOUT
-    rescue
+    rescue Exception => e
       # TODO Notify instructor, admins
+      @assignment_check.extra ||= {}
+      @assignment_check.extra['error'] = {
+        message: e.message.force_encoding('UTF-8'),
+        backtrace: e.backtrace
+      }
       @assignment_check.status = AssignmentCheck::FAILED
     end
 
@@ -140,7 +145,7 @@ with open('_results.yml', 'w') as f:
 END
     end
 
-    `python3 _runner.py`
+    `python3 _runner.py > stdout.log 2> stderr.log`
   end
 
 
@@ -158,7 +163,7 @@ END
     actual_total = 0.0
     possible_total = 0.0
 
-    if results['tests']
+    if results && results['tests']
       results['tests'].each_with_index do |test, position|
         name = test.delete('name')
         description = test.delete('description')

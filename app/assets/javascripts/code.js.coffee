@@ -126,6 +126,7 @@ class CodeController
 
   # ---------------------------------------------------------------
   _checkCode: ->
+    $('#check').tooltip('hide')
     $('#check').button('loading')
     this._sendMessage data: message: 'check'
 
