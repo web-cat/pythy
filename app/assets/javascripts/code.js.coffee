@@ -175,11 +175,15 @@ class CodeController
   # ---------------------------------------------------------------
   _subscribe: ->
     # TODO Need to figure out how to get Juggernaut working over HTTPS
-    @jug = new Juggernaut(
-      protocol: 'http',
-      host: window.location.hostname,
-      port: '8080',
-      secure: false)
+    if window.location.protocol == 'https:'
+      @jug = new Juggernaut(
+        protocol: 'https', port: '8080', secure: true,
+        host: window.location.hostname)
+    else
+      @jug = new Juggernaut(
+        protocol: 'http', port: '8080', secure: false,
+        host: window.location.hostname)
+    end
 
     $.ajaxSetup beforeSend: (xhr) =>
       xhr.setRequestHeader "X-Session-ID", @jug.sessionID
