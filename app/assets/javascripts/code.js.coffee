@@ -183,7 +183,6 @@ class CodeController
       @jug = new Juggernaut(
         protocol: 'http', port: '8080', secure: false,
         host: window.location.hostname)
-    end
 
     $.ajaxSetup beforeSend: (xhr) =>
       xhr.setRequestHeader "X-Session-ID", @jug.sessionID
