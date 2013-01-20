@@ -20,11 +20,11 @@ class HomeController < FriendlyUrlController
         @examples |= offering.example_repositories.where(
           source_repository_id: nil)
 
-        assignments = offering.assignment_offerings.visible
-
         if instructor
+          assignments = offering.assignment_offerings
           @assignments |= assignments.map { |ao| ao.assignment }
         else
+          assignments = offering.assignment_offerings.visible
           assignments.each do |assignment|
             # TODO does a repository exist for the student and assignment? Put
             # it in the right bucket.
