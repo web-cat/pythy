@@ -317,8 +317,10 @@ HTML
 
   # -------------------------------------------------------------
   def juggernaut_javascript_include_tag
-    src = "http://#{request.host}:8080/application.js"
-    content_tag :script, nil, src: src, type: 'text/javascript', charset: 'utf-8'
+    #src = "http://#{request.host}:8080/application.js"
+    #content_tag :script, nil, src: src, type: 'text/javascript', charset: 'utf-8'
+
+    javascript_include_tag 'juggernaut'
   end
 
 end
