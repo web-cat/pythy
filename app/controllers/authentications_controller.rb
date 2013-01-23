@@ -74,6 +74,10 @@ class AuthenticationsController < ApplicationController
 
     if main_email =~ /@(.*)$/
       domain = $1
+    elsif main_email.blank?
+      # FIXME Ugly ugly quick hack to append PID and vt.edu when an e-mail
+      # address is confidential.
+      domain = 'vt.edu'
     end
 
     emails = []
