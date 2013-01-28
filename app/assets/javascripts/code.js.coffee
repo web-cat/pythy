@@ -436,7 +436,7 @@ class InteractiveConsole
       newSpan = $("<span class=\"#{classes}\"></span>").text(text)
       @currentLine.append(newSpan)
     else
-      @currentLine.append(text)
+      @currentLine.append($('<div/>').text(text).html())
 
 
 # Export
