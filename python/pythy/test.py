@@ -286,6 +286,18 @@ class TestCase(unittest.TestCase):
 
 
   # -------------------------------------------------------------
+  def captureOutput(self, fn):
+    captureout = io.StringIO()
+    oldstdout = sys.stdout
+    sys.stdout = captureout
+    try:
+      fn()
+      return captureout.getvalue()
+    finally:
+      sys.stdout = oldstdout
+
+
+  # -------------------------------------------------------------
   def __overrideBuiltins(self, dictionary):
     # Create a shallow copy of the dictionary of built-in methods. Then,
     # we'll take specific ones that are unsafe and replace them.
