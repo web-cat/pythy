@@ -28,6 +28,7 @@ class Ability
       process_courses user
       process_assignments user
       process_repositories user
+      process_assignment_checks user
     end
   end
 
@@ -201,6 +202,24 @@ class Ability
     # instructors can edit
     can :manage, AssignmentReferenceRepository do |repository|
       can? :manage, repository.assignment
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  # Private: Process assignment check-related permissions.
+  #
+  # user - the user
+  #
+  def process_assignment_checks(user)
+    can :read, AssignmentCheck do |check|
+      if check.assignment_repository.user == user
+        true
+      else
+        co = check.assignment_repository.assignment_offering.course_offering
+        role = co.role_for_user(user)
+        role.can_view_other_submissions?
+      end
     end
   end
 
