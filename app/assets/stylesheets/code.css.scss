@@ -34,12 +34,6 @@ body {
   }
 }
 
-table td p.hint {
-  font-size: 12px;
-  font-style: italic;
-  margin-bottom: 0;
-}
-
 .syntax-highlight{
   background-color: yellow;
 }
@@ -182,11 +176,4 @@ table td p.hint {
 
 .outcomes-header {
   margin-bottom: 6px;
-}
-
-.score-label {
-  vertical-align: middle;
-  font-size: 28px;
-  line-height: 32px;
-  font-weight: 600;
 }
