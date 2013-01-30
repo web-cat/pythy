@@ -20,8 +20,8 @@
         = button_tag id: 'run', class: 'btn btn-success', rel: 'tooltip', title: 'Run your code and see its output' do
           = icon_tag('play') + ' Run'
         - if @repository.is_a? AssignmentReferenceRepository
-          = button_tag id: 'save', class: 'btn', rel: 'tooltip', title: 'Save the changes to this file' do
-            = icon_tag('save') + ' Save'
+          = link_to edit_assignment_path(@repository.assignment), id: 'edit', class: 'btn', rel: 'tooltip', title: 'Edit this assignment' do
+            = icon_tag('pencil') + ' Edit'
         - if @repository.is_a? AssignmentRepository
           = button_tag id: 'check', class: 'btn', rel: 'tooltip', disabled: @repository.assignment_offering.closed?, title: 'Check your work to see how well you are doing', data: { :'loading-text' => "#{icon_tag('spinner icon-spin')} Checking..." } do
             = icon_tag('magic') + ' Check'
