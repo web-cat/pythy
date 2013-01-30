@@ -30,6 +30,10 @@ class AssignmentsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.json { render :json => @assignment }
+      format.csv do
+        @assignment_offerings.each { |ao| authorize! :edit, ao }
+        render text: AssignmentOffering.to_csv(@assignment_offerings)
+      end
     end
   end
 

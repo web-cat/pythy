@@ -37,6 +37,26 @@ class AssignmentOffering < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  def self.to_csv(offerings)
+    CSV.generate do |csv|
+      header = true
+      offerings.each do |offering|
+        offering.to_csv_internal(csv, crn: true, header: header)
+        header = false
+      end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def to_csv(options={})
+    CSV.generate do |csv|
+      offering.to_csv_internal(csv, options)
+    end
+  end
+
+
+  # -------------------------------------------------------------
   def visible?
     opens_at && Time.now >= opens_at
   end
@@ -69,6 +89,33 @@ class AssignmentOffering < ActiveRecord::Base
   # -------------------------------------------------------------
   def repository_for_user(user)
     assignment_repositories.where(user_id: user.id).first
+  end
+
+
+  # -------------------------------------------------------------
+  # Can't be private.
+  def to_csv_internal(csv, options={})
+    header = options[:header]
+    crn = options[:crn]
+
+    if header
+      row = []
+      row << 'email'
+      row << 'crn' if crn
+      row << 'score'
+      csv << row
+    end
+
+    assignment_repositories.each do |repo|
+      check = repo.assignment_checks.most_recent
+      if check
+        row = []
+        row << repo.user.email
+        row << course_offering.crn if crn
+        row << check.overall_score
+        csv << row
+      end
+    end
   end
 
 end

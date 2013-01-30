@@ -1,0 +1,33 @@
+= link_to assignment_path(@assignment, format: :csv) do
+  = icon_tag('bar-chart')
+  Download all grades in a CSV...
+
+- @assignment_offerings.each do |ao|
+  %h3
+    = ao.course_offering.crn
+    = surround '(', ')' do
+      = ao.course_offering.label
+  %table.table.table-bordered.table-striped.table-condensed
+    %thead
+      %tr
+        %th Student
+        %th{ width: '25%' } Check #
+        %th{ width: '25%' } Score
+    %tbody
+      - ao.course_offering.users.each do |user|
+        - repository = ao.repository_for_user(user)
+        %tr
+          %td= user.display_name
+          - if repository
+            - if repository.assignment_checks.any?
+              - most_recent = repository.assignment_checks.most_recent
+              %td
+                = link_to most_recent, remote: true do
+                  = most_recent.number
+                  = surround '(', ')' do
+                    = l most_recent.created_at
+              %td= score_bar(most_recent.overall_score)
+            - else
+              %td{ colspan: 2 } Started but never checked
+          - else
+            %td{ colspan: 2 } Not started
