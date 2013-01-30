@@ -44,7 +44,7 @@ class AssignmentOffering < ActiveRecord::Base
 
   # -------------------------------------------------------------
   def past_due?
-    effectively_due_at < Time.now
+    effectively_due_at && effectively_due_at < Time.now
   end
 
 
