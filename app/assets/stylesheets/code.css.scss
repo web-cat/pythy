@@ -23,7 +23,8 @@ body {
       padding: 3px 6px;
       margin: 4px;
       background-color: #f99;
-      font-family: "Raleway", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-family: "Source Sans Pro", "Helvetica Neue",
+        Helvetica, Arial, sans-serif;
       font-weight: bold;
       font-size: 11px;
       border: 2px solid red;
@@ -148,8 +149,9 @@ table td p.hint {
     max-height: 100%;
 
     .line {
-      font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", 
-        "Bitstream Vera Sans Mono", "Courier New", monospace;
+      font-family: "Source Code Pro", Menlo, Monaco, Consolas,
+        "DejaVu Sans Mono",  "Bitstream Vera Sans Mono",
+        "Courier New", monospace;
       white-space: pre;
       font-size: 14px;
       line-height: 17px;
@@ -163,8 +165,9 @@ table td p.hint {
       padding: 0 0;
       margin: -2px 0 0 0;
       background-color: rgba(255, 255, 255, 0.2);
-      font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", 
-        "Bitstream Vera Sans Mono", "Courier New", monospace;
+      font-family: "Source Code Pro", Menlo, Monaco, Consolas,
+        "DejaVu Sans Mono",  "Bitstream Vera Sans Mono",
+        "Courier New", monospace;
     }
 
     .text-info {
