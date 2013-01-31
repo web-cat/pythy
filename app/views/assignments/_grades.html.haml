@@ -11,8 +11,9 @@
     %thead
       %tr
         %th Student
-        %th{ width: '25%' } Check #
-        %th{ width: '25%' } Score
+        %th{ width: '20%' } Check #
+        %th{ width: '20%' } Score
+        %th{ width: '1px', style: 'border-left: none' }
     %tbody
       - ao.course_offering.users.each do |user|
         - repository = ao.repository_for_user(user)
@@ -21,13 +22,16 @@
           - if repository
             - if repository.assignment_checks.any?
               - most_recent = repository.assignment_checks.most_recent
-              %td
+              %td{ style: 'white-space: nowrap' }
                 = link_to most_recent, remote: true do
                   = most_recent.number
                   = surround '(', ')' do
                     = l most_recent.created_at
-              %td= score_bar(most_recent.overall_score)
+              %td
+                = score_bar(most_recent.overall_score)
+              %td{ style: 'border-left: none' }
+                = link_to icon_tag('bar-chart'), assignment_repository_assignment_checks_path(repository), remote: true
             - else
-              %td{ colspan: 2 } Started but never checked
+              %td{ colspan: 3 } Started but never checked
           - else
-            %td{ colspan: 2 } Not started
+            %td{ colspan: 3 } Not started

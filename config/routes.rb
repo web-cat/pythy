@@ -35,7 +35,10 @@ Pythy::Application.routes.draw do
   resources :terms
   resources :global_roles
   resources :course_roles
-  resources :assignment_checks
+
+  resources :assignment_repositories, shallow: true do
+    resources :assignment_checks
+  end
 
   resources :institutions, shallow: true do
     resources :departments do

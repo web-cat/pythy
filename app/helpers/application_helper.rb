@@ -319,8 +319,13 @@ HTML
   def juggernaut_javascript_include_tag
     #src = "http://#{request.host}:8080/application.js"
     #content_tag :script, nil, src: src, type: 'text/javascript', charset: 'utf-8'
-
     javascript_include_tag 'juggernaut'
+  end
+
+
+  # -------------------------------------------------------------
+  def google_api_javascript_include_tag
+    raw javascript_include_tag('https://www.google.com/jsapi').sub('.js', '')
   end
 
 end
