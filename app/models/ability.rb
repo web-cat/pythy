@@ -190,9 +190,16 @@ class Ability
 
 
     # Users can, of course, always read assignment repositories that
-    # contain their own work.
+    # contain their own work. So can people enrolled in the same course
+    # offering who have permission to view other students' submissions.
     can [:read, :update], AssignmentRepository do |repository|
-      repository.user == user
+      if repository.user == user
+        true
+      else
+        co = repository.assignment_offering.course_offering
+        role = co.role_for_user(user)
+        role.can_view_other_submissions?
+      end
     end
 
 
