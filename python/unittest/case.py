@@ -516,13 +516,15 @@ class TestCase(object):
     def assertFalse(self, expr, msg=None):
         """Check that the expression is false."""
         if expr:
-            msg = self._formatMessage(msg, "%s is not false" % safe_repr(expr))
+            msg = self._formatMessage(msg,
+                "Expected false, but got %s" % safe_repr(expr))
             raise self.failureException(msg)
 
     def assertTrue(self, expr, msg=None):
         """Check that the expression is true."""
         if not expr:
-            msg = self._formatMessage(msg, "%s is not true" % safe_repr(expr))
+            msg = self._formatMessage(msg,
+                "Expected true, but got %s" % safe_repr(expr))
             raise self.failureException(msg)
 
     def _formatMessage(self, msg, standardMsg):
@@ -544,7 +546,7 @@ class TestCase(object):
             # it changes the way unicode input is handled
             return '%s : %s' % (standardMsg, msg)
         except UnicodeDecodeError:
-            return  '%s : %s' % (safe_repr(standardMsg), safe_repr(msg))
+            return '%s : %s' % (safe_repr(standardMsg), safe_repr(msg))
 
     def assertRaises(self, excClass, callableObj=None, *args, **kwargs):
         """Fail unless an exception of class excClass is thrown
@@ -635,7 +637,7 @@ class TestCase(object):
     def _baseAssertEqual(self, first, second, msg=None):
         """The default assertEqual implementation, not type specific."""
         if not first == second:
-            standardMsg = '%s != %s' % (safe_repr(first), safe_repr(second))
+            standardMsg = 'Expected %s, but got %s' % (safe_repr(first), safe_repr(second))
             msg = self._formatMessage(msg, standardMsg)
             raise self.failureException(msg)
 
@@ -651,7 +653,8 @@ class TestCase(object):
            operator.
         """
         if not first != second:
-            msg = self._formatMessage(msg, '%s == %s' % (safe_repr(first),
+            msg = self._formatMessage(msg,
+                'Expected something other than %s, but got %s' % (safe_repr(first),
                                                           safe_repr(second)))
             raise self.failureException(msg)
 
@@ -678,9 +681,9 @@ class TestCase(object):
             if abs(first - second) <= delta:
                 return
 
-            standardMsg = '%s != %s within %s delta' % (safe_repr(first),
-                                                        safe_repr(second),
-                                                        safe_repr(delta))
+            standardMsg = 'Expected %s +/- %s, but got %s' % (safe_repr(first),
+                                                        safe_repr(delta),
+                                                        safe_repr(second))
         else:
             if places is None:
                 places = 7
@@ -688,9 +691,8 @@ class TestCase(object):
             if round(abs(second-first), places) == 0:
                 return
 
-            standardMsg = '%s != %s within %r places' % (safe_repr(first),
-                                                          safe_repr(second),
-                                                          places)
+            standardMsg = 'Expected %s within %r places, but got %s' % (safe_repr(first),
+                                                          places, safe_repr(second))
         msg = self._formatMessage(msg, standardMsg)
         raise self.failureException(msg)
 
