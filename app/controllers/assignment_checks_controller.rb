@@ -16,7 +16,7 @@ class AssignmentChecksController < ApplicationController
     @check_ids = []
     @assignment_checks.each do |check|
       @scores << [
-        check.number,
+        check.number.to_s,
         (check.overall_score / 100).to_f,
         "<div style='padding: 2px 5px'><b>Attempt #{check.number}:</b><br/>#{check.overall_score.round}%</div>"
       ]

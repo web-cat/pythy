@@ -1,6 +1,6 @@
 google.load 'visualization', '1.0', packages: ['corechart'], callback: ->
   data = new google.visualization.DataTable
-  data.addColumn 'number', 'Check Number'
+  data.addColumn 'string', 'Check Number'
   data.addColumn 'number', 'Score'
   data.addColumn type: 'string', role: 'tooltip', p: { html: true }
   data.addRows <%= raw @scores.to_json %>
