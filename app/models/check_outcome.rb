@@ -16,7 +16,15 @@ class CheckOutcome < ActiveRecord::Base
 
   # -------------------------------------------------------------
   def reason
-    detail['reason']
+    # Putting a $ at the end of the custom hint message for the
+    # assertion will indicate that the rest of the message should
+    # not be shown to the student.
+    r = detail['reason']
+    if r && r =~ /(.*)\$:.*/
+      $1
+    else
+      r
+    end
   end
 
 
