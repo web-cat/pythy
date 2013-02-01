@@ -174,7 +174,6 @@ class CodeController
 
   # ---------------------------------------------------------------
   _subscribe: ->
-    # TODO Need to figure out how to get Juggernaut working over HTTPS
     if window.location.protocol == 'https:'
       @jug = new Juggernaut(
         protocol: 'https', port: '8080', secure: true,
