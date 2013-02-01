@@ -3537,6 +3537,28 @@ Sk.builtin.min = function min()
     return lowest;
 };
 
+Sk.builtin.round = function round()
+{
+    // todo; delegate to x.__round__(n)
+    
+    // todo; throw if wrong num of args
+    arguments = Sk.misceval.arrayFromArguments(arguments);
+    var value = arguments[0];
+    var places = arguments[1] || 0;
+
+    if (places == 0)
+    {
+        return Math.round(value);
+    }
+    else
+    {
+        // TODO Might be some precision problems here? Should
+        // look into coming up with a better way.
+        var factor = Math.pow(10, places);
+        return Math.round(value * factor) / factor;
+    }
+};
+
 Sk.builtin.max = function max()
 {
     // todo; throw if no args
@@ -15729,6 +15751,7 @@ Compiler.prototype._interruptTest = function() { // Added by RNL
 // commented out by allevato
 //  out("if (Sk.execStart === undefined) {Sk.execStart=new Date()}");
 //      out("if (Sk.execLimit != null && new Date() - Sk.execStart > Sk.execLimit) {throw new Sk.builtin.TimeLimitError('Program exceeded run time limit.')}");
+//    out("Sk.asyncCall(null);");
 }
 
 Compiler.prototype._jumpfalse = function(test, block)
@@ -17416,6 +17439,7 @@ goog.exportSymbol("Sk.sendAsyncResult", Sk.sendAsyncResult);
 goog.exportSymbol("Sk._hasFrameToRestore", Sk._hasFrameToRestore);
 goog.exportSymbol("Sk._restoreOrCreateFrame", Sk._restoreOrCreateFrame);
 goog.exportSymbol("Sk._entryPoint", Sk._entryPoint);
+goog.exportSymbol("AsyncResultRequest", AsyncResultRequest);
 // this is stored into sys specially, rather than created by sys
 Sk.sysmodules = new Sk.builtin.dict([]);
 Sk.realsyspath = undefined;
@@ -17600,7 +17624,7 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
     var namestr = "new Sk.builtin.str('" + modname + "')";
     finalcode += "\nSk._entryPoint = function() { return " + co.funcname + "(" + namestr + "); };";
     finalcode += "\nSk._entryPoint();";
-
+//print(finalcode);
 //	if (Sk.debugCode)
 //		Sk.debugout(finalcode);
 
@@ -17682,6 +17706,7 @@ Sk.builtins = {
 'len': Sk.builtin.len,
 'min': Sk.builtin.min,
 'max': Sk.builtin.max,
+'round': Sk.builtin.round, //  Added by allevato
 'sum': Sk.builtin.sum,
 'abs': Sk.builtin.abs,
 'fabs': Sk.builtin.abs,	//	Added by RNL
