@@ -14,6 +14,8 @@
 //= require jquery_ujs
 //= require jquery.remotipart
 //= require twitter/bootstrap/bootstrap
+//= require cowboy/jquery-hashchange/jquery.ba-hashchange.min
+//= require allevato/jslider/jquery.slider.all
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
 //= require smalot/bootstrap-datetimepicker/bootstrap-datetimepicker
 //= require codemirror

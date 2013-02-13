@@ -2,9 +2,12 @@ require 'redis'
 
 class CodeController < FriendlyUrlController
 
+  layout 'code'
+
   DEFAULT_FILE = 'main.py'
 
-  ALLOWED_MESSAGES = %w(add_user remove_user unsync resync ping check start_over check_results)
+  ALLOWED_MESSAGES = %w(hash_change add_user remove_user unsync resync
+    ping check start_over check_results)
 
   before_filter :authenticate_user!
   before_filter :find_repository
@@ -71,15 +74,32 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   # Called when a new user opens the code controller for a particular
   # repository.
+  def hash_change
+    code = ''
+
+    @repository.read do |git|
+      code = git.cat_file(git_object)
+    end
+    
+    respond_to do |format|
+      format.js { render template: 'code/update_code',
+        locals: { code: code, force: true } }
+    end
+    
+  end
+
+
+  # -------------------------------------------------------------
+  # Called when a new user opens the code controller for a particular
+  # repository.
   def add_user
     @repository.connect_user current_user
     users = @repository.connected_users.alphabetical
 
     code = ''
 
-    @repository.read do
-      path = File.join(@repository.git_path, @filename)
-      code = File.exists?(path) ? File.read(path) : ''
+    @repository.read do |git|
+      code = git.cat_file(git_object)
     end
     
     publish(:users) do
@@ -298,9 +318,25 @@ class CodeController < FriendlyUrlController
     # not-found exception if it wasn't found.
     if @repository
       authorize! :read, @repository
+
+      @repository.read do |git|
+        @hashes = git.log.map { |commit| commit.sha }
+      end
     else
       not_found
     end
+  end
+
+
+  # -------------------------------------------------------------
+  def sha_param
+    params[:sha].blank? ? 'HEAD' : params[:sha]
+  end
+
+
+  # -------------------------------------------------------------
+  def git_object
+    "#{sha_param}:#{@filename}"
   end
 
 end

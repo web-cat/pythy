@@ -10,6 +10,7 @@
  *
  *= require_self
  *= require codemirror
+ *= require allevato/jslider/jquery.slider.min
  *= require eternicode/bootstrap-datepicker/datepicker.css
 //= require smalot/bootstrap-datetimepicker/datetimepicker
  *= require bootstrap_and_overrides

@@ -97,10 +97,12 @@ class Repository < ActiveRecord::Base
   # if they all share the same Redis instance).
   #
   def read
+    open
+
     # TODO lock
     
     # Yield to the block, which will access the working directory.
-    yield
+    yield @git
 
     # TODO unlock
   end

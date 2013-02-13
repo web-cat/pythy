@@ -3388,6 +3388,25 @@ goog.asserts.assertInstanceof = function(value, type, opt_message, var_args) {
 var Sk = Sk || {};
 
 /**
+ * Resets Skulpt's global runtime data. This is called automatically in
+ * Sk.configure and Sk.importMain, but there may be situations where you
+ * need to reset manually (for example, if you're implementing some kind
+ * of REPL).
+ */
+Sk.reset = function()
+{
+    Sk._moduleStack = [];
+    Sk._frames = [];
+
+    Sk._initingObjects = [];
+    Sk._initingObjectsIndex = 0;
+
+    delete Sk._preservedFrames;
+    delete Sk._frameRestoreIndex;
+    delete Sk.continuationResult;
+};
+
+/**
  *
  * Set various customizable parts of Skulpt.
  *
@@ -3402,6 +3421,9 @@ var Sk = Sk || {};
  */
 Sk.configure = function(options)
 {
+    // added by allevato
+    Sk.reset();
+
     Sk.output = options["output"] || Sk.output;
     goog.asserts.assert(typeof Sk.output === "function");
 
@@ -3439,7 +3461,7 @@ Sk.output = function(x) {};
 /*
  * Replacable input redirection (called from input, etc).
  */
-Sk.input = function(x) { return prompt(x); };
+Sk.input = function(x) { return "10"; }; //return prompt(x); };
 
 /*
  * Replacable function to load modules with (called via import, etc.)
@@ -3473,6 +3495,73 @@ Sk.inBrowser = goog.global.document !== undefined;
  * @param {...} args
  */
 Sk.debugout = function(args) {};
+
+/**
+ * A basic run loop for Skulpt-generated code. Since this fork of Skulpt has
+ * yield/resume-style execution, a loop is needed to catch the
+ * SuspendExecution exceptions that the Sk.yield() primitve throws, and then
+ * resume execution afterwards.
+ *
+ * The function that simpleRun takes as an argument is a function that kicks
+ * off the actual execution. The most basic example would be:
+ *
+ *   Sk.simpleRun(function() { return Sk.importMain('module name'); });
+ *
+ * This simpleRun function returns whatever value the passed in function
+ * returns. This makes it easy to return the imported module, to access its
+ * locals table and so forth.
+ *
+ * If the executing Python code throws any exceptions that a type other than
+ * SuspendExecution, the exception will be rethrown out of simpleRun so that
+ * the caller can catch it.
+ *
+ * WARNING: This function is NOT appropriate for in-browser execution -- it
+ * is a hard loop that will block the browser UI thread. Use the
+ * Sk.runInBrowser function for this instead, which uses a repeated
+ * setTimeout mechanism to ensure that the UI has an opportunity to update.
+ *
+ * @param start the function that starts a Skulpt execution; see the example
+ *              above
+ * @return the result of start
+ */
+Sk.simpleRun = function(start)
+{
+    var result;
+    var running = true;
+    var firsttime = true;
+
+    while (running)
+    {
+        running = false;
+        try
+        {
+            if (!firsttime)
+            {
+                Sk.resume();
+            }
+            else
+            {
+                firsttime = false;
+                result = start();
+            }
+        }
+        catch (e)
+        {
+            if (e instanceof SuspendExecution)
+            {
+                running = true;
+            }
+            else
+            {
+                throw e;
+            }
+        }
+    }
+
+    return result;
+};
+goog.exportSymbol("Sk.simpleRun", Sk.simpleRun);
+
 
 (function() {
     // set up some sane defaults based on availability
@@ -3535,28 +3624,6 @@ Sk.builtin.min = function min()
             lowest = arguments[i];
     }
     return lowest;
-};
-
-Sk.builtin.round = function round()
-{
-    // todo; delegate to x.__round__(n)
-    
-    // todo; throw if wrong num of args
-    arguments = Sk.misceval.arrayFromArguments(arguments);
-    var value = arguments[0];
-    var places = arguments[1] || 0;
-
-    if (places == 0)
-    {
-        return Math.round(value);
-    }
-    else
-    {
-        // TODO Might be some precision problems here? Should
-        // look into coming up with a better way.
-        var factor = Math.pow(10, places);
-        return Math.round(value * factor) / factor;
-    }
 };
 
 Sk.builtin.max = function max()
@@ -3635,8 +3702,11 @@ Sk.builtin.dir = function dir(x)
 
 Sk.builtin.dir.slotNameToRichName = function(k)
 {
-    // todo; map tp$xyz to __xyz__ properly
-    return undefined;
+    // Added by allevato
+    if (k.indexOf("tp$") === 0)
+        return "__" + k.substring(3) + "__";
+    else
+        return undefined;
 };
 
 Sk.builtin.repr = function repr(x)
@@ -3735,6 +3805,29 @@ Sk.builtin.jsmillis = function jsmillis()
 {
 	var now = new Date()
 	return now.valueOf();
+};
+
+// Added by allevato
+Sk.builtin.round = function round()
+{
+    // todo; delegate to x.__round__(n)
+
+    // todo; throw if wrong num of args
+    arguments = Sk.misceval.arrayFromArguments(arguments);
+    var value = arguments[0];
+    var places = arguments[1] || 0;
+
+    if (places == 0)
+    {
+        return Math.round(value);
+    }
+    else
+    {
+        // TODO Might be some precision problems here? Should
+        // look into coming up with a better way.
+        var factor = Math.pow(10, places);
+        return Math.round(value * factor) / factor;
+    }
 };
 
 /*
@@ -3949,7 +4042,7 @@ Sk.builtin.type = function(name, bases, dict)
         }
         return obj.ob$type;
     }
-    else
+    else if (bases !== undefined && dict !== undefined)
     {
         // type building version of type
 
@@ -3961,23 +4054,35 @@ Sk.builtin.type = function(name, bases, dict)
          * @constructor
          */
         var klass = (function(args)
-                {
-                    if (!(this instanceof klass)) return new klass(Array.prototype.slice.call(arguments, 0));
+        {
+            if (!(this instanceof klass))
+            {
+              return new klass(Array.prototype.slice.call(arguments, 0));
+            }
+            else
+            {
+              args = args || [];
+              goog.asserts.assert(Sk.builtin.dict !== undefined);
 
-                    args = args || [];
-                    goog.asserts.assert(Sk.builtin.dict !== undefined);
-                    this['$d'] = new Sk.builtin.dict([]);
+              // Added by allevato: Protect against multiple initialization
+              // when yielding inside a constructor.
+              var self = Sk._createOrRetrieveObject(this, function() {
+                this['$d'] = new Sk.builtin.dict([]);
+              });
 
-                    var init = Sk.builtin.type.typeLookup(this.ob$type, "__init__");
-                    if (init !== undefined)
-                    {
-                        // return ignored I guess?
-                        args.unshift(this);
-                        Sk.misceval.apply(init, undefined, undefined, undefined, args);
-                    }
+              var init = Sk.builtin.type.typeLookup(self.ob$type, "__init__");
+              if (init !== undefined)
+              {
+                  // return ignored I guess?
+                  args.unshift(self);
+                  Sk.misceval.apply(init, undefined, undefined, undefined, args);
+              }
 
-                    return this;
-                });
+              Sk._finishCreatingObject();
+
+              return self;
+            }
+        });
         //print("type(nbd):",name,JSON.stringify(dict, null,2));
         for (var v in dict)
         {
@@ -4050,7 +4155,10 @@ Sk.builtin.type = function(name, bases, dict)
 
         return klass;
     }
-
+    else if (arguments.length < 1 || arguments.length > 3)
+    {
+        throw new Sk.builtin.TypeError("type() takes 1 or 3 arguments");        
+    }
 };
 
 /**
@@ -5596,24 +5704,35 @@ Sk.builtin.list = function(L)
 {
     if (!(this instanceof Sk.builtin.list)) return new Sk.builtin.list(L);
 
+    var self = this;
+
     if (Object.prototype.toString.apply(L) === '[object Array]')
     {
-        this.v = L;
+        self.v = L;
     }
     else
     {
         if (L.tp$iter)
         {
-            this.v = [];
+            // Added by allevato: Protect against multiple initialization
+            // when yielding inside a constructor.
+            self = Sk._createOrRetrieveObject(self, function() {
+                this.v = [];
+            });
+
             for (var it = L.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
-                this.v.push(i);
+            {
+                self.v.push(i);
+            }
+
+            Sk._finishCreatingObject();
         }
         else
             throw new Sk.builtin.ValueError("expecting Array or iterable");
     }
 
-    this["v"] = this.v;
-    return this;
+    self["v"] = self.v;
+    return self;
 };
 
 
@@ -6504,6 +6623,15 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
     var ret = this.v.replace(regex, replFunc);
     return new Sk.builtin.str(ret);
 };
+
+// Python 3 prefers the "format" method to the overloaded % operator.
+// Added by allevato
+Sk.builtin.str.prototype['format'] = new Sk.builtin.func(function() {
+    var self = arguments[0];
+    var args = Array.prototype.slice.call(arguments, 1);
+    return Sk.builtin.str.prototype.nb$remainder.call(
+        self, new Sk.builtin.tuple(args));
+});
 /**
  * @constructor
  * @param {Array.<Object>|Object} L
@@ -15561,19 +15689,7 @@ goog.exportSymbol("Sk.dumpSymtab", Sk.dumpSymtab);
 /** @param {...*} x */
 var out;
 
-/** */
-Sk._entryPoint;
-
-/**
- * @constructor
- * @param {string} name
- * @param {...*} args
- */
-function AsyncResultRequest(name, args)
-{
-  this.name = name;
-  this.args = args;
-}
+Sk.continuationResult = null;
 
 /**
  * @constructor
@@ -15751,33 +15867,32 @@ Compiler.prototype._interruptTest = function() { // Added by RNL
 // commented out by allevato
 //  out("if (Sk.execStart === undefined) {Sk.execStart=new Date()}");
 //      out("if (Sk.execLimit != null && new Date() - Sk.execStart > Sk.execLimit) {throw new Sk.builtin.TimeLimitError('Program exceeded run time limit.')}");
-//    out("Sk.asyncCall(null);");
 }
 
 Compiler.prototype._jumpfalse = function(test, block)
 {
     var cond = this._gr('jfalse', "(", test, "===false||!Sk.misceval.isTrue(", test, "))");
     this._interruptTest();  // Added by RNL
-    out("if(", cond, "){/*test failed */$blk=", block, ";continue;}");
+    out("if(", cond, "){/*test failed */$frm.blk=", block, ";Sk.yield();continue;}");
 };
 
 Compiler.prototype._jumpundef = function(test, block)
 {
     this._interruptTest();  // Added by RNL
-    out("if(", test, "===undefined){$blk=", block, ";continue;}");
+    out("if(", test, "===undefined){$frm.blk=", block, ";Sk.yield();continue;}");
 };
 
 Compiler.prototype._jumptrue = function(test, block)
 {
     var cond = this._gr('jtrue', "(", test, "===true||Sk.misceval.isTrue(", test, "))");
     this._interruptTest();  // Added by RNL
-    out("if(", cond, "){/*test passed */$blk=", block, ";continue;}");
+    out("if(", cond, "){/*test passed */$frm.blk=", block, ";Sk.yield();continue;}");
 };
 
 Compiler.prototype._jump = function(block)
 {
     this._interruptTest();  // Added by RNL
-    out("$blk=", block, ";/* jump */continue;");
+    out("$frm.blk=", block, ";/* jump */Sk.yield();continue;");
 };
 
 Compiler.prototype.ctupleorlist = function(e, data, tuporlist)
@@ -15874,7 +15989,7 @@ Compiler.prototype.cyield = function(e)
         val = this.vexpr(e.value);
     var nextBlock = this.newBlock('after yield');
     // return a pair: resume target block and yielded value
-    out("return [/*resume*/", nextBlock, ",/*ret*/", val, "];");
+    out("Sk._frameLeave();return [/*resume*/", nextBlock, ",/*ret*/", val, "];");
     this.setBlock(nextBlock);
     return '$gen.gi$sentvalue'; // will either be null if none sent, or the value from gen.send(value)
 }
@@ -15907,11 +16022,10 @@ Compiler.prototype.ccall = function(e)
     var retval;
 
     // added by allevato
-    var beforeCall = this.newBlock('resume before call');
-    this._jump(beforeCall);
-    this.setBlock(beforeCall);
+    var beforecall = this.newBlock('before call');
+    this._jump(beforecall);
+    this.setBlock(beforecall);
 
-    //print(JSON.stringify(e, null, 2));
     if (e.keywords.length > 0 || e.starargs || e.kwargs)
     {
         var kwarray = [];
@@ -15933,6 +16047,11 @@ Compiler.prototype.ccall = function(e)
     {
         retval = this._gr('call', "Sk.misceval.callsim(", func, args.length > 0 ? "," : "", args, ")");
     }
+
+    // added by allevato
+    var aftercall = this.newBlock('after call');
+    this._jump(aftercall);
+    this.setBlock(aftercall);
 
     return retval;
 };
@@ -16272,8 +16391,8 @@ Compiler.prototype.setupExcept = function(eb)
 Compiler.prototype.endExcept = function()
 {
     out("$exc.pop();}catch($err){");
-    out("$blk=$exc.pop();");
-    out("continue;}");
+    out("$frm.blk=$exc.pop();");
+    out("Sk.yield();continue;}");
 };
 
 Compiler.prototype.outputLocals = function(unit)
@@ -16648,7 +16767,7 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     //
     // the header of the function, and arguments
     //
-    var cachedscope = "Sk._scopes['" + scopename + "']";
+    var cachedscope = "$moddata.scopes['" + scopename + "']";
 
     // modified by allevato
     this.u.prefixCode = cachedscope + "=" + cachedscope + "||(function " + this.niceName(coname.v) + "$(";
@@ -16707,12 +16826,12 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     //   print foo.lastValue() * foo.lastValue()
     //   foo.ask()
     //
-    this.u.varDeclsCode += "var $frm=Sk._restoreOrCreateFrame(" + entryBlock + "); Sk._frames.push($frm); ";
-    this.u.varDeclsCode += "var $ctx=$frm.ctx,$blk=$frm.blk,$exc=$ctx.$exc||[],$loc=" + locals + cells + ",$gbl=$ctx.$gbl||this;"
+    this.u.varDeclsCode += "var $frm=Sk._frameEnter(" + entryBlock + ");";
+    this.u.varDeclsCode += "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$loc=" + locals + cells + ",$gbl=$ctx.$gbl||this;"
       + "$ctx.$exc=$exc; " + (hasCell ? "$ctx.$cell=$cell; " : "") + "$ctx.$gbl=$gbl; $ctx.$loc=$loc;"
     for (var i = 0; i < funcArgs.length; ++i)
     {
-      this.u.varDeclsCode += "$ctx." + funcArgs[i] + "=" + funcArgs[i] + ";";
+      this.u.varDeclsCode += "$ctx." + funcArgs[i] + "=" + "$ctx." + funcArgs[i] + "||" + funcArgs[i] + ";";
     }
 
     //
@@ -16774,7 +16893,7 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     //
     // finally, set up the block switch that the jump code expects
     //
-    this.u.switchCode += "while(true){$frm.blk=$blk;switch($blk){";
+    this.u.switchCode += "while(true){switch($frm.blk){";
     this.u.suffixCode = "}break;}});";
     this.u.suffixCode += "var " + scopename + "=" + cachedscope + ";";
 
@@ -16870,7 +16989,7 @@ Compiler.prototype.cfunction = function(s)
     var funcorgen = this.buildcodeobj(s, s.name, s.decorator_list, s.args, function(scopename)
             {
                 this.vseqstmt(s.body);
-                out("Sk._frames.pop();return null;"); // if we fall off the bottom, we want the ret to be None
+                out("Sk._frameLeave();return null;"); // if we fall off the bottom, we want the ret to be None
             });
     this.nameop(s.name, Store, funcorgen);
 };
@@ -16881,7 +17000,7 @@ Compiler.prototype.clambda = function(e)
     var func = this.buildcodeobj(e, new Sk.builtin.str("<lambda>"), null, e.args, function(scopename)
             {
                 var val = this.vexpr(e.body);
-                out("Sk._frames.pop();return ", val, ";");
+                out("Sk._frameLeave();return ", val, ";");
             });
     return func;
 };
@@ -16952,7 +17071,7 @@ Compiler.prototype.cgenexpgen = function(generators, genIndex, elt)
     if (genIndex >= generators.length)
     {
         var velt = this.vexpr(elt);
-        out("return [", skip, "/*resume*/,", velt, "/*ret*/];");
+        out("Sk._frameLeave();return [", skip, "/*resume*/,", velt, "/*ret*/];");
         this.setBlock(skip);
     }
 
@@ -16961,7 +17080,7 @@ Compiler.prototype.cgenexpgen = function(generators, genIndex, elt)
     this.setBlock(end);
 
     if (genIndex === 1)
-        out("return null;");
+        out("Sk._frameLeave();return null;");
 };
 
 Compiler.prototype.cgenexp = function(e)
@@ -16997,18 +17116,18 @@ Compiler.prototype.cclass = function(s)
     var scopename = this.enterScope(s.name, s, s.lineno);
     var entryBlock = this.newBlock('class entry');
 
-    var cachedscope = "Sk._scopes['" + scopename + "']";
+    var cachedscope = "$moddata.scopes['" + scopename + "']";
 
     // modified by allevato
     this.u.prefixCode = cachedscope + "=" + cachedscope + "||(function $" + s.name.v + "$class_outer($globals,$locals,$rest){" +
       "var $gbl=$outergbl=$globals,$loc=$outerloc=$locals;";
     this.u.switchCode += "return(function " + s.name.v + "(){";
     
-    this.u.switchCode += "var $frm=Sk._restoreOrCreateFrame(" + entryBlock + "); Sk._frames.push($frm); " +
-      "var $ctx=$frm.ctx,$blk=$frm.blk,$exc=$ctx.$exc||[],$gbl=$ctx.$gbl||$globals,$loc=$ctx.$loc||$locals;" +
+    this.u.switchCode += "var $frm=Sk._frameEnter(" + entryBlock + ");" +
+      "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$gbl=$ctx.$gbl||$globals,$loc=$ctx.$loc||$locals;" +
       "$ctx.$exc=$exc;$ctx.$gbl=$gbl;$ctx.$loc=$loc;" +
-      "while(true){$frm.blk=$blk; switch($blk){\n";
-    this.u.suffixCode = "}break;}}).apply(null,$rest);});";
+      "while(true){switch($frm.blk){\n";
+    this.u.suffixCode = "};Sk._frameLeave();break;}}).apply(null,$rest);});";
     this.u.suffixCode += "var " + scopename + "=" + cachedscope + ";";
 
     this.u.private_ = s.name;
@@ -17022,11 +17141,21 @@ Compiler.prototype.cclass = function(s)
 
     this.exitScope();
 
+    // added by allevato
+    var beforebuildclass = this.newBlock('before build class');
+    this._jump(beforebuildclass);
+    this.setBlock(beforebuildclass);
+
     // todo; metaclass
     var wrapped = this._gr("built", "Sk.misceval.buildClass($gbl,", scopename, ",", s.name['$r']().v, ",[", bases, "])");
 
     // store our new class under the right name
     this.nameop(s.name, Store, wrapped);
+
+    // added by allevato
+    var afterbuildclass = this.newBlock('after build class');
+    this._jump(afterbuildclass);
+    this.setBlock(afterbuildclass);
 };
 
 Compiler.prototype.ccontinue = function(s)
@@ -17059,9 +17188,9 @@ Compiler.prototype.vstmt = function(s)
             if (this.u.ste.blockType !== FunctionBlock)
                 throw new SyntaxError("'return' outside function");
             if (s.value)
-                out("Sk._frames.pop();return ", this.vexpr(s.value), ";");
+                out("Sk._frameLeave();return ", this.vexpr(s.value), ";");
             else
-                out("Sk._frames.pop();return null;");
+                out("Sk._frameLeave();return null;");
             break;
         case Delete_:
             this.vseqexpr(s.targets);
@@ -17336,15 +17465,15 @@ Compiler.prototype.cmod = function(mod)
     //print("-----");
     //print(Sk.astDump(mod));
     var modf = this.enterScope(new Sk.builtin.str("<module>"), mod, 0);
-    var cachedscope = "Sk._scopes['" + modf + "']";
+    var cachedscope = "$moddata.scopes['" + modf + "']";
 
     var entryBlock = this.newBlock('module entry');
     // modified by allevato
     this.u.prefixCode = cachedscope + "=" + cachedscope + "||(function($modname){";
-    this.u.varDeclsCode = "var $frm=Sk._restoreOrCreateFrame(" + entryBlock + "); Sk._frames.push($frm); " +
-      "var $ctx=$frm.ctx,$blk=$frm.blk,$exc=$ctx.$exc||[],$gbl=$ctx.$gbl||{},$loc=$ctx.$loc||$gbl; $gbl.__name__=$modname;" +
+    this.u.varDeclsCode = "var $frm=Sk._frameEnter(" + entryBlock + ");" +
+      "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$gbl=$ctx.$gbl||{},$loc=$ctx.$loc||$gbl; $gbl.__name__=$modname;" +
       "$ctx.$exc=$exc;$ctx.$gbl=$gbl;$ctx.$loc=$loc;";
-    this.u.switchCode = "while(true){$frm.blk=$blk; switch($blk){\n";
+    this.u.switchCode = "while(true){switch($frm.blk){\n";
     this.u.suffixCode = "}}});";
     this.u.suffixCode += "var " + modf + "=" + cachedscope + ";";
 
@@ -17352,7 +17481,7 @@ Compiler.prototype.cmod = function(mod)
     {
         case Module:
             this.cbody(mod.body);
-            out("Sk._frames.pop();return $loc;");
+            out("Sk._frameLeave();return $loc;");
             break;
         default:
             goog.asserts.fail("todo; unhandled case in compilerMod");
@@ -17383,36 +17512,78 @@ Sk.compile = function(source, filename, mode)
     };
 };
 
+
+/**
+ * @constructor
+ * @param {string=} name
+ * @param {...*} args
+ */
+function SuspendExecution(name, args)
+{
+  this.name = name;
+  this.args = args;
+}
+
 /**
  * Have a function call this to "suspend" the program so that you
  * can interactively provide the return value (like "input"); to
  * resume the program, call Sk.sendAsyncResult and pass it the
  * desired value.
  */
-Sk.asyncCall = function()
+Sk.yield = function()
 {
-  if (Sk.asyncResult)
+  if (arguments.length > 0)
   {
-    var result = Sk.asyncResult;
-    delete Sk.asyncResult;
-    return result;
+    if (Sk.continuationResult !== undefined)
+    {
+      var result = Sk.continuationResult;
+      delete Sk.continuationResult;
+      return result;
+    }
+    else
+    {
+      Sk._preservedFrames = Sk._frames;
+      Sk._frameRestoreIndex = 0;
+      Sk._frames = [];
+
+      var name = arguments[0];
+      var args = (2 <= arguments.length) ?
+        Array.prototype.slice.call(arguments, 1) : [];
+      throw new SuspendExecution(name, args);
+    }
   }
   else
   {
-    Sk._preservedFrames = Sk._frames;
-    Sk._frameRestoreIndex = 0;
-    Sk._frames = [];
+    if (!Sk._preservedFrames ||
+      Sk._preservedFrames.length < Sk._frames.length)
+    {
+      Sk._preservedFrames = Sk._frames;
+      Sk._frameRestoreIndex = 0;
+      Sk._frames = [];
 
-    var name = arguments[0];
-    var args = (2 <= arguments.length) ? Array.prototype.slice.call(arguments, 1) : [];
-    throw new AsyncResultRequest(name, args);
+      throw new SuspendExecution();
+    }
+    else
+    {
+      delete Sk._preservedFrames;
+      delete Sk._frameRestoreIndex;
+    }
   }
 };
 
-Sk.sendAsyncResult = function(value)
+/**
+ * Resumes execution after a yield. If a result is specified, then the
+ * deepest call to Sk.yield() in the stack will return that result.
+ *
+ * @param {Object=} result the optional result
+ */
+Sk.resume = function(result)
 {
-  Sk.asyncResult = value;
-  return Sk._entryPoint();
+  Sk._initingObjectsIndex = 0;
+  Sk.continuationResult = result;
+
+  var moddata = Sk._moduleStack[Sk._moduleStack.length - 1];
+  return moddata.code(moddata);
 };
 
 Sk._hasFrameToRestore = function()
@@ -17421,25 +17592,81 @@ Sk._hasFrameToRestore = function()
     Sk._frameRestoreIndex < Sk._preservedFrames.length;
 };
 
-Sk._restoreOrCreateFrame = function(entryBlock)
+Sk._frameEnter = function(entryBlock)
 {
+  var frm;
+
   if (Sk._hasFrameToRestore())
   {
-    return Sk._preservedFrames[Sk._frameRestoreIndex++];
+    frm = Sk._preservedFrames[Sk._frameRestoreIndex++];
   }
   else
   {
-    return { ctx: {}, blk: entryBlock };
+    frm = { ctx: {}, blk: entryBlock };
   }
+
+  Sk._frames.push(frm);
+
+  return frm;
+};
+
+Sk._frameLeave = function()
+{
+  Sk._frames.pop();
+};
+
+/**
+ * Executes a Python module that has been translated into Javascript.
+ *
+ * @param code a JS function that executes the code in the module
+ * @return the locals dictionary for the module
+ */
+Sk._execModule = function(code)
+{
+  var moduleData = {
+    scopes: {},
+    code: code
+  };
+
+  Sk._moduleStack.push(moduleData);
+  var result = code(moduleData);
+  Sk._moduleStack.pop();
+
+  return result;
+};
+
+Sk._createOrRetrieveObject = function(self, initializer)
+{
+  if (Sk._initingObjects[Sk._initingObjectsIndex] !== undefined)
+  {
+    self = Sk._initingObjects[Sk._initingObjectsIndex++];
+  }
+  else
+  {
+    initializer.call(self);
+    Sk._initingObjects.push(self);
+    Sk._initingObjectsIndex++;
+  }
+
+  return self;
+};
+
+Sk._finishCreatingObject = function()
+{
+  Sk._initingObjects.pop();
+  Sk._initingObjectsIndex--;
 };
 
 goog.exportSymbol("Sk.compile", Sk.compile);
-goog.exportSymbol("Sk.asyncCall", Sk.asyncCall);
-goog.exportSymbol("Sk.sendAsyncResult", Sk.sendAsyncResult);
+goog.exportSymbol("Sk.yield", Sk.yield);
+goog.exportSymbol("Sk.resume", Sk.resume);
 goog.exportSymbol("Sk._hasFrameToRestore", Sk._hasFrameToRestore);
-goog.exportSymbol("Sk._restoreOrCreateFrame", Sk._restoreOrCreateFrame);
-goog.exportSymbol("Sk._entryPoint", Sk._entryPoint);
-goog.exportSymbol("AsyncResultRequest", AsyncResultRequest);
+goog.exportSymbol("Sk._frameEnter", Sk._frameEnter);
+goog.exportSymbol("Sk._frameLeave", Sk._frameLeave);
+goog.exportSymbol("Sk._execModule", Sk._execModule);
+goog.exportSymbol("Sk._createOrRetrieveObject", Sk._createOrRetrieveObject);
+goog.exportSymbol("Sk._finishCreatingObject", Sk._finishCreatingObject);
+goog.exportSymbol("SuspendExecution", SuspendExecution);
 // this is stored into sys specially, rather than created by sys
 Sk.sysmodules = new Sk.builtin.dict([]);
 Sk.realsyspath = undefined;
@@ -17587,11 +17814,7 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
         }
     }
 
-    module.$js = co.code; // todo; only in DEBUG?
     var finalcode = co.code;
-
-    // added by allevato
-    finalcode = "Sk._frames=[];Sk._scopes={};\n" + finalcode;
 
     // removed by allevato
 	// if (Sk.dateSet == null || !Sk.dateSet) {
@@ -17599,13 +17822,24 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
 	// 	Sk.dateSet = true;
 	// }
 
+    var namestr = "new Sk.builtin.str('" + modname + "')";
+
+    finalcode += "\nreturn " + co.funcname + "(" + namestr + ");";
+
+    // added by allevato: Each module needs to run in its own JS scope
+    // because the $scopeN variables and Sk._scopes[] array will be reused
+    // by the compiler. This function also pushes modules onto a module
+    // stack as they are executed, so that yield/resume always continues in
+    // the correct module as code is being loaded and executed.
+    finalcode = "Sk._execModule(function($moddata) {\n" + finalcode + "\n});\n";
+
     //if (!COMPILED)
     {
         if (dumpJS)
         {
             var withLineNumbers = function(code)
             {
-                var beaut = js_beautify(co.code);
+                var beaut = js_beautify(finalcode);
                 var lines = beaut.split("\n");
                 for (var i = 1; i <= lines.length; ++i)
                 {
@@ -17616,17 +17850,12 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
                 }
                 return lines.join("\n");
             };
-            finalcode = withLineNumbers(co.code);
+            finalcode = withLineNumbers(finalcode);
             Sk.debugout(finalcode);
         }
     }
 
-    var namestr = "new Sk.builtin.str('" + modname + "')";
-    finalcode += "\nSk._entryPoint = function() { return " + co.funcname + "(" + namestr + "); };";
-    finalcode += "\nSk._entryPoint();";
-//print(finalcode);
-//	if (Sk.debugCode)
-//		Sk.debugout(finalcode);
+    module.$js = finalcode; // todo; only in DEBUG?
 
     var modlocs = goog.global.eval(finalcode);
 
@@ -17664,6 +17893,9 @@ Sk.importModule = function(name, dumpJS)
 
 Sk.importMain = function(name, dumpJS)
 {
+    // Added by allevato
+    Sk.reset();
+
 	Sk.dateSet = false;
 	Sk.filesLoaded = false
 	//	Added to reset imports
@@ -17675,6 +17907,9 @@ Sk.importMain = function(name, dumpJS)
 
 Sk.importMainWithBody = function(name, dumpJS, body)
 {
+    // Added by allevato
+    Sk.reset();
+
 	Sk.dateSet = false;
 	Sk.filesLoaded = false
 	//	Added to reset imports
@@ -17702,42 +17937,81 @@ goog.exportSymbol("Sk.builtin.__import__", Sk.builtin.__import__);// Note: the h
 // uniquization that the compiler does for words that are reserved in
 // Javascript. This is a bit hokey.
 Sk.builtins = {
-'range': Sk.builtin.range,
-'len': Sk.builtin.len,
-'min': Sk.builtin.min,
-'max': Sk.builtin.max,
-'round': Sk.builtin.round, //  Added by allevato
-'sum': Sk.builtin.sum,
 'abs': Sk.builtin.abs,
-'fabs': Sk.builtin.abs,	//	Added by RNL
-'ord': Sk.builtin.ord,
+//'all': Sk.builtin.all, // Added by allevato
+//'any': Sk.builtin.any, // Added by allevato
+//'ascii': Sk.builtin.ascii, // Added by allevato
+//'bin': Sk.builtin.bin, // Added by allevato
+//'bool': Sk.builtin.bool, // Added by allevato
+//'bytearray': Sk.builtin.bytearray, // Added by allevato
+//'bytes': Sk.builtin.bytes, // Added by allevato
 'chr': Sk.builtin.chr,
+//'classmethod': Sk.builtin.classmethod, // Added by allevato
+//'compile': Sk.builtin.compile, // Added by allevato
+//'complex': Sk.builtin.complex, // Added by allevato
+//'delattr': Sk.builtin.delattr, // Added by allevato
+'dict': Sk.builtin.dict,
 'dir': Sk.builtin.dir,
-'repr': Sk.builtin.repr,
-'open': Sk.builtin.open,
-'isinstance': Sk.builtin.isinstance,
-'hash': Sk.builtin.hash,
-'getattr': Sk.builtin.getattr,
+//'divmod': Sk.builtin.divmod, // Added by allevato
+//'enumerate': Sk.builtin.enumerate, // Added by allevato
+//'eval': Sk.builtin.eval, // Added by allevato
+//'exec': Sk.builtin.exec, // Added by allevato
+'fabs': Sk.builtin.abs, //  Added by RNL
+//'filter': Sk.builtin.filter, // Added by allevato
 'float_$rw$': Sk.builtin.float_,
+//'format': Sk.builtin.format, // Added by allevato
+//'frozenset': Sk.builtin.frozenset, // Added by allevato
+'getattr': Sk.builtin.getattr,
+//'globals': Sk.builtin.globals, // Added by allevato
+//'hasattr': Sk.builtin.hasattr, // Added by allevato
+'hash': Sk.builtin.hash,
+//'help': Sk.builtin.help, // Added by allevato
+//'hex': Sk.builtin.hex, // Added by allevato
+//'id': Sk.builtin.id, // Added by allevato
+'input': Sk.builtin.input,
 'int_$rw$': Sk.builtin.int_,
+'isinstance': Sk.builtin.isinstance,
+//'issubclass': Sk.builtin.issubclass, // Added by allevato
+//'iter': Sk.builtin.iter, // Added by allevato
+'len': Sk.builtin.len,
+'list': Sk.builtin.list,
+//'locals': Sk.builtin.locals, // Added by allevato
+//'map': Sk.builtin.map, // Added by allevato
+'max': Sk.builtin.max,
+//'memoryview': Sk.builtin.memoryview, // Added by allevato
+'min': Sk.builtin.min,
+//'next': Sk.builtin.next, // Added by allevato
+'object': Sk.builtin.object,
+//'oct': Sk.builtin.oct, // Added by allevato
+'open': Sk.builtin.open,
+'ord': Sk.builtin.ord,
+//'pow': Sk.builtin.pow, // Added by allevato
+//'property': Sk.builtin.property, // Added by allevato
+'range': Sk.builtin.range,
+'repr': Sk.builtin.repr,
+//'reversed': Sk.builtin.reversed, // Added by allevato
+'round': Sk.builtin.round, //  Added by allevato
+'set': Sk.builtin.set,
+//'setattr': Sk.builtin.setattr, // Added by allevato
+'slice': Sk.builtin.slice,
+//'sorted': Sk.builtin.sorted, // Added by allevato
+//'staticmethod': Sk.builtin.staticmethod, // Added by allevato
+'str': Sk.builtin.str,
+'sum': Sk.builtin.sum,
+//'super': Sk.builtin.super, // Added by allevato
+'tuple': Sk.builtin.tuple,
+'type': Sk.builtin.type,
+//'vars': Sk.builtin.vars, // Added by allevato
+//'zip': Sk.builtin.zip, // Added by allevato
 
 'AttributeError': Sk.builtin.AttributeError,
 'ValueError': Sk.builtin.ValueError,
 
-'dict': Sk.builtin.dict,
 'file': Sk.builtin.file,
 'function': Sk.builtin.func,
 'generator': Sk.builtin.generator,
-'list': Sk.builtin.list,
 'long_$rw$': Sk.builtin.lng,
 'method': Sk.builtin.method,
-'object': Sk.builtin.object,
-'slice': Sk.builtin.slice,
-'str': Sk.builtin.str,
-'set': Sk.builtin.set,
-'tuple': Sk.builtin.tuple,
-'type': Sk.builtin.type,
-'input': Sk.builtin.input,
 /*'read': Sk.builtin.read,*/
 'jseval': Sk.builtin.jseval,
 'jsmillis': Sk.builtin.jsmillis,

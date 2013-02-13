@@ -1,7 +1,7 @@
 class CodeController
 
   # -------------------------------------------------------------
-  constructor: (@channel, @isEditor) ->
+  constructor: (@channel, @isEditor, @hashCount) ->
     # Convert the text area to a CodeMirror widget.
     @codeArea = CodeMirror.fromTextArea $('#codearea')[0],
       mode: { name: "python", version: 3, singleLineStringErrors: false },
@@ -40,7 +40,7 @@ class CodeController
     # $('#sidebar').click (e) => e.stopPropagation()
     # $('#console').click (e) => e.stopPropagation()
 
-    this._createWorker()
+    this._initializeSkulpt()
 
     # Register event handlers for widgets.
     $('#run').click (e) => this._runCode()
@@ -48,6 +48,13 @@ class CodeController
     $('#check').click (e) => this._checkCode()
     $('#start-over').click (e) => this._startOver()
     $('#sidebar-toggle').click this.toggleSidebar
+    $(window).hashchange => this._hashChange()
+
+    $('#history-slider').slider {
+      from: 0, to: @hashCount - 1, value: @hashCount - 1,
+      step: 1, limits: false, smooth: false, skin: 'round_plastic',
+      onstatechange: (value) => this._historySliderChange(value)
+    }
 
     this._subscribe()
 
@@ -62,6 +69,16 @@ class CodeController
 
 
   #~ Private methods ..........................................................
+
+  # ---------------------------------------------------------------
+  _historySliderChange: (value) ->
+    if value
+      value = @hashCount - 1 - value
+      if value == 0
+        window.location.hash = ''
+      else
+        window.location.hash = "HEAD~#{value}"
+
 
   # ---------------------------------------------------------------
   _updateCodeSize: ->
@@ -192,7 +209,20 @@ class CodeController
       @jug.subscribe "#{@channel}_users", this._jugMessageHandler(this)
       @jug.subscribe "#{@channel}_results", this._jugMessageHandler(this)
 
-    this._sendMessage data: message: 'add_user'
+    data = { message: 'add_user' }
+    if window.location.hash
+      data.sha = unescape(window.location.hash.substring(1))
+
+    this._sendMessage data: data
+
+
+  # -------------------------------------------------------------
+  _hashChange: ->
+    data = { message: 'hash_change' }
+    if window.location.hash
+      data.sha = unescape(window.location.hash.substring(1))
+
+    this._sendMessage data: data
 
 
   # -------------------------------------------------------------
@@ -225,18 +255,19 @@ class CodeController
   _runCode: ->
     if $('#run').data('running')
       @console.terminate()
-      @worker.terminate()
       this._cleanup()
-      this._createWorker()
     else
       this._setRunButtonStop(true)
       this._clearErrors()
       @console.clear()
-      @worker.postMessage cmd: 'run', code: @codeArea.getValue()
+      this._skRunLoop @codeArea.getValue()
 
 
   # -------------------------------------------------------------
   _cleanup: ->
+    window.clearTimeout(@nextRunTimeout)
+    delete @nextRunTimeout
+    Sk.reset()
     this._setRunButtonStop(false)
 
 
@@ -290,30 +321,102 @@ class CodeController
 
 
   # -------------------------------------------------------------
-  _createWorker: ->
-    # Create HTML5 web worker to run code in a separate thread, so infinite
-    # loops will not cause the entire browser to hang.
-    @worker = new Worker '/assets/internal/skulpt-worker.js'
+  _skRunLoop: (code) ->
+    runner = (first, continuationResult) =>
+      resume = false
+      success = false
+      try
+        if first
+          Sk.importMainWithBody('<stdin>', false, code)
+        else
+          Sk.resume(continuationResult)
+        success = true
+      catch e
+        if e instanceof SuspendExecution
+          if e.name
+            args = e.args
+            args.unshift (result) => runner(false, result)
+            this["async_#{e.name}"].apply(this, args)
+            resume = false
+          else
+            resume = true
+        else
+          resume = false
+          success = false
+          this._handleException(e)
 
-    @worker.addEventListener 'message', (e) =>
-      data = e.data
+      if resume
+        @nextRunTimeout = window.setTimeout (=> runner(false)), 1
+      else if success
+        @console.success()
+        this._cleanup()
 
-      switch data.event
-        when 'async_call'
-          if data.functionName == 'input'
-            @console.promptForInput data.args[0], (value) =>
-              @worker.postMessage cmd: 'resume', returnValue: value
-        when 'log'
-          console.log data.args
-        when 'output'
-          this._handleOutput data.text
-        when 'success'
-          @console.success()
-          this._cleanup()
-        when 'error'
-          this._handleError data.error
-          this._cleanup()
-    , false
+    @nextRunTimeout = window.setTimeout (=> runner(true)), 1
+
+
+  # -------------------------------------------------------------
+  async_input: (resumer, prompt) ->
+    @console.promptForInput prompt, (text) => resumer(text)
+
+
+  # -------------------------------------------------------------
+  _handleException: (e) ->
+    if e.tp$name
+      errorInfo =
+        type: e.tp$name,
+        message: e.args.v[0].v
+
+      if e.args.v.length > 3
+        if typeof(e.args.v[3]) is 'number'
+          errorInfo.start =
+            line: e.args.v[3],
+            ch: e.args.v[4]
+        else
+          errorInfo.start =
+            line: e.args.v[3][0][0],
+            ch: e.args.v[3][0][1]
+          errorInfo.end =
+            line: e.args.v[3][1][0],
+            ch: e.args.v[3][1][1]
+      else
+        errorInfo.start =
+          line: Sk.currLineNo,
+          ch: Sk.currColNo
+    else
+      errorInfo =
+        type: 'Internal error (' + e.name + ')',
+        message: e.message
+
+    this._handleError errorInfo
+    this._cleanup()
+
+
+  # -------------------------------------------------------------
+  _initializeSkulpt: ->
+    Sk.configure {
+      output: (text) => this._skOutput(text),
+      input:  (prompt) => return this._skInput(prompt),
+      read:   (file) => return this._skRead(file)
+    }
+
+
+  # -------------------------------------------------------------
+  _skOutput: (text) ->
+    this._handleOutput text
+
+
+  # -------------------------------------------------------------
+  _skInput: (prompt) ->
+    Sk.yield 'input', prompt
+
+
+  # -------------------------------------------------------------
+  _skRead: (file) ->
+    if Sk.builtinFiles is undefined || Sk.builtinFiles['files'][file] is undefined
+      throw "File not found: '" + x + "'"
+    else
+      Sk.builtinFiles['files'][file]
+
 
 
 # -------------------------------------------------------------

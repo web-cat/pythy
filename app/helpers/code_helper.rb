@@ -96,4 +96,11 @@ module CodeHelper
     end
   end
 
+
+  # -------------------------------------------------------------
+  def skulpt_javascript_include_tags
+    javascript_include_tag('internal/skulpt-uncomp') +
+    javascript_include_tag('internal/builtin')
+  end
+
 end
