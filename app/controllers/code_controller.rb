@@ -78,7 +78,12 @@ class CodeController < FriendlyUrlController
     code = ''
 
     @repository.read do |git|
-      code = git.cat_file(git_object)
+      begin
+        code = git.cat_file(git_object)
+      rescue
+        # Do nothing; an exception will occur if the repository is empty
+        # and we want to just ignore that.
+      end
     end
     
     respond_to do |format|
@@ -99,9 +104,14 @@ class CodeController < FriendlyUrlController
     code = ''
 
     @repository.read do |git|
-      code = git.cat_file(git_object)
+      begin
+        code = git.cat_file(git_object)
+      rescue
+        # Do nothing; an exception will occur if the repository is empty
+        # and we want to just ignore that.
+      end
     end
-    
+
     publish(:users) do
       render_to_string template: 'code/update_user_list',
         locals: { users: users }
