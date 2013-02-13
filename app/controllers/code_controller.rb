@@ -330,7 +330,17 @@ class CodeController < FriendlyUrlController
       authorize! :read, @repository
 
       @repository.read do |git|
-        @hashes = git.log.map { |commit| commit.sha }
+        begin
+          @hashes = git.log.map { |commit| commit.sha }
+        rescue
+          # If the above fails, it's because the repo doesn't have a
+          # HEAD yet (most likely) or it's busted (hopefully not).
+          #
+          # TODO: We should probably make sure every repository has
+          # a HEAD when it's created, by committing a default
+          # .gitignore file or something similar.
+          @hashes = []
+        end
       end
     else
       not_found
