@@ -257,6 +257,7 @@ class CodeController
       @console.terminate()
       this._cleanup()
     else
+      Sk.reset()
       this._setRunButtonStop(true)
       this._clearErrors()
       @console.clear()
@@ -269,8 +270,7 @@ class CodeController
 
   # -------------------------------------------------------------
   _cleanup: ->
-    window.clearTimeout(@nextRunTimeout)
-    delete @nextRunTimeout
+    Sk.cancelInBrowser()
     Sk.reset()
     this._setRunButtonStop(false)
 
