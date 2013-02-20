@@ -3436,6 +3436,9 @@ Sk.configure = function(options)
     Sk.read = options["read"] || Sk.read;
     goog.asserts.assert(typeof Sk.read === "function");
 
+    Sk.transformUrl = options["transformUrl"] || Sk.transformUrl;
+    goog.asserts.assert(typeof Sk.transformUrl === "function");
+
     Sk.sysargv = options["sysargv"] || Sk.sysargv;
     goog.asserts.assert(goog.isArrayLike(Sk.sysargv));
 
@@ -3468,6 +3471,21 @@ Sk.input = function(x) { return "10"; }; //return prompt(x); };
  * todo; this should be an async api
  */
 Sk.read = function(x) { throw "Sk.read has not been implemented"; };
+
+/*
+ * Transform a URL. This is used by modules that make web requests,
+ * since cross-origin requests are usually not allowed for security
+ * reasons.
+ *
+ * For example, a web application that uses Skulpt can implement this
+ * function to make the URL passthrough the local service. For example,
+ * transform "http://foreignsite.com" to
+ * "http://localservice.com/proxy?url=http://foreignsite.com".
+ *
+ * Note that this function should take and return a JS string (not a
+ * wrapped Skulpt string).
+ */
+Sk.transformUrl = function(x) { return x; };
 
 /*
  * Setable to emulate arguments to the script. Should be array of JS strings.
@@ -3561,6 +3579,105 @@ Sk.simpleRun = function(start)
     return result;
 };
 goog.exportSymbol("Sk.simpleRun", Sk.simpleRun);
+
+/**
+ * A browser-friendly run loop for Skulpt-generated code. Since this fork of
+ * Skulpt has yield/resume-style execution, this function uses a setTimeout
+ * "loop" to execute the code; the code is started, and when it yields, it
+ * is resumed with another call to setTimeout. This allows the Python code
+ * to give some idle time to the browser UI thread, allowing it to update the
+ * DOM and handle user interaction (for example, to let them click a button
+ * to stop long-running code).
+ *
+ * The function that runInBrowser takes as an argument is a function that
+ * kicks off the actual execution. The most basic example would be:
+ *
+ *   Sk.runInBrowser(function() { return Sk.importMain('module name'); });
+ *
+ * This runInBrowser function can optionally take two other arguments: the
+ * first is a callback function called when the code successfully completes
+ * execution (takes no arguments); the second is a callback function called
+ * if an exception occurs while the code is executing (takes one argument,
+ * the exception that was thrown).
+ *
+ * @param {function()} start
+ * @param {function()=} onSuccess
+ * @param {function(Object)=} onError
+ */
+Sk.runInBrowser = function(start, onSuccess, onError)
+{
+    /**
+     * @param {boolean} first
+     * @param {Object=} continuationResult
+     */
+    var runner = function(first, continuationResult) {
+        var resume = false;
+        var success = false;
+
+        try
+        {
+            if (first)
+            {
+                start();
+            }
+            else
+            {
+                Sk.resume(continuationResult);
+            }
+            
+            success = true;
+        }
+        catch (e)
+        {
+            if (e instanceof SuspendExecution)
+            {
+                if (e.future)
+                {
+                    e.future(function(result) { runner(false, result); });
+                }
+                else
+                {
+                    resume = true;
+                }
+            }
+            else
+            {
+                resume = false;
+                success = false;
+
+                if (onError)
+                {
+                    onError(e);
+                }
+                else
+                {
+                    goog.global.console.log(e);
+                }
+            }
+        }
+
+        if (resume)
+        {
+            Sk._nextRunTimeout = window.setTimeout(
+              function() { runner(false); }, 1);
+        }
+        else if (success && onSuccess)
+        {
+            onSuccess();
+        }
+    };
+
+    runner(true);
+};
+
+Sk.cancelInBrowser = function()
+{
+  window.clearTimeout(Sk._nextRunTimeout);
+  delete Sk._nextRunTimeout;
+};
+
+goog.exportSymbol("Sk.runInBrowser", Sk.runInBrowser);
+goog.exportSymbol("Sk.cancelInBrowser", Sk.cancelInBrowser);
 
 
 (function() {
@@ -9051,9 +9168,9 @@ Sk.builtin.module.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetA
 Sk.builtin.module.prototype.tp$setattr = Sk.builtin.object.prototype.GenericSetAttr;
 /**
  * @constructor
- * @param {Function} code javascript code object for the function
- * @param {Object} globals where this function was defined
- * @param {Object} args arguments to the original call (stored into locals for
+ * @param {Function=} code javascript code object for the function
+ * @param {Object=} globals where this function was defined
+ * @param {Object=} args arguments to the original call (stored into locals for
  * the generator to reenter)
  * @param {Object=} closure dict of free variables
  * @param {Object=} closure2 another dict of free variables that will be
@@ -9144,6 +9261,26 @@ Sk.builtin.generator.prototype['send'] = new Sk.builtin.func(function(self, valu
     return self.tp$iternext(value);
 });
 
+/**
+ * Creates a generator with the specified next function and additional
+ * instance data. Useful in Javascript-implemented modules to implement
+ * the __iter__ method.
+ */
+Sk.builtin.makeGenerator = function(next, data)
+{
+  var gen = new Sk.builtin.generator();
+  gen.tp$iternext = next;
+
+  for (var key in data)
+  {
+    if (data.hasOwnProperty(key))
+    {
+      gen[key] = data[key];
+    }
+  }
+
+  return gen;
+};
 /**
  * @constructor
  * @param {Sk.builtin.str} name
@@ -9291,7 +9428,11 @@ Sk.ffi = Sk.ffi || {};
  */
 Sk.ffi.remapToPy = function(obj)
 {
-    if (Object.prototype.toString.call(obj) === "[object Array]")
+    if (obj === null)
+    {
+        return null;
+    }
+    else if (Object.prototype.toString.call(obj) === "[object Array]")
     {
         var arr = [];
         for (var i = 0; i < obj.length; ++i)
@@ -9344,12 +9485,34 @@ Sk.ffi.remapToJs = function(obj)
             ret.push(Sk.ffi.remapToJs(obj.v[i]));
         return ret;
     }
-    else if (typeof obj === "number" || typeof obj === "boolean")
+    else if (obj === null || typeof obj === "number" || typeof obj === "boolean")
         return obj;
     else
         return obj.v;
 };
 goog.exportSymbol("Sk.ffi.remapToJs", Sk.ffi.remapToJs);
+
+/*
+ * Added by allevato
+ *
+ * Takes a kwargs array (which alternates [name, value, name, value...])
+ * and returns a JS object with the appropriate keys/values.
+ */
+Sk.ffi.kwargsToJs = function(kwargs)
+{
+    var dict = {};
+
+    for (var index = 0; index < kwargs.length; index += 2)
+    {
+        var pykey = kwargs[index];
+        var pyval = kwargs[index + 1];
+
+        dict[Sk.ffi.remapToJs(pykey)] = Sk.ffi.remapToJs(pyval);
+    }
+
+    return dict;
+};
+goog.exportSymbol("Sk.ffi.kwargsToJs", Sk.ffi.kwargsToJs);
 
 Sk.ffi.callback = function(fn)
 {
@@ -17515,65 +17678,97 @@ Sk.compile = function(source, filename, mode)
 
 /**
  * @constructor
- * @param {string=} name
- * @param {...*} args
+ * @param {Object=} future
  */
-function SuspendExecution(name, args)
+function SuspendExecution(future)
 {
-  this.name = name;
-  this.args = args;
+  this.future = future;
 }
 
 /**
  * Have a function call this to "suspend" the program so that you
- * can interactively provide the return value (like "input"); to
- * resume the program, call Sk.sendAsyncResult and pass it the
- * desired value.
+ * can interactively provide the return value (like "input") or do
+ * something else asynchronous without hanging the browser (like an
+ * HTTP request).
+ * 
+ * This works as follows. Imagine that you have an input function
+ * (like Sk.input) that you want to implement asynchronously by
+ * displaying a text field in the browser window. In order to wait
+ * for the user to type a response, program execution must be
+ * suspended temporarily. So you could write Sk.input like this:
+ *
+ * Sk.input = function(prompt) {
+ *   return Sk.future(function(continueWith) {
+ *     // add #textfield to the DOM
+ *     $('#textfield').change(function() {
+ *       continueWith($('#textfield').val());
+ *     });
+ *   });
+ * };
+ *
+ * The process:
+ * 1. Surround the *entire body* of the asynchronous function in
+ *    the call to Sk.future, because it will be invoked multiple
+ *    times.
+ * 2. Sk.future takes a single parameter -- the function that will
+ *    be executed to start the asynchronous process (in this case,
+ *    add a text field to the DOM and hook up event listeners).
+ * 3. The function that you give to Sk.future itself takes a single
+ *    parameter, which is a handle to a function (continueWith)
+ *    that you must call to provide the return value of the future.
+ *    Once this is called, execution will resume.
+ * 4. Once resumed, the Sk.future function will return the value
+ *    that was passed to continueWith.
+ *
+ * @param perform the function that
+ *    performs the actions that will return a value in the future
  */
-Sk.yield = function()
+Sk.future = function(perform)
 {
-  if (arguments.length > 0)
+  if (Sk.continuationResult !== undefined)
   {
-    if (Sk.continuationResult !== undefined)
-    {
-      var result = Sk.continuationResult;
-      delete Sk.continuationResult;
-      return result;
-    }
-    else
-    {
-      Sk._preservedFrames = Sk._frames;
-      Sk._frameRestoreIndex = 0;
-      Sk._frames = [];
-
-      var name = arguments[0];
-      var args = (2 <= arguments.length) ?
-        Array.prototype.slice.call(arguments, 1) : [];
-      throw new SuspendExecution(name, args);
-    }
+    var result = Sk.continuationResult;
+    delete Sk.continuationResult;
+    return result;
   }
   else
   {
-    if (!Sk._preservedFrames ||
-      Sk._preservedFrames.length < Sk._frames.length)
-    {
-      Sk._preservedFrames = Sk._frames;
-      Sk._frameRestoreIndex = 0;
-      Sk._frames = [];
+    Sk._preservedFrames = Sk._frames;
+    Sk._frameRestoreIndex = 0;
+    Sk._frames = [];
 
-      throw new SuspendExecution();
-    }
-    else
-    {
-      delete Sk._preservedFrames;
-      delete Sk._frameRestoreIndex;
-    }
+    throw new SuspendExecution(perform);
   }
 };
 
 /**
- * Resumes execution after a yield. If a result is specified, then the
- * deepest call to Sk.yield() in the stack will return that result.
+ * Halt execution of the program until Sk.resume() is called. This is a
+ * low-level primitive; most users who need to suspend execution (for
+ * example, to wait for an asynchronous HTTP load to finish or to allow
+ * interactive input) should use the higher-level Sk.future() instead.
+ */
+Sk.yield = function()
+{
+  if (!Sk._preservedFrames ||
+    Sk._preservedFrames.length < Sk._frames.length)
+  {
+    Sk._preservedFrames = Sk._frames;
+    Sk._frameRestoreIndex = 0;
+    Sk._frames = [];
+
+    throw new SuspendExecution();
+  }
+  else
+  {
+    delete Sk._preservedFrames;
+    delete Sk._frameRestoreIndex;
+  }
+};
+
+/**
+ * Resumes execution after Sk.yield(). This is a low-level primitive;
+ * clients using Sk.future() should communicate their result to the
+ * function that gets passed into their future.
  *
  * @param {Object=} result the optional result
  */

@@ -328,4 +328,10 @@ HTML
     raw javascript_include_tag('https://www.google.com/jsapi').sub('.js', '')
   end
 
+
+  # -------------------------------------------------------------
+  def percentage(value)
+    "#{value.round(2)}%"
+  end
+
 end

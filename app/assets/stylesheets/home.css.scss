@@ -21,6 +21,7 @@
 
 .assignment {
   text-align: left;
+
   .assignment-title {
     font-size: 16px;
     font-weight: 600;
@@ -44,6 +45,109 @@
       font-size: 24px;
       font-weight: 600;
     }
+  }
+}
+
+.assignment-tile {
+  position: relative;
+  display: inline-block;
+  text-align: left;
+  height: 104px;
+  padding: 4px 6px;
+  margin-right: 12px;
+  margin-bottom: 12px;
+
+  background-color: #e8e8e8;
+  border: 1px solid #bbbbbb;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+
+  .assignment-short-name {
+    font-weight: 600;
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .assignment-long-name {
+    font-size: 13px;
+    line-height: 15px;
+  }
+
+  .assignment-options {
+    position: absolute;
+    bottom: 4px;
+  }
+}
+
+/* Large desktop */
+@media (min-width: 1200px)
+{
+  .assignment-tile {
+    float: left;
+    width: 144px;
+  }
+  .assignment-tile:nth-child(2n) {
+    margin-left: 1px;
+  }
+  .assignment-tile:nth-child(4n) {
+    margin-right: 0;
+  }
+}
+
+/* Portrait tablet to landscape and desktop */
+@media (min-width: 980px) and (max-width: 1199px)
+{
+  .assignment-tile {
+    float: left;
+    width: 158px;
+  }
+  .assignment-tile:nth-child(3n) {
+    margin-right: 0;
+  }
+}
+
+/* Portrait tablet to landscape and desktop */
+@media (min-width: 768px) and (max-width: 979px)
+{
+  .assignment-tile {
+    float: left;
+    width: 187px;
+  }
+  .assignment-tile:nth-child(2n) {
+    margin-right: 0;
+  }
+}
+
+/* Landscape phone to portrait tablet */
+@media (min-width: 480px) and (max-width: 767px)
+{
+  .assignment-tile {
+    float: left;
+    width: 29%;
+    margin-right: 2%;
+  }
+   .assignment-tile:nth-child(3n) {
+     margin-right: 0%;
+   }
+}
+ 
+/* Landscape phones and down */
+@media (max-width: 479px)
+{
+  .assignment-tile {
+    margin-right: 0;
+    height: auto;
+    display: block;
+  }
+
+  .assignment-options {
+    position: absolute;
+    right: 6px;
+    top: 4px;
   }
 }
 

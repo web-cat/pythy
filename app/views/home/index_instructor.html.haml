@@ -16,7 +16,7 @@
     %p
       = link_to 'Create a new assignment...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
 
-    #assignments
+    #assignments.clearfix><
       = render(partial: 'home/instructor_assignment', collection: @assignments) || render(partial: 'home/no_assignments')
     
 

@@ -66,6 +66,10 @@ Pythy::Application.routes.draw do
 
   match 'home(/:institution(/:course(/:term(/:crn))))' => 'home#index'
 
+  # External content proxy, to get around HTTPS issues when Python code makes
+  # requests to external sites.
+  match 'proxy' => 'proxy#get', as: 'proxy'  
+
   # Default route when a user is logged in.
   authenticated :user do
     root to: redirect('/home')

@@ -63,7 +63,8 @@
           This assignment is open forever.
 
     .assignment_description
-      = raw @description
+      .span8
+        = raw @description
   - if can? :edit, @assignment
     #grades.tab-pane
       - if can? :manage, @assignment

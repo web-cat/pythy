@@ -9,8 +9,9 @@ class CodeController
       gutters: ["CodeMirror-linenumbers"]
       indentUnit: 2,
       tabSize: 2,
-      tabMode: "shift",
-      matchBrackets: true
+      indentWithTabs: false,
+      matchBrackets: true,
+      extraKeys: { Tab: (cm) -> cm.replaceSelection('  ', 'end') }
 
     $(window).resize => this._updateCodeSize()
     this._updateCodeSize()
@@ -27,7 +28,6 @@ class CodeController
     @codeArea.on 'blur', =>
       if @hlLine
         @codeArea.removeLineClass @hlLine, 'background', 'active-line'
-
 
     @ignoreChange = false
 
@@ -260,7 +260,11 @@ class CodeController
       this._setRunButtonStop(true)
       this._clearErrors()
       @console.clear()
-      this._skRunLoop @codeArea.getValue()
+      code = @codeArea.getValue()
+      starter =     => Sk.importMainWithBody("<stdin>", false, code)
+      error   = (e) => this._handleException(e)
+      success =     => @console.success(); this._cleanup()
+      Sk.runInBrowser starter, success, error
 
 
   # -------------------------------------------------------------
@@ -321,45 +325,6 @@ class CodeController
 
 
   # -------------------------------------------------------------
-  _skRunLoop: (code) ->
-    runner = (first, continuationResult) =>
-      resume = false
-      success = false
-      try
-        if first
-          Sk.importMainWithBody('<stdin>', false, code)
-        else
-          Sk.resume(continuationResult)
-        success = true
-      catch e
-        if e instanceof SuspendExecution
-          if e.name
-            args = e.args
-            args.unshift (result) => runner(false, result)
-            this["async_#{e.name}"].apply(this, args)
-            resume = false
-          else
-            resume = true
-        else
-          resume = false
-          success = false
-          this._handleException(e)
-
-      if resume
-        @nextRunTimeout = window.setTimeout (=> runner(false)), 1
-      else if success
-        @console.success()
-        this._cleanup()
-
-    @nextRunTimeout = window.setTimeout (=> runner(true)), 1
-
-
-  # -------------------------------------------------------------
-  async_input: (resumer, prompt) ->
-    @console.promptForInput prompt, (text) => resumer(text)
-
-
-  # -------------------------------------------------------------
   _handleException: (e) ->
     if e.tp$name
       errorInfo =
@@ -394,9 +359,10 @@ class CodeController
   # -------------------------------------------------------------
   _initializeSkulpt: ->
     Sk.configure {
-      output: (text) => this._skOutput(text),
-      input:  (prompt) => return this._skInput(prompt),
-      read:   (file) => return this._skRead(file)
+      output:       (text) => this._skOutput(text),
+      input:        (prompt) => this._skInput(prompt),
+      read:         (file) => this._skRead(file),
+      transformUrl: (url) => this._skTransformUrl(url)
     }
 
 
@@ -407,7 +373,8 @@ class CodeController
 
   # -------------------------------------------------------------
   _skInput: (prompt) ->
-    Sk.yield 'input', prompt
+    Sk.future (continueWith) =>
+      @console.promptForInput prompt, (text) => continueWith(text)
 
 
   # -------------------------------------------------------------
@@ -417,6 +384,12 @@ class CodeController
     else
       Sk.builtinFiles['files'][file]
 
+
+  # -------------------------------------------------------------
+  _skTransformUrl: (url) ->
+    # TODO Kinda fragile
+    encodedUrl = encodeURIComponent(url)
+    "#{window.location.protocol}//#{window.location.host}/proxy?url=#{encodedUrl}"
 
 
 # -------------------------------------------------------------

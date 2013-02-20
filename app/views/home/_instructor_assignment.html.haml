@@ -1,9 +1,5 @@
-= link_to code_path(instructor_assignment.assignment_reference_repository), class: 'btn btn-block assignment' do
-  .assignment-title
-    = succeed ':' do
-      = instructor_assignment.short_name
-    = instructor_assignment.long_name
-  .subtext
-    -#= assignment_date_wrapper(instructor_assignment) do
-    -#  %i.icon-calendar
-      -#= assignment_date_text(instructor_assignment)
+.assignment-tile.btn{ href: assignment_url(instructor_assignment) }
+  .assignment-short-name><= instructor_assignment.short_name
+  .assignment-long-name><= instructor_assignment.long_name
+  .assignment-options<
+    = link_to 'View code', code_path(instructor_assignment.assignment_reference_repository)
