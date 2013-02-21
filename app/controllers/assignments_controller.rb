@@ -29,10 +29,10 @@ class AssignmentsController < ApplicationController
 
     scores = []
     @score_summary = {
-      minimum: 0,
-      maximum: 0,
-      median: 0,
-      mean: 0
+      minimum: 0.0,
+      maximum: 0.0,
+      median: 0.0,
+      mean: 0.0
     }
 
     @assignment_offerings.each do |ao|
@@ -45,9 +45,11 @@ class AssignmentsController < ApplicationController
           if check
             score = check.overall_score
 
-            scores << score
-            @score_summary[:maximum] = score if score > @score_summary[:maximum]
-            @score_summary[:minimum] = score if score < @score_summary[:minimum]
+            if score
+              scores << score
+              @score_summary[:maximum] = score if score > @score_summary[:maximum]
+              @score_summary[:minimum] = score if score < @score_summary[:minimum]
+            end
           end
         end
       end
@@ -137,7 +139,9 @@ class AssignmentsController < ApplicationController
 
   # -------------------------------------------------------------
   def median(array)
-    if array.length % 2 == 0
+    if array.length == 0
+      0.0
+    elsif array.length % 2 == 0
       (array[array.length / 2 - 1] + array[array.length / 2]) / 2
     else
       array[(array.length - 1) / 2]
