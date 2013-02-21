@@ -55,9 +55,11 @@ class AssignmentsController < ApplicationController
       end
     end
 
-    scores.sort!
-    @score_summary[:mean] = scores.inject(0.0) { |sum, el| sum + el } / scores.size
-    @score_summary[:median] = median(scores)
+    if scores.length > 0
+      scores.sort!
+      @score_summary[:mean] = scores.inject(0.0) { |sum, el| sum + el } / scores.size
+      @score_summary[:median] = median(scores)
+    end
 
     respond_to do |format|
       format.html # show.html.erb
