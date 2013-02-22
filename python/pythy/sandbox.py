@@ -51,7 +51,11 @@ def safe_urlopen(url):
     groups = m.groups()
     amount = groups[0]
     currency = groups[1]
-    return io.StringIO(_fixed_currencies[amount + ':' + currency])
+    key = amount + ':' + currency
+    if key in _fixed_currencies:
+      return io.StringIO(_fixed_currencies[key])
+    else:
+      return io.StringIO('{lhs: "100 U.S. dollars",rhs: "75.7002271 Euros",error: "",icc: true}')
   else:
     raise AssertionError('The URL you requested was formatted incorrectly or not allowed.')
 
