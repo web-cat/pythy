@@ -110,6 +110,17 @@ class User < ActiveRecord::Base
   end
 
 
+  # -------------------------------------------------------------
+  # Gets the username (without the domain) of the e-mail address, if possible.
+  def email_without_domain
+    if email =~ /(^[^@]+)@/
+      $1
+    else
+      email
+    end
+  end
+
+
   private
 
   # -------------------------------------------------------------

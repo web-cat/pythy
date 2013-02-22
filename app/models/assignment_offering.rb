@@ -92,7 +92,7 @@ class AssignmentOffering < ActiveRecord::Base
   end
 
 
-  # -------------------------------------------------------------
+# -------------------------------------------------------------
   # Can't be private.
   def to_csv_internal(csv, options={})
     header = options[:header]
@@ -100,9 +100,8 @@ class AssignmentOffering < ActiveRecord::Base
 
     if header
       row = []
-      row << 'email'
-      row << 'crn' if crn
-      row << 'score'
+      row << 'id'
+      row << assignment.short_name
       csv << row
     end
 
@@ -110,8 +109,7 @@ class AssignmentOffering < ActiveRecord::Base
       check = repo.assignment_checks.most_recent
       if check
         row = []
-        row << repo.user.email
-        row << course_offering.crn if crn
+        row << repo.user.email_without_domain
         row << check.overall_score
         csv << row
       end
