@@ -276,6 +276,8 @@ class TestCase(unittest.TestCase):
       with open(filename, 'r') as fh:
         code = fh.read() + '\n'
 
+      code = "import pythy.sandbox\n" + code
+
       codeObject = compile(code, filename, 'exec')
       exec(codeObject, self.safeGlobals, studentLocals)
     finally:
