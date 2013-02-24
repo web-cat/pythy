@@ -28,9 +28,6 @@ class CommitCollector
     hours_open = (@end_time - @start_time) / (60 * 60)
     bucket_count = hours_open.ceil / @bucket_hours
 
-    puts hours_open
-    puts bucket_count
-
     bucket_count.times do |i|
       time = @start_time + i * @bucket_hours.hours
       @buckets << [time, 0]
@@ -41,7 +38,7 @@ class CommitCollector
   # -------------------------------------------------------------
   def collect_commits
     @repository.open do |git|
-      git.log.each do |commit|
+      git.log(nil).each do |commit|
         date = commit.date
         bucket = bucket_for_time(date)
 
