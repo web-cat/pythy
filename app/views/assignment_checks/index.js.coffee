@@ -8,8 +8,7 @@ google.load 'visualization', '1.0', packages: ['corechart'], callback: ->
 
   # Append the modal to the page body.
   $('body').append(
-    '<%= j(render partial: "score_history_modal",
-      locals: { }) %>')
+    '<%= j(render partial: "score_history_modal") %>')
 
   options = {
     width: 770,

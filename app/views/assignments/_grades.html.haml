@@ -16,7 +16,11 @@
           - ao.course_offering.users.each do |user|
             - repository = ao.repository_for_user(user)
             %tr
-              %td= user.display_name
+              %td
+                - if repository
+                  = link_to user.display_name, repository
+                - else
+                  = user.display_name
               - if repository
                 - if repository.assignment_checks.any?
                   - most_recent = repository.assignment_checks.most_recent

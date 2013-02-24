@@ -1,0 +1,14 @@
+%h2
+  = @assignment.short_name
+  %small
+    = surround '(', ')' do
+      = @assignment.long_name
+%h4
+  %small
+    = @assignment_repository.user.display_name
+
+.row
+  .span6
+    %h3 Activity Over Time
+    #commit-time-chart.chart
+  .span6
