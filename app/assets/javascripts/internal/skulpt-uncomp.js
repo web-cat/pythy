@@ -3403,7 +3403,7 @@ Sk.reset = function()
 
     delete Sk._preservedFrames;
     delete Sk._frameRestoreIndex;
-    delete Sk.continuationResult;
+    delete Sk._futureResult;
 };
 
 /**
@@ -3442,6 +3442,19 @@ Sk.configure = function(options)
     Sk.sysargv = options["sysargv"] || Sk.sysargv;
     goog.asserts.assert(goog.isArrayLike(Sk.sysargv));
 
+    // added by allevato: When the code is running in the browser,
+    // it is running in the same UI thread as the rest of the page, so the
+    // code is suspended at regular intervals to give the DOM an opportunity
+    // to update and for user input to take place. The "suspend interval" is
+    // the number of milliseconds that should pass between suspensions.
+    // Higher values of this parameter will increase the speed of the Python
+    // code because less time will be spent yielding back to the DOM thread,
+    // but will also make the browser significantly less responsive. Lower
+    // values will make the browser more responsive but significantly slow
+    // down execution. The default is 100 milliseconds.
+    Sk.suspendInterval = options["suspendInterval"] || 100;
+    goog.asserts.assert(typeof Sk.suspendInterval === "number");
+
     if (options["syspath"])
     {
         Sk.syspath = options["syspath"];
@@ -3464,7 +3477,7 @@ Sk.output = function(x) {};
 /*
  * Replacable input redirection (called from input, etc).
  */
-Sk.input = function(x) { return "10"; }; //return prompt(x); };
+Sk.input = function(x) { return prompt(x); };
 
 /*
  * Replacable function to load modules with (called via import, etc.)
@@ -3945,6 +3958,21 @@ Sk.builtin.round = function round()
         var factor = Math.pow(10, places);
         return Math.round(value * factor) / factor;
     }
+};
+
+// Added by allevato
+Sk.builtin.globals = function()
+{
+  var gbl = Sk._frames[Sk._frames.length - 1].ctx['$gbl'];
+  return Sk.ffi.varTableToDict(gbl);
+};
+
+// Added by allevato
+Sk.builtin.locals = function()
+{
+  // FIXME Needs fixes in the compiler
+  var loc = Sk._frames[Sk._frames.length - 1].ctx['$loc'];
+  return Sk.ffi.varTableToDict(loc);
 };
 
 /*
@@ -9558,6 +9586,40 @@ Sk.ffi.unwrapn = function(obj)
     return obj['v'];
 };
 goog.exportSymbol("Sk.ffi.unwrapn", Sk.ffi.unwrapn);
+
+/**
+ * Converts a variable table (either $gbl or $loc from a stack frame) into
+ * a Python dictionary. This function is used to implement the globals() and
+ * locals() built-ins.
+ *
+ * @param vars the variable table
+ * @return the Python dictionary with the variables
+ */
+Sk.ffi.varTableToDict = function(vars)
+{
+  var kvs = [];
+
+  for (var name in vars)
+  {
+    if (vars.hasOwnProperty(name))
+    {
+      kvs.push(Sk.ffi.remapToPy(name));
+
+      var value = vars[name];
+      if (value.__proto__.ob$type)
+      {
+        kvs.push(value);
+      }
+      else
+      {
+        kvs.push(Sk.ffi.remapToPy(value));
+      }
+    }
+  }
+
+  return new Sk.builtin.dict(kvs);
+};
+goog.exportSymbol("Sk.ffi.varTableToDict", Sk.ffi.varTableToDict);
 /*
  * This is a port of tokenize.py by Ka-Ping Yee.
  *
@@ -15852,7 +15914,7 @@ goog.exportSymbol("Sk.dumpSymtab", Sk.dumpSymtab);
 /** @param {...*} x */
 var out;
 
-Sk.continuationResult = null;
+Sk._futureResult = null;
 
 /**
  * @constructor
@@ -16052,10 +16114,17 @@ Compiler.prototype._jumptrue = function(test, block)
     out("if(", cond, "){/*test passed */$frm.blk=", block, ";Sk.yield();continue;}");
 };
 
-Compiler.prototype._jump = function(block)
+/**
+ * @param {number} block
+ * @param {boolean=} forceYield
+ */
+Compiler.prototype._jump = function(block, forceYield)
 {
     this._interruptTest();  // Added by RNL
-    out("$frm.blk=", block, ";/* jump */Sk.yield();continue;");
+    //if (forceYield)
+    //  out("$frm.blk=", block, ";/* jump */Sk.yield(true);continue;");
+    //else
+      out("$frm.blk=", block, ";/* jump */Sk.yield();continue;");
 };
 
 Compiler.prototype.ctupleorlist = function(e, data, tuporlist)
@@ -16186,7 +16255,7 @@ Compiler.prototype.ccall = function(e)
 
     // added by allevato
     var beforecall = this.newBlock('before call');
-    this._jump(beforecall);
+    this._jump(beforecall, true);
     this.setBlock(beforecall);
 
     if (e.keywords.length > 0 || e.starargs || e.kwargs)
@@ -17306,7 +17375,7 @@ Compiler.prototype.cclass = function(s)
 
     // added by allevato
     var beforebuildclass = this.newBlock('before build class');
-    this._jump(beforebuildclass);
+    this._jump(beforebuildclass, true);
     this.setBlock(beforebuildclass);
 
     // todo; metaclass
@@ -17708,8 +17777,11 @@ function SuspendExecution(future)
  *
  * The process:
  * 1. Surround the *entire body* of the asynchronous function in
- *    the call to Sk.future, because it will be invoked multiple
- *    times.
+ *    the call to Sk.future, because it will be invoked twice (once
+ *    when it is initially called, to preserve the stack state and
+ *    yield, and then a second time when the continueWith callback
+ *    is invoked to resume execution), and you don't want to do
+ *    anything that causes side effects.
  * 2. Sk.future takes a single parameter -- the function that will
  *    be executed to start the asynchronous process (in this case,
  *    add a text field to the DOM and hook up event listeners).
@@ -17725,10 +17797,10 @@ function SuspendExecution(future)
  */
 Sk.future = function(perform)
 {
-  if (Sk.continuationResult !== undefined)
+  if (Sk._futureResult !== undefined)
   {
-    var result = Sk.continuationResult;
-    delete Sk.continuationResult;
+    var result = Sk._futureResult;
+    delete Sk._futureResult;
     return result;
   }
   else
@@ -17747,35 +17819,43 @@ Sk.future = function(perform)
  * example, to wait for an asynchronous HTTP load to finish or to allow
  * interactive input) should use the higher-level Sk.future() instead.
  */
-Sk.yield = function()
+Sk.yield = function(force)
 {
-  if (!Sk._preservedFrames ||
-    Sk._preservedFrames.length < Sk._frames.length)
-  {
-    Sk._preservedFrames = Sk._frames;
-    Sk._frameRestoreIndex = 0;
-    Sk._frames = [];
+  var currentTime = new Date().getTime();
 
-    throw new SuspendExecution();
-  }
-  else
+  if (!Sk._lastYieldTime
+    || (currentTime - Sk._lastYieldTime > Sk.suspendInterval))
   {
-    delete Sk._preservedFrames;
-    delete Sk._frameRestoreIndex;
+    Sk._lastYieldTime = currentTime;
+
+    if (!Sk._preservedFrames ||
+      Sk._preservedFrames.length < Sk._frames.length)
+    {
+      Sk._preservedFrames = Sk._frames;
+      Sk._frameRestoreIndex = 0;
+      Sk._frames = [];
+
+      throw new SuspendExecution();
+    }
+    else
+    {
+      delete Sk._preservedFrames;
+      delete Sk._frameRestoreIndex;
+    }
   }
 };
 
 /**
  * Resumes execution after Sk.yield(). This is a low-level primitive;
  * clients using Sk.future() should communicate their result to the
- * function that gets passed into their future.
+ * continueWith callback that gets passed into their future function.
  *
  * @param {Object=} result the optional result
  */
 Sk.resume = function(result)
 {
   Sk._initingObjectsIndex = 0;
-  Sk.continuationResult = result;
+  Sk._futureResult = result;
 
   var moddata = Sk._moduleStack[Sk._moduleStack.length - 1];
   return moddata.code(moddata);
@@ -17853,6 +17933,7 @@ Sk._finishCreatingObject = function()
 };
 
 goog.exportSymbol("Sk.compile", Sk.compile);
+goog.exportSymbol("Sk.future", Sk.future);
 goog.exportSymbol("Sk.yield", Sk.yield);
 goog.exportSymbol("Sk.resume", Sk.resume);
 goog.exportSymbol("Sk._hasFrameToRestore", Sk._hasFrameToRestore);
@@ -18157,7 +18238,7 @@ Sk.builtins = {
 //'format': Sk.builtin.format, // Added by allevato
 //'frozenset': Sk.builtin.frozenset, // Added by allevato
 'getattr': Sk.builtin.getattr,
-//'globals': Sk.builtin.globals, // Added by allevato
+'globals': Sk.builtin.globals, // Added by allevato
 //'hasattr': Sk.builtin.hasattr, // Added by allevato
 'hash': Sk.builtin.hash,
 //'help': Sk.builtin.help, // Added by allevato
@@ -18170,7 +18251,7 @@ Sk.builtins = {
 //'iter': Sk.builtin.iter, // Added by allevato
 'len': Sk.builtin.len,
 'list': Sk.builtin.list,
-//'locals': Sk.builtin.locals, // Added by allevato
+'locals': Sk.builtin.locals, // Added by allevato
 //'map': Sk.builtin.map, // Added by allevato
 'max': Sk.builtin.max,
 //'memoryview': Sk.builtin.memoryview, // Added by allevato
