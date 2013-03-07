@@ -43,14 +43,14 @@ ActiveRecord::Schema.define(:version => 20130111190807) do
 
   create_table "assignments", :force => true do |t|
     t.integer  "creator_id"
+    t.integer  "course_id"
     t.string   "short_name"
     t.string   "long_name"
     t.text     "brief_summary"
-    t.text     "description",   :limit => 2147483647
-    t.datetime "created_at",                          :null => false
-    t.datetime "updated_at",                          :null => false
-    t.integer  "course_id"
+    t.text     "description"
     t.string   "url_part"
+    t.datetime "created_at",    :null => false
+    t.datetime "updated_at",    :null => false
   end
 
   create_table "authentications", :force => true do |t|

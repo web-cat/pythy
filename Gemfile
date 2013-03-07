@@ -7,6 +7,7 @@ group :development, :test do
   gem 'sqlite3', '~> 1.3.4'
   gem 'mysql2'
   gem 'quiet_assets'
+  gem 'pg'                  #postgres db support
 end
 
 group :production do
