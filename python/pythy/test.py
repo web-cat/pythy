@@ -126,15 +126,20 @@ def timeout(duration, func, *args, **kwargs):
 def runAllTests(stream=sys.stderr,timeoutCeiling=2.5):
   """
   Runs all test cases in suites that extend pythy.TestCase.
-  TODO: Need to support indirect subclasses.
   """
 
   global _timeoutData
   _timeoutData = _TimeoutData(timeoutCeiling)
 
-  for child in TestCase.__subclasses__():
+  _recursivelyRunTests(TestCase, stream)
+
+
+# -------------------------------------------------------------
+def _recursivelyRunTests(cls, stream):
+  for child in cls.__subclasses__():
     suite = unittest.TestLoader().loadTestsFromTestCase(child)
     TestRunner(stream).run(suite)
+    _recursivelyRunTests(child, stream)
 
 
 
