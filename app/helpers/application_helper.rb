@@ -324,6 +324,12 @@ HTML
 
 
   # -------------------------------------------------------------
+  def jquery_ui_javascript_include_tag
+    raw javascript_include_tag('//ajax.googleapis.com/ajax/libs/jqueryui/1.10.2/jquery-ui.min.js')
+  end
+
+
+  # -------------------------------------------------------------
   def google_api_javascript_include_tag
     raw javascript_include_tag('https://www.google.com/jsapi').sub('.js', '')
   end
