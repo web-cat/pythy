@@ -13,6 +13,7 @@
 //= require jquery
 //= require jquery_ujs
 //= require jquery.remotipart
+//= require jquery/jqueryui/jquery-ui-1.10.2.custom.min
 //= require twitter/bootstrap/bootstrap
 //= require cowboy/jquery-hashchange/jquery.ba-hashchange.min
 //= require allevato/jslider/jquery.slider.all
