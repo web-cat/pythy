@@ -317,15 +317,7 @@ HTML
 
   # -------------------------------------------------------------
   def juggernaut_javascript_include_tag
-    #src = "http://#{request.host}:8080/application.js"
-    #content_tag :script, nil, src: src, type: 'text/javascript', charset: 'utf-8'
     javascript_include_tag 'juggernaut'
-  end
-
-
-  # -------------------------------------------------------------
-  def jquery_ui_javascript_include_tag
-    raw javascript_include_tag('//ajax.googleapis.com/ajax/libs/jqueryui/1.10.2/jquery-ui.min.js')
   end
 
 
