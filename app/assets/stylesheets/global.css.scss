@@ -38,6 +38,10 @@ body.code {
   padding-bottom: 0;
 }
 
+body.setup {
+  padding-top: 60px;
+}
+
 .close {
   opacity: 0.3;
   filter: alpha(opacity=30);
@@ -45,6 +49,18 @@ body.code {
 
 .navbar-fixed-top .container {
   padding: 0;
+}
+
+form.form-bordered {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding-top: 25px;
+
+  .form-actions {
+    margin-bottom: 0;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
 }
 
 #flashbar {
@@ -258,10 +274,6 @@ body.impersonation .navbar-inner {
 
 .header-buttons {
   margin-top: 10px;
-}
-
-body.setup, body.landing {
-  padding-top: 60px;
 }
 
 form.form-search.breadcrumb-hang {

@@ -1,0 +1,8 @@
+= twitter_bootstrap_form_for(resource, as: resource_name, url: session_path(resource), html: { class: 'form-horizontal form-bordered' }) do |f|
+  %fieldset
+    = f.email_field :email
+    = f.password_field :password
+    = f.label nil do |controls|
+      = controls.check_box :remember_me, 'Remember me?'
+  = f.actions do
+    = f.submit "Sign In"

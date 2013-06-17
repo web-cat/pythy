@@ -23,3 +23,7 @@ en:
       course_offering:
         crn: "CRN"
         url: "URL"
+
+      user:
+        email: 'E-mail address'
+        password_confirmation: 'Confirm password'
