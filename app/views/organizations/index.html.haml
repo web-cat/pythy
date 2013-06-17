@@ -1,0 +1,22 @@
+%ul.breadcrumb
+  %li.active
+    Organizations
+  %li.pull-right
+    = link_to 'New...', new_organization_path
+
+%table.table.table-striped.table-bordered
+  %thead
+    %tr
+      %th Display Name
+      %th Domain
+      %th= icon_tag('cog')
+  %tbody
+    - @organizations.each do |organization|
+      %tr
+        %td
+          = link_to organization.display_name, organization
+          = "(#{organization.abbreviation})"
+        %td= organization.domain
+        %td
+          = link_to icon_tag('pencil'), edit_organization_path(organization)
+          = link_to_destroy organization

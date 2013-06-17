@@ -51,7 +51,7 @@ class CourseOffering < ActiveRecord::Base
   # Returns the path to the CourseOffering's storage directory.
   def storage_path
     File.join(
-      course.institution.storage_path,
+      course.organization.storage_path,
       course.url_part,
       term.url_part,
       crn.to_s)

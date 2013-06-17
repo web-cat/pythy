@@ -41,7 +41,7 @@ Pythy::Application.routes.draw do
   end
 
   shallow do
-    resources :institutions do
+    resources :organizations do
       resources :courses do
         resources :assignments
         resources :course_offerings do
@@ -59,12 +59,12 @@ Pythy::Application.routes.draw do
   # Route for viewing code. The constraints allow project and file names to
   # include dots, which would normally be interpreted by Rails' router as a
   # format indicator.
-  code_pattern = 'code(/:institution(/:course(/:term(/:crn(/:rest)))))'
+  code_pattern = 'code(/:organization(/:course(/:term(/:crn(/:rest)))))'
   match code_pattern => 'code#show', via: :get, constraints: { rest: /.+/ }
   match code_pattern => 'code#update', via: :put, constraints: { rest: /.+/ }
   match code_pattern => 'code#message', via: :post, constraints: { rest: /.+/ }
 
-  match 'home(/:institution(/:course(/:term(/:crn))))' => 'home#index'
+  match 'home(/:organization(/:course(/:term(/:crn))))' => 'home#index'
 
   # Route for accessing the media library.
   medias_pattern = 'media(/user/:user)(/assignment/:assignment)'

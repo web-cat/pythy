@@ -6,8 +6,8 @@ vt:
   abbreviation: VT
   url_part: vt
 
-test_institution:
+test_organization:
   domain: test.edu
-  display_name: Test Institution
+  display_name: Test Organization
   abbreviation: Test
   url_part: test

@@ -1,10 +1,10 @@
 %ul.breadcrumb
   %li
-    = link_to @institution.display_name, @institution
+    = link_to @organization.display_name, @organization
     %span.divider /
   %li.active
     Courses
   %li.pull-right
-    = link_to 'New...', new_institution_course_path(@institution)
+    = link_to 'New...', new_organization_course_path(@organization)
 
 = render partial: 'courses/index', locals: { courses: @courses }

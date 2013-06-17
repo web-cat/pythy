@@ -49,13 +49,12 @@ class Ability
     #
     # TODO: This permission does too much. We probably want to separate
     # out things like ActivityLog, SystemConfiguration, User, and the roles
-    # from Department and Institution, for example.
+    # from Organization, for example.
     if user.global_role.can_edit_system_configuration?
       can :manage, ActivityLog
       can :manage, CourseRole
-      can :manage, Department
       can :manage, GlobalRole
-      can :manage, Institution
+      can :manage, Organization
       can :manage, Term
       can :manage, SystemConfiguration
       can :manage, User

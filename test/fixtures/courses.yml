@@ -4,10 +4,10 @@ cs1064:
   name: Computational Problem Solving in Python
   number: CS 1064
   url_part: cs-1064
-  institution: vt
+  organization: vt
 
 cs1124:
   name: Intro to Media Computation
   number: CS 1124
   url_part: cs-1124
-  institution: test
+  organization: test

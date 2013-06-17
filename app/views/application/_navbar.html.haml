@@ -42,7 +42,7 @@
             %ul.dropdown-menu
               %li.nav-header Manage
               = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
-              = menu_link_to_if can?(:manage, Institution), icon_tag('sitemap') + ' Institutions', institutions_path
+              = menu_link_to_if can?(:manage, Organization), icon_tag('sitemap') + ' Organizations', organizations_path
               = menu_link_to_if can?(:manage, Term), icon_tag('calendar') + ' Terms', terms_path                
               %li.divider
               = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path

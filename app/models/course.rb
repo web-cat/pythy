@@ -1,15 +1,15 @@
 #
 # A course represents a course (which may have multiple sections; see
-# course_offering.rb) at an institution, such as "CS 1064".
+# course_offering.rb) at an organization, such as "CS 1064".
 #
 class Course < ActiveRecord::Base
   
   # Relationships
-  belongs_to  :institution
+  belongs_to  :organization
   has_many    :course_offerings
   has_many    :assignments
 
-  attr_accessible :institution_id, :name, :number
+  attr_accessible :organization_id, :name, :number
 
   before_validation :set_url_part
 
@@ -53,7 +53,7 @@ class Course < ActiveRecord::Base
   #
   # Returns the path to the Course's storage directory.
   def storage_path
-    File.join(institution.storage_path, url_part)
+    File.join(organization.storage_path, url_part)
   end
 
 
@@ -63,6 +63,5 @@ class Course < ActiveRecord::Base
   def set_url_part
     self.url_part = url_part_safe(number)
   end
-
 
 end

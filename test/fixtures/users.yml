@@ -8,19 +8,16 @@ test_student:
   email: test_student@vt.edu
   first_name: Test
   last_name: Student
-  institution: vt
   global_role: regular_role
 
 test_teacher:
   email: test_teacher@vt.edu
   first_name: Test
   last_name: Teacher
-  institution: vt
   global_role: instructor_role
 
 test_grader:
   email: test_grader@vt.edu
   first_name: Test
   last_name: Grader
-  institution: vt
   global_role: regular_role

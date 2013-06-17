@@ -1,0 +1,23 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Organizations', organizations_path
+    %span.divider /
+  %li.active
+    = @organization.display_name
+  %li.pull-right
+    = link_to edit_organization_path(@organization) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @organization.display_name
+  %small= "(#{@organization.domain})"
+
+-# Table listing the courses belonging to the organization (and allowing
+-# them to be modified
+%h3
+  = link_to 'Courses', organization_courses_path(@organization)
+
+= render partial: 'courses/index', locals: { courses: @organization.courses }
+.pull-right
+  = link_to 'Create a new course...', new_organization_course_path(@organization), class: 'btn btn-success'

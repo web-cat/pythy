@@ -1,9 +1,9 @@
 class CoursesController < ApplicationController
 
   before_filter :authenticate_user!
-  load_and_authorize_resource :institution
+  load_and_authorize_resource :organization
   load_and_authorize_resource :course,
-    through: :institution, shallow: true
+    through: :organization, shallow: true
 
   # -------------------------------------------------------------
   # GET /courses
@@ -55,7 +55,7 @@ class CoursesController < ApplicationController
         format.html { redirect_to @course, notice: 'Course was successfully created.' }
         format.json { render json: @course, status: :created, location: @course }
       else
-        format.html { render action: "new" }
+        format.html { render action: 'new' }
         format.json { render json: @course.errors, status: :unprocessable_entity }
       end
     end
@@ -71,7 +71,7 @@ class CoursesController < ApplicationController
         format.html { redirect_to @course, notice: 'Course was successfully updated.' }
         format.json { head :no_content }
       else
-        format.html { render action: "edit" }
+        format.html { render action: 'edit' }
         format.json { render json: @course.errors, status: :unprocessable_entity }
       end
     end
@@ -85,7 +85,7 @@ class CoursesController < ApplicationController
     @course.destroy
 
     respond_to do |format|
-      format.html { redirect_to institution_courses_url(@course.institution) }
+      format.html { redirect_to organization_courses_url(@course.organization) }
       format.json { head :no_content }
     end
   end

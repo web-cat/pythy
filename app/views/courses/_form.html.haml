@@ -1,6 +1,6 @@
-= pythy_form_for @course.institution, @course do |f|
+= pythy_form_for @course.organization, @course do |f|
 
-  = f.collection_select :institution_id, 'Institution', Institution.all, :id, :name, prompt: '(none)'
+  = f.collection_select :organization_id, 'Organization', Organization.all, :id, :name, prompt: '(none)'
 
   = f.text_field :number
     %span.help-block

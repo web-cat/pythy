@@ -1,7 +1,7 @@
 .row
   %ul.breadcrumb
     %li
-      = link_to_if can?(:edit, @assignment), @assignment.course.institution.display_name, @assignment.course.institution
+      = link_to_if can?(:edit, @assignment), @assignment.course.organization.display_name, @assignment.course.organization
       %span.divider /
     %li
       = link_to_if can?(:edit, @assignment), @assignment.course.number, @assignment.course

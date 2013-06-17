@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130617204903) do
+ActiveRecord::Schema.define(:version => 20130617205241) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -111,7 +111,7 @@ ActiveRecord::Schema.define(:version => 20130617204903) do
     t.string   "number"
     t.datetime "created_at",     :null => false
     t.datetime "updated_at",     :null => false
-    t.integer  "institution_id"
+    t.integer  "organization_id"
     t.string   "url_part"
   end
 
@@ -123,18 +123,6 @@ ActiveRecord::Schema.define(:version => 20130617204903) do
     t.boolean "builtin",                       :default => false, :null => false
   end
 
-  create_table "institutions", :force => true do |t|
-    t.string   "display_name"
-    t.string   "domain"
-    t.string   "abbreviation"
-    t.string   "url_part"
-    t.datetime "created_at",   :null => false
-    t.datetime "updated_at",   :null => false
-  end
-
-  add_index "institutions", ["abbreviation"], :name => "index_institutions_on_abbreviation", :unique => true
-  add_index "institutions", ["domain"], :name => "index_institutions_on_domain", :unique => true
-
   create_table "media_items", :force => true do |t|
     t.integer  "user_id"
     t.integer  "assignment_id"
@@ -145,6 +133,18 @@ ActiveRecord::Schema.define(:version => 20130617204903) do
     t.string   "content_type"
     t.integer  "file_size"
   end
+
+  create_table "organizations", :force => true do |t|
+    t.string   "display_name"
+    t.string   "domain"
+    t.string   "abbreviation"
+    t.string   "url_part"
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
+  end
+
+  add_index "organizations", ["abbreviation"], :name => "index_institutions_on_abbreviation", :unique => true
+  add_index "organizations", ["domain"], :name => "index_institutions_on_domain", :unique => true
 
   create_table "rails_admin_histories", :force => true do |t|
     t.text     "message"

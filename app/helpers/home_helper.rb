@@ -2,7 +2,7 @@ module HomeHelper
 
   # -------------------------------------------------------------
   def course_exists?
-    @institution && @course && @term
+    @organization && @course && @term
   end
 
 
@@ -18,10 +18,10 @@ module HomeHelper
 
     if model.is_a?(Course)
       path_parts.unshift model.url_part
-      model = model.institution
+      model = model.organization
     end
 
-    if model.is_a?(Institution)
+    if model.is_a?(Organization)
       path_parts.unshift model.url_part
       model = nil
     end
@@ -41,7 +41,7 @@ module HomeHelper
         path_parts.unshift model.assignment.url_part
         path_parts.unshift 'assignments'
         path_parts.unshift model.assignment.course.url_part
-        model = model.assignment.course.institution
+        model = model.assignment.course.organization
     else
       if model.is_a?(ExampleRepository)
         # TODO use a friendlier name
@@ -58,11 +58,11 @@ module HomeHelper
         path_parts.unshift model.crn.to_s
         path_parts.unshift model.term.url_part
         path_parts.unshift model.course.url_part
-        model = model.course.institution
+        model = model.course.organization
       end
     end
 
-    if model.is_a?(Institution)
+    if model.is_a?(Organization)
       path_parts.unshift model.url_part
       model = nil
     end
@@ -162,7 +162,7 @@ module HomeHelper
   # -------------------------------------------------------------
   def can_manage_anything?
     can?(:manage, User) ||
-    can?(:manage, Institution) ||
+    can?(:manage, Organization) ||
     can?(:manage, Term) ||
     can?(:manage, GlobalRole) ||
     can?(:manage, CourseRole) ||

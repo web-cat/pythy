@@ -1,4 +1,4 @@
-class Institution < ActiveRecord::Base
+class Organization < ActiveRecord::Base
 
   has_many    :courses
 

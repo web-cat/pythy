@@ -8,14 +8,14 @@ class FriendlyUrlController < ApplicationController
 
   # -------------------------------------------------------------
   def parse_path
-    @institution = nil
+    @organization = nil
     @course = nil
     @offerings = []
     @rest = params[:rest]
 
-    @institution = Institution.from_path_component(params[:institution]).first
+    @organization = Organization.from_path_component(params[:organization]).first
 
-    if @institution
+    if @organization
       @course = Course.from_path_component(params[:course]).first
 
       if @course

@@ -1,6 +1,6 @@
 %ul.breadcrumb
   %li
-    = link_to @assignment_offering.course_offering.course.institution.display_name, @assignment_offering.course_offering.course.institution
+    = link_to @assignment_offering.course_offering.course.organization.display_name, @assignment_offering.course_offering.course.organization
     %span.divider /
   %li
     = link_to @assignment_offering.@course_offering.course.number, course_path(@assignment_offering.course_offering.course)

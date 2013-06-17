@@ -27,10 +27,10 @@ RailsAdmin.config do |config|
   # config.default_items_per_page = 20
 
   # Exclude specific models (keep the others):
-  # config.excluded_models = ['Assignment', 'AssignmentOffering', 'Course', 'CourseOffering', 'CourseOfferingStaff', 'CourseOfferingStudent', 'Department', 'Institution', 'Term', 'User']
+  # config.excluded_models = ['Assignment', 'AssignmentOffering', 'Course', 'CourseOffering', 'CourseOfferingStaff', 'CourseOfferingStudent', 'Department', 'Organization', 'Term', 'User']
 
   # Include specific models (exclude the others):
-  # config.included_models = ['Assignment', 'AssignmentOffering', 'Course', 'CourseOffering', 'CourseOfferingStaff', 'CourseOfferingStudent', 'Department', 'Institution', 'Term', 'User']
+  # config.included_models = ['Assignment', 'AssignmentOffering', 'Course', 'CourseOffering', 'CourseOfferingStaff', 'CourseOfferingStudent', 'Department', 'Organization', 'Term', 'User']
 
   # Label methods for model instances:
   # config.label_methods << :description # Default is [:name, :title]
@@ -153,7 +153,7 @@ RailsAdmin.config do |config|
   
   #   # Found associations:
 
-  #     configure :institution, :belongs_to_association 
+  #     configure :organization, :belongs_to_association 
   #     configure :assignments, :has_many_association 
 
   #   # Found columns:
@@ -161,7 +161,7 @@ RailsAdmin.config do |config|
   #     configure :id, :integer 
   #     configure :name, :string 
   #     configure :number, :string 
-  #     configure :institution_id, :integer         # Hidden 
+  #     configure :organization_id, :integer         # Hidden 
   #     configure :created_at, :datetime 
   #     configure :updated_at, :datetime 
 
@@ -329,16 +329,15 @@ RailsAdmin.config do |config|
   # end
 
 
-  ###  Institution  ###
+  ###  Organization  ###
 
-  # config.model 'Institution' do
+  # config.model 'Organization' do
 
-  #   # You can copy this to a 'rails_admin do ... end' block inside your institution.rb model definition
+  #   # You can copy this to a 'rails_admin do ... end' block inside your organization.rb model definition
   
   #   # Found associations:
 
   #     configure :courses, :has_many_association 
-  #     configure :users, :has_many_association 
 
   #   # Found columns:
 
@@ -428,7 +427,7 @@ RailsAdmin.config do |config|
   
   #   # Found associations:
 
-  #     configure :institution, :belongs_to_association 
+  #     configure :organization, :belongs_to_association 
   #     configure :course_offering_staff, :has_many_association 
   #     configure :staffing_course_offerings, :has_many_association 
   #     configure :course_offering_students, :has_many_association 
@@ -451,7 +450,7 @@ RailsAdmin.config do |config|
   #     configure :created_at, :datetime 
   #     configure :updated_at, :datetime 
   #     configure :username, :string 
-  #     configure :institution_id, :integer         # Hidden 
+  #     configure :organization_id, :integer         # Hidden 
   #     configure :role, :string 
 
   #   # Cross-section configuration:
