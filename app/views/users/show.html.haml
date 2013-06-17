@@ -18,8 +18,5 @@
       %th E-mail
       %td= @user.email
     %tr
-      %th Institution
-      %td= (link_to @user.institution.display_name, @user.institution) rescue '(none)'
-    %tr
       %th Global Role
       %td= @user.global_role.name

@@ -9,7 +9,6 @@ class User < ActiveRecord::Base
 
   delegate    :can?, :cannot?, :to => :ability
 
-  belongs_to  :institution
   belongs_to  :global_role
   
   has_many    :authentications
@@ -30,11 +29,9 @@ class User < ActiveRecord::Base
   # Setup accessible (or protected) attributes for your model
   attr_accessible :first_name, :last_name, :email,
     :password, :password_confirmation, :remember_me,
-    :global_role_id, :institution_id, :course_offerings,
-    :course_enrollments
+    :global_role_id, :course_offerings, :course_enrollments
 
   before_create :set_default_role
-  before_save :get_institution
 
   paginates_per 15
 
@@ -136,15 +133,6 @@ class User < ActiveRecord::Base
     end
   end
 
-  # -------------------------------------------------------------
-  # Populates the instition relationship by looking up an institution with
-  # the e-mail domain of the user's e-mail address.
-  def get_institution
-    if !institution && email =~ /@(.*)$/
-      domain = $1
-      self.institution = Institution.where(domain: domain).first
-    end
-  end
 
   # -------------------------------------------------------------
   # Overrides the built-in password required method to allow for users

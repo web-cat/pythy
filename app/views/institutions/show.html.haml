@@ -13,14 +13,6 @@
   = @institution.display_name
   %small= "(#{@institution.domain})"
 
--# Table of statistics about the institution
-%table.table.table-bordered
-  %tbody
-    %tr
-      %th Number of users
-      %td= @institution.users.count
-
-
 -# Table listing the courses belonging to the institution (and allowing
 -# them to be modified
 %h3
