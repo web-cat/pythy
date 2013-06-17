@@ -39,7 +39,7 @@ gem 'omniauth'
 gem 'omniauth-facebook'
 gem 'omniauth-ldap',
   git: 'git://github.com/web-cat/omniauth-ldap.git'
-gem 'cancan'
+gem 'cancan', '1.6.9' # 1.6.10 broke shallow routes
 
 # Various gems for other features used in Pythy.
 gem 'fastercsv'       # CSV reading/writing
@@ -48,7 +48,14 @@ gem 'remotipart'      # Adds support for remote mulitpart forms (file uploads)
 gem 'redcarpet'       # Markdown renderer
 gem 'rails_admin'     # Turnkey admin interface
 gem 'delocalize'      # Fixes formatting of date/time form fields
-gem 'git'             # Git repository support
+gem 'git',            # Git repository support
+  git: 'git://github.com/allevato/ruby-git.git'
+gem 'carrierwave'     # File attachment support
+gem 'mime-types'      # MIME types for the above
+gem 'jquery-fileupload-rails'  # Better support for file uploads
+gem 'mini_magick'     # ImageMagick command-line interface
+gem 'uuidtools'       # For generating passkeys for models
+gem 'highcharts-rails', '~> 3.0.0'  # For beautiful client-side charts
 
 # Gems for server-side event support.
 gem 'redis'
