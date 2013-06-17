@@ -18,3 +18,5 @@ pickle-email-*.html
 /config/database.yml
 
 *.rdb
+/public/m
+/public/uploads/tmp
