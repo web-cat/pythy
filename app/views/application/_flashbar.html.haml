@@ -1,6 +1,9 @@
 #flashbar
-  - [:notice, :error, :alert].each do |level|
+  - [:notice, :alert, :error].each do |level|
     - unless flash[level].blank?
-      .alert{:class => flash_class(level)}
-        = close_button_tag dismiss: 'alert'
-        = flash[level]
+      .flash{ class: flash_class(level) }
+        .container
+          .row
+            = close_button_tag dismiss: 'flash'
+            %span{ class: "tag-#{level.to_s}" }
+            = flash[level]

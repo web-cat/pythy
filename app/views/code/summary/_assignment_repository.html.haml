@@ -1,0 +1,24 @@
+.container-fluid
+  .row-fluid
+    .span8
+      .clearfix
+        %h3.slim.pull-left
+          = succeed ':' do
+            = @repository.assignment_offering.assignment.short_name
+          = @repository.assignment_offering.assignment.long_name
+          %small
+            = surround '(', ')' do
+              = @repository.assignment_offering.assignment.course.department_name_and_number
+
+      = raw @repository.assignment_offering.assignment.brief_summary_html
+
+    .span4
+      %h4 Important Dates
+      - if @repository.assignment_offering.due_at
+        This assignment is due at
+        = succeed '.' do
+          = live_date_tag @repository.assignment_offering.due_at
+      - if @repository.assignment_offering.closes_at
+        This assignment may not be checked after
+        = succeed '.' do
+          = l @repository.assignment_offering.closes_at

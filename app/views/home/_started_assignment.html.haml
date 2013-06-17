@@ -1,20 +1,15 @@
 - repository = started_assignment.repository_for_user(current_user)
 - most_recent_check = repository.assignment_checks.most_recent
-
-= link_to code_path(started_assignment), class: 'btn btn-block assignment started' do
-  .assignment-title
-    = succeed ':' do
-      = started_assignment.assignment.short_name
-    = started_assignment.assignment.long_name
-
-  .subtext
-    = assignment_date_wrapper(started_assignment) do
-      %i.icon-calendar
-      = assignment_date_text(started_assignment)
-
-  .subtext
-    Last edited
-    = distance_of_time_in_words_to_now(repository.updated_at)
-    ago
-
+.assignment-tile-wrapper.student
+  .assignment-tile.front{ href: assignment_url(started_assignment.assignment) }
+    = assignment_date_tag(started_assignment)
+    .assignment-short-name><= started_assignment.assignment.short_name
+    .assignment-long-name><= started_assignment.assignment.long_name
+  .assignment-tile.back
+    = link_to code_path(started_assignment) do
+      = icon_tag('laptop')
+      Code
+    = link_to started_assignment.assignment do
+      = icon_tag('list-ol')
+      Description
   = score_tile(most_recent_check)

@@ -1,10 +1,11 @@
 .navbar.navbar-inverse.navbar-fixed-top
   .navbar-inner
     .container
-      = link_to 'Pythy', root_url, class: 'brand'
+      = link_to root_url, class: 'brand hidden-phone' do
+        %span.hidden-phone Pythy
       %ul.nav
         - if (controller_name == 'home' || controller_name == 'code') && @term
-          %li.dropdown
+          %li.dropdown.nav-courses
             = dropdown_tag do
               = icon_tag('home icon-large')
               - if @course
@@ -24,16 +25,20 @@
                     = offering.course.name
                     = surround '(', ')' do
                       = offering.crn
-        %li
+        %li.nav-book
           %a{ href: 'http://interactivepython.org/courselib/static/thinkcspy/index.html', target: '_blank' }
             %i.icon-book.icon-large
             %span.hidden-phone Book
+        %li.nav-grades
+          %a{ href: 'http://interactivepython.org/courselib/static/thinkcspy/index.html', target: '_blank' }
+            %i.icon-book.icon-large
+            %span.hidden-phone Grades
       %ul.nav.pull-right
         - if can_manage_anything?
-          %li.dropdown          
+          %li.dropdown.nav-settings
             = dropdown_tag do
               %i.icon-wrench.icon-large
-              %i.icon-caret-down
+              %i.icon-caret-down.hidden-phone
             %ul.dropdown-menu
               %li.nav-header Manage
               = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
@@ -44,15 +49,12 @@
               = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
               = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
         - if current_user
-          %li.dropdown
+          %li.dropdown.nav-user
             = dropdown_tag do
               %i.icon-user.icon-large
               %span.hidden-phone
-                - if session[:original_user]
-                  %span.impersonation= current_user.display_name
-                - else
-                  = current_user.display_name
-              %i.icon-caret-down
+                = current_user.display_name
+              %i.icon-caret-down.hidden-phone
             %ul.dropdown-menu
               - #%li= link_to icon_tag('cog') + ' Account Settings', '#'
               - #%li.divider

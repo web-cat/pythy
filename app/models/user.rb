@@ -5,21 +5,19 @@
 # of supporting multiple authenticators in Devise.)
 class User < ActiveRecord::Base
 
-  delegate :can?, :cannot?, :to => :ability
+  include ResourceKeyMethods
+
+  delegate    :can?, :cannot?, :to => :ability
 
   belongs_to  :institution
-
   belongs_to  :global_role
   
   has_many    :authentications
-
   has_many    :activity_logs
-
   has_many    :course_enrollments
-
   has_many    :course_offerings, through: :course_enrollments
-
   has_many    :assignment_offerings, through: :course_offerings
+  has_many    :media_items
 
   # Include default devise modules. Others available are:
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
@@ -89,9 +87,13 @@ class User < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
-  def full_name
+  def full_name(first_name_first=false)
     if !last_name.blank? && !first_name.blank?
-      "#{last_name}, #{first_name}"
+      if first_name_first
+        "#{first_name} #{last_name}"
+      else
+        "#{last_name}, #{first_name}"
+      end
     elsif !last_name.blank?
       last_name
     elsif !first_name.blank?
@@ -105,8 +107,8 @@ class User < ActiveRecord::Base
   # -------------------------------------------------------------
   # Gets the user's "display name", which is their full name if it is in the
   # database, otherwise it is their e-mail address.
-  def display_name
-    full_name.blank? ? email : full_name
+  def display_name(first_name_first=false)
+    full_name.blank? ? email : full_name(first_name_first)
   end
 
 

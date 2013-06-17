@@ -1,13 +1,15 @@
-%h2
-  = @course.department_name_and_number
-  %small
-    = @offerings.first.term.display_name
-    = surround '(', ')' do
-      = raw @offerings.map { |o| link_to_if(o.crn.to_s != params[:crn], o.crn, home_path(o)) }.join(', ')
-    - if @offerings.count == 1 && can?(:edit, @offerings.first)
-      = link_to 'Manage', course_offering_path(@offerings.first)
-    - elsif @offerings.count > 1
-      = link_to 'Manage', course_path(@offerings.first.course)
+.row
+  .span12
+    %h2
+      = @course.department_name_and_number
+      %small
+        = @offerings.first.term.display_name
+        = surround '(', ')' do
+          = raw @offerings.map { |o| link_to_if(o.crn.to_s != params[:crn], o.crn, home_path(o)) }.join(', ')
+        - if @offerings.count == 1 && can?(:edit, @offerings.first)
+          = link_to 'Manage', course_offering_path(@offerings.first)
+        - elsif @offerings.count > 1
+          = link_to 'Manage', course_path(@offerings.first.course)
 
 .row
   .span7

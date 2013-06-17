@@ -1,6 +1,6 @@
 <script type="text/javascript">
 $(function() {
   window.codeController = new CodeController(
-    '<%= @subscribe_channel %>', <%= can? :update, @repository %>, <%= @hashes.length %>);
+    '<%= @subscribe_channel %>', <%= can? :update, @repository %>);
 });
 </script>

@@ -1,0 +1,10 @@
+%ul.unstyled
+  - @repository.ls(path).each do |e|
+    - unless File.directory?(File.join(@repository.git_path, path, e))
+      - relative_path = File.join(path, e)
+      %li
+        = icon_tag('file')
+        - if relative_path == @filename
+          %strong= e
+        - else
+          %a{ href: code_path(@repository, relative_path) }= e

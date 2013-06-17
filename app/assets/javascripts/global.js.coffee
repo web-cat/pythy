@@ -1,26 +1,25 @@
 $ ->
   # -------------------------------------------------------------
   # Enable tooltips.
-  $('[rel=tooltip]').tooltip(
+  $('[rel=tooltip]').tooltip
     placement: 'bottom',
     container: 'body'
-  )
 
   # -------------------------------------------------------------
   # Create datepickers.
-  $('input.datepicker').datepicker(
+  $('input.datepicker').datepicker
     autoclose: true,
     todayHighlight: true,
     todayBtn: true
-  )
 
   # -------------------------------------------------------------
   # Create datetimepickers.
-  $('input.datetimepicker').datetimepicker(
+  $('input.datetimepicker').datetimepicker
     autoclose: true,
     todayHighlight: true,
-    todayBtn: true
-  )
+    todayBtn: true,
+    format: 'mm/dd/yyyy hh:ii',
+    pickerPosition: 'top-right'
 
   # -------------------------------------------------------------
   # Create typeahead fields.
@@ -52,6 +51,40 @@ $ ->
     , 250
 
     $this.data('change-timeout', timeout)
+
+
+  # -------------------------------------------------------------
+  # Make the close button dismiss (by sliding up) flash divs.
+  $('.close[data-dismiss="flash"]').click ->
+    $(this).closest('.flash').animate height: 0, -> $(this).remove()
+
+
+  # -------------------------------------------------------------
+  # Process live dates (spans with dates in them that should show the relative
+  # time in an auto-updating fashioned). I should move this into a jQuery
+  # plugin of its own.
+  processLiveDates = ->
+    $('.live-date').each ->
+      $this = $(this)
+      format = $this.data('format') || ' ({0})'
+      if $this.data('date')
+        date = new Date($this.data('date'))
+        relativeDate = $('span.live-date-relative', $this)
+        if relativeDate.length == 0
+          relativeDate = $('<span class="live-date-relative"></span>').appendTo($this)
+        relativeDate.text format.replace(/\{0\}/g, date.toRelativeTime(60000))
+
+  window.setInterval processLiveDates, 60000 # one minute
+  processLiveDates()
+
+
+  # -------------------------------------------------------------
+  # Allow the use of links with hashes to automatically activate the
+  # appropriate tab on a page, if a matching tab exists.
+  hash = window.location.hash
+  if hash
+    $("ul.nav-tabs a[href='#{hash}']").tab('show')
+    window.location.hash = ''
 
 
 # -------------------------------------------------------------

@@ -47,6 +47,7 @@ class AssignmentReferenceRepository < Repository
       commit(user, 'Initial repository setup.') do |git|
         # An area where sample reference solutions can be stored.
         create_dir 'solution'
+        FileUtils.touch 'solution/main.py'
 
         # An area to store additional Python modules that should be loaded
         # when the program runs. (TODO)
@@ -54,6 +55,7 @@ class AssignmentReferenceRepository < Repository
 
         # An area to store Python modules containing reference tests.
         create_dir 'test'
+        FileUtils.touch 'test/test.py'
 
         # An area to store assets/resources that students should have
         # access to when their program is running (e.g., text files with
@@ -68,6 +70,7 @@ class AssignmentReferenceRepository < Repository
         # An area to store starter files that will be cloned into the
         # student's new repository when they start working on an assignment.
         create_dir 'starter'
+        FileUtils.touch 'starter/main.py'
 
         git.add '.'
       end

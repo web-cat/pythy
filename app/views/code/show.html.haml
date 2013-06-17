@@ -1,40 +1,59 @@
 - title raw @page_title
 
-#summary-area
-  .clearfix
+#action-bar
+  .btn-group-parent
+    .btn-group.btn-group-vertical
+      = action_button_tag id: 'run', icon: 'play', class: 'btn-success', tooltip: 'Run your code and see its output'
+      - if @repository.can_check?(current_user)
+        = action_button_tag id: 'check', icon: 'magic', class: 'btn', disabled: @repository.assignment_offering.closed?, tooltip: 'Check your work to see how well you are doing'
+      / - if @repository.resettable?
+      /   = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
+      /     = icon_tag('cog')
+      /     %span.caret
+      /   %ul.dropdown-menu.pull-right
+      /     %li
+      /       %a{ href: '#', id: 'start-over' }
+      /         = icon_tag('remove') + ' Start over...'
+      = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
+  - if @repository.can_sync?(current_user)
+    #sync-button-group.btn-group-parent.hide
+      = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
 
-    .pull-left
-      %h3.slim
-        = raw @page_title
-    .pull-right
-      %span#save-indicator.text-success.hide
-        Saved
+/ #summary-area
+/   .clearfix
 
-      .btn-group
-        = button_tag id: 'sync', class: 'btn btn-warning hide',
-          rel: 'tooltip', title: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.',
-          data: { placement: 'bottom' } do
-          = icon_tag('refresh') + ' Sync'
+/     .pull-left
+/       %h3.slim
+/         = raw @page_title
+/     .pull-right
+/       %span#save-indicator.text-success.hide
+/         Saved
 
-      .btn-group
-        = button_tag id: 'run', class: 'btn btn-success', rel: 'tooltip', title: 'Run your code and see its output' do
-          = icon_tag('play') + ' Run'
-        - if @repository.is_a? AssignmentReferenceRepository
-          = link_to edit_assignment_path(@repository.assignment), id: 'edit', class: 'btn', rel: 'tooltip', title: 'Edit this assignment' do
-            = icon_tag('pencil') + ' Edit'
-        - if @repository.is_a? AssignmentRepository
-          = button_tag id: 'check', class: 'btn', rel: 'tooltip', disabled: @repository.assignment_offering.closed?, title: 'Check your work to see how well you are doing', data: { :'loading-text' => "#{icon_tag('spinner icon-spin')} Checking..." } do
-            = icon_tag('magic') + ' Check'
-          = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
-            = icon_tag('cog')
-            %span.caret
-          %ul.dropdown-menu.pull-right
-            %li
-              %a{ href: '#', id: 'start-over' }
-                = icon_tag('remove') + ' Start over...'
+/       .btn-group
+/         = button_tag id: 'sync', class: 'btn btn-warning hide',
+/           rel: 'tooltip', title: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.',
+/           data: { placement: 'bottom' } do
+/           = icon_tag('refresh') + ' Sync'
 
-  .summary-content
-    = raw @summary
+/       .btn-group
+/         = button_tag id: 'run', class: 'btn btn-success', rel: 'tooltip', title: 'Run your code and see its output' do
+/           = icon_tag('play') + ' Run'
+/         - if @repository.is_a? AssignmentReferenceRepository
+/           = link_to edit_assignment_path(@repository.assignment), id: 'edit', class: 'btn', rel: 'tooltip', title: 'Edit this assignment' do
+/             = icon_tag('pencil') + ' Edit'
+/         - if @repository.is_a? AssignmentRepository
+/           = button_tag id: 'check', class: 'btn', rel: 'tooltip', disabled: @repository.assignment_offering.closed?, title: 'Check your work to see how well you are doing', data: { :'loading-text' => "#{icon_tag('spinner icon-spin')} Checking..." } do
+/             = icon_tag('magic') + ' Check'
+/           = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
+/             = icon_tag('cog')
+/             %span.caret
+/           %ul.dropdown-menu.pull-right
+/             %li
+/               %a{ href: '#', id: 'start-over' }
+/                 = icon_tag('remove') + ' Start over...'
+
+/   .summary-content
+/     = raw @summary
 
 - # TODO improve the logic used to control the visibility for this;
 - # we probably want certain repositories to have "advanced file controls"
@@ -45,36 +64,36 @@
 - # how I usually roll. This UI right now only supports a two-level-deep file
 - # organization with folders at the top level and files in those folders. I
 - # deem it good enough for me to set up assignments I need for class.
-- if @repository.is_a? AssignmentReferenceRepository
-  #file-bar
-    %ul.nav.nav-pills
-      %li.disabled
-        %a Files:
-      - @repository.ls('.').each do |e|
-        - if File.directory?(File.join(@repository.git_path, e))
-          - children = @repository.ls(e)
-          %li.dropdown
-            %a.dropdown-toggle{ href: '#', data: { toggle: 'dropdown' } }
-              = icon_tag('folder-open-alt')
-              = e
-              %span.caret
-            %ul.dropdown-menu
-              - unless children.empty?
-                - children.each do |child|
-                  %li
-                    %a{ href: code_path(@repository, File.join(e, child)) }
-                      = icon_tag('file')
-                      = child
-                %li.divider
-              %li
-                %a#create-file{ href: '#', data: { dir: e } } Create a new file...
-              %li
-                %a#upload-file{ href: '#', data: { dir: e } } Upload a file...
-        - else
-          %li
-            %a{ href: code_path(@repository, e) }
-              = icon_tag('file')
-              = e
+/ - if @repository.is_a? AssignmentReferenceRepository
+/   #file-bar
+/     %ul.nav.nav-pills
+/       %li.disabled
+/         %a Files:
+/       - @repository.ls('.').each do |e|
+/         - if File.directory?(File.join(@repository.git_path, e))
+/           - children = @repository.ls(e)
+/           %li.dropdown
+/             %a.dropdown-toggle{ href: '#', data: { toggle: 'dropdown' } }
+/               = icon_tag('folder-open-alt')
+/               = e
+/               %span.caret
+/             %ul.dropdown-menu
+/               - unless children.empty?
+/                 - children.each do |child|
+/                   %li
+/                     %a{ href: code_path(@repository, File.join(e, child)) }
+/                       = icon_tag('file')
+/                       = child
+/                 %li.divider
+/               %li
+/                 %a#create-file{ href: '#', data: { dir: e } } Create a new file...
+/               %li
+/                 %a#upload-file{ href: '#', data: { dir: e } } Upload a file...
+/         - else
+/           %li
+/             %a{ href: code_path(@repository, e) }
+/               = icon_tag('file')
+/               = e
 
 
 -# #history-bar
@@ -82,6 +101,47 @@
 #code-area
   = text_area_tag :codearea
 
-= render partial: 'console'
-= render partial: 'sidebar'
+- # Docked tab area
+#dock.tabbable.tabs-left
+  %ul.nav.nav-tabs
+    = tab_tag 'summary', active: true do
+      = icon_tag('dashboard')
+      %span.hidden-phone Summary
+    = tab_tag 'console' do
+      = icon_tag('desktop')
+      %span.hidden-phone Console
+    = tab_tag 'history' do
+      = icon_tag('time')
+      %span.hidden-phone History
+    - if class_partial_exists?(@repository, 'related_files')
+      = tab_tag 'files' do
+        = icon_tag('copy')
+        %span.hidden-phone Related
+  .tab-content
+    #summary.tab-pane.active
+      = render_class_partial @repository, 'summary'
+    
+    #console.tab-pane
+      #console-content
+        %span.muted
+          You haven't run your code yet. When you do, this console is where
+          its output will be displayed and where you will be asked to enter
+          any input that your program requests.
+      %i#console-spinner.icon-spinner.icon-large.icon-spin
+
+    #history.tab-pane
+      %table#history-table.table.table-condensed.table-striped
+        %tbody
+        %tfoot
+          %tr
+            %td.next-page{ colspan: 2, data: { :'appear-top-offset' => '40' } }
+              %i.icon-refresh
+              Earlier history
+
+    - if class_partial_exists?(@repository, 'related_files')
+      #files.tab-pane
+        .container-fluid
+          .row-fluid
+            = render_class_partial @repository, 'related_files'
+
 = render partial: 'subscribe'

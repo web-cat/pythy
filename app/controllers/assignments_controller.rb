@@ -1,8 +1,12 @@
 class AssignmentsController < ApplicationController
 
   before_filter :authenticate_user!
+
   load_and_authorize_resource :assignment
   load_resource :course, through: :assignment, shallow: true
+
+  before_filter :get_assignment_offerings,
+    only: [ :show, :edit, :create, :update ]
 
 
   # -------------------------------------------------------------
@@ -20,10 +24,6 @@ class AssignmentsController < ApplicationController
   # GET /assignments/1
   # GET /assignments/1.json
   def show
-    @assignment_offerings =
-      @assignment.assignment_offerings.joins(:course_offering).
-        order('course_offerings.crn asc').select { |ao| can? :read, ao }
-
     @summary = @assignment.brief_summary_html
     @description = @assignment.description_html
 
@@ -86,9 +86,6 @@ class AssignmentsController < ApplicationController
   # -------------------------------------------------------------
   # GET /assignments/1/edit
   def edit
-    @assignment_offerings =
-      @assignment.assignment_offerings.joins(:course_offering).
-        order('course_offerings.crn asc').select { |ao| can? :manage, ao }
   end
 
 
@@ -101,7 +98,7 @@ class AssignmentsController < ApplicationController
         format.html { redirect_to @assignment, :notice => 'Assignment was successfully created.' }
         format.json { render :json => @assignment, :status => :created, :location => @assignment }
       else
-        format.html { render :action => "new" }
+        format.html { render :action => 'new' }
         format.json { render :json => @assignment.errors, :status => :unprocessable_entity }
       end
     end
@@ -117,7 +114,7 @@ class AssignmentsController < ApplicationController
         format.html { redirect_to @assignment, :notice => 'Assignment was successfully updated.' }
         format.json { head :no_content }
       else
-        format.html { render :action => "edit" }
+        format.html { render :action => 'edit' }
         format.json { render :json => @assignment.errors, :status => :unprocessable_entity }
       end
     end
@@ -138,6 +135,14 @@ class AssignmentsController < ApplicationController
 
 
   private
+
+  # -------------------------------------------------------------
+  def get_assignment_offerings
+    @assignment_offerings =
+      @assignment.assignment_offerings.joins(:course_offering).
+        order('course_offerings.crn asc').select { |ao| can? :read, ao }
+  end
+
 
   # -------------------------------------------------------------
   def median(array)

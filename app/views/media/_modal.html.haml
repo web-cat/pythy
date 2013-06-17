@@ -1,0 +1,11 @@
+#media_library_modal.modal.modal-wide.hide
+  .modal-header
+    = close_button_tag dismiss: 'modal'
+    %h3
+      Media Library
+
+  .modal-body
+    = render partial: 'index'
+
+  .modal-footer
+    = button_tag 'Close', class: 'btn btn-primary', data: { dismiss: 'modal' }

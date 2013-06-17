@@ -1,0 +1,17 @@
+.clearfix
+  %h3.slim.pull-left
+    = @repository.assignment.long_name
+    %small
+      = surround '(', ')' do
+        = @repository.assignment.course.department_name_and_number
+      %span.label.label-important Reference repository
+  .pull-right.header-buttons
+    = link_to edit_assignment_path(@repository.assignment), class: 'btn', title: 'Edit this assignment', rel: 'tooltip' do
+      = icon_tag('pencil')
+      Edit description and dates...
+
+This example was created by
+= @repository.user.display_name(true)
+at
+= succeed '.' do
+  %strong= l @repository.created_at

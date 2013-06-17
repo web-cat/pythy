@@ -1,7 +1,7 @@
 class CodeController
 
   # -------------------------------------------------------------
-  constructor: (@channel, @isEditor, @hashCount) ->
+  constructor: (@channel, @isEditor) ->
     # Convert the text area to a CodeMirror widget.
     @codeArea = CodeMirror.fromTextArea $('#codearea')[0],
       mode: { name: "python", version: 3, singleLineStringErrors: false },
@@ -13,8 +13,8 @@ class CodeController
       matchBrackets: true,
       extraKeys: { Tab: (cm) -> cm.replaceSelection('  ', 'end') }
 
-    $(window).resize => this._updateCodeSize()
-    this._updateCodeSize()
+    #$(window).resize => this._updateCodeSize()
+    #this._updateCodeSize()
 
     # Highlight the line the cursor is currently on (and kill the
     # highlighting when the editor doesn't have the focus).
@@ -30,6 +30,7 @@ class CodeController
         @codeArea.removeLineClass @hlLine, 'background', 'active-line'
 
     @ignoreChange = false
+    @ignoreNextHashChange = false
 
     @console = new InteractiveConsole()
 
@@ -42,21 +43,29 @@ class CodeController
 
     this._initializeSkulpt()
 
+    $('#check').data('loading-text', '<i class="icon-spinner icon-spin"></i>')
+
     # Register event handlers for widgets.
     $('#run').click (e) => this._runCode()
     $('#sync').click (e) => this._resync()
     $('#check').click (e) => this._checkCode()
     $('#start-over').click (e) => this._startOver()
+    $('#media').click (e) => this._openMediaLibrary()
     $('#sidebar-toggle').click this.toggleSidebar
     $(window).hashchange => this._hashChange()
 
-    $('#history-slider').slider {
-      from: 0, to: @hashCount - 1, value: @hashCount - 1,
-      step: 1, limits: false, smooth: false, skin: 'round_plastic',
-      onstatechange: (value) => this._historySliderChange(value)
-    }
+    window.setInterval (=> this._updateHistoryTimestamps()), 1000
+
+    #$('#dock .nav-tabs a').on 'shown', (e) => this._dockTabShown(e)
+    $('#history .next-page').appear()
+    $(document.body).on 'appear', '#history .next-page', => this._loadNextHistoryPage()
+    this._loadNextHistoryPage()
+
+    window.pythy.mediaLibraryOptions =
+      mediaLinkClicked: (link) => this._insertHrefIntoCode(link)
 
     this._subscribe()
+    this._updateHistorySelection(window.location.hash)
 
     setTimeout =>
       this._sendMessage data: message: 'ping'
@@ -71,13 +80,81 @@ class CodeController
   #~ Private methods ..........................................................
 
   # ---------------------------------------------------------------
-  _historySliderChange: (value) ->
-    if value
-      value = @hashCount - 1 - value
-      if value == 0
-        window.location.hash = ''
+  _dockTabShown: (e) ->
+    if e.target.hash == '#history'
+      if $('#history-table tbody tr').length == 0
+        this._loadNextHistoryPage()
+
+
+  # ---------------------------------------------------------------
+  _loadNextHistoryPage: ->
+    if @loading
+      @pendingHistoryLoad = true
+    else
+      @loading = true
+      skip = $('#history-table tbody tr').length
+      $('#history .next-page i').addClass 'icon-spin'
+      this._sendMessage data: message: 'history', start: skip
+
+
+  # ---------------------------------------------------------------
+  nextHistoryPageLoaded: ->
+    $('#history .next-page i').removeClass 'icon-spin'
+    @loading = false
+    if @pendingHistoryLoad
+      this._loadNextHistoryPage()
+
+
+  # ---------------------------------------------------------------
+  _updateHistoryTimestamps: ->
+    if $('#history').hasClass('active')
+      $('#history-table tr').each ->
+        $this = $(this)
+        date = new Date($this.data('date'))
+        $('.relative-date', $this).text "(#{date.toRelativeTime(60000)})"
+
+
+  # ---------------------------------------------------------------
+  _isQuote: (ch) ->
+    ch == '"' || ch == "'"
+
+
+  # ---------------------------------------------------------------
+  _insertHrefIntoCode: (link) ->
+    clientHost = "#{window.location.protocol}//#{window.location.host}"
+
+    url = $(link).attr('href')
+    if url[0] == '/'
+      url = clientHost + url
+
+    cursor = @codeArea.getCursor()
+
+    if @codeArea.somethingSelected()
+      @codeArea.replaceSelection(url)
+    else
+      # Let's try to be smart about quoting to help the student out. Look
+      # around the cursor for quotes that they've already typed; if some
+      # are found, match them automatically. Otherwise surround the URL
+      # with quotes of its own.
+
+      before = { line: cursor.line, ch: cursor.ch - 1 }
+      after = { line: cursor.line, ch: cursor.ch + 1 }
+
+      if before.ch >= 0
+        charBefore = @codeArea.getRange(before, cursor)
+        charAfter = @codeArea.getRange(cursor, after)
+
+        if charBefore == charAfter && this._isQuote(charBefore)
+          @codeArea.replaceSelection("#{url}")
+        else if this._isQuote(charBefore)
+          @codeArea.replaceSelection("#{url}#{charBefore}")
+        else
+          @codeArea.replaceSelection("'#{url}'")
       else
-        window.location.hash = "HEAD~#{value}"
+        @codeArea.replaceSelection("'#{url}'")
+
+    $('#media_library_modal').modal 'hide'
+    @codeArea.focus()
 
 
   # ---------------------------------------------------------------
@@ -99,8 +176,8 @@ class CodeController
   _trackChangesWithSaving: ->
     @timerHandle = null
     
-    @codeArea.on "change", (_editor, change) =>
-      if (!@ignoreChange)
+    @codeArea.on 'change', (_editor, change) =>
+      if !@ignoreChange
         $('#check').attr 'disabled', 'disabled'
         if (@timerHandle)
           clearTimeout(@timerHandle)
@@ -116,12 +193,12 @@ class CodeController
 
   # ---------------------------------------------------------------
   _trackChanges: ->
-    @codeArea.on "change", (_editor, change) =>
+    @codeArea.on 'change', (_editor, change) =>
       if !@desynched && !@ignoreChange
         @desynched = true
         this._unsubscribeFromCode()
         this._sendMessage data: message: 'unsync'
-        $('#sync').fadeIn('fast')
+        $('#sync-button-group').fadeIn('fast')
         $('#sync').tooltip('show')
         setTimeout =>
           $('#sync').tooltip('hide')
@@ -135,7 +212,7 @@ class CodeController
   # ---------------------------------------------------------------
   _resync: ->
     @desynched = false
-    $('#sync').fadeOut('fast')
+    $('#sync-button-group').fadeOut('fast')
     $('#sync').tooltip('hide')
     this._subscribeToCode()
     this._sendMessage data: message: 'resync'
@@ -143,9 +220,15 @@ class CodeController
 
   # ---------------------------------------------------------------
   _checkCode: ->
-    $('#check').tooltip('hide')
-    $('#check').button('loading')
-    this._sendMessage data: message: 'check'
+    unless $('#check').attr('disabled')
+      $('#check').tooltip('hide')
+      $('#check').button('loading')
+      this._sendMessage data: message: 'check'
+
+
+  # ---------------------------------------------------------------
+  _openMediaLibrary: ->
+    $.get('/media.js', dataType: 'script')
 
 
   # ---------------------------------------------------------------
@@ -158,11 +241,28 @@ class CodeController
 
 
   # ---------------------------------------------------------------
-  updateCode: (code, force) ->
+  updateCode: (code, force, newHistoryRow, amend) ->
     if force || !force && !@desynched
       @ignoreChange = true
       @codeArea.setValue code
       @ignoreChange = false
+
+    if newHistoryRow
+      this.updateHistory(newHistoryRow, amend)
+
+
+  # ---------------------------------------------------------------
+  updateHistory: (newHistoryRow, amend) ->
+    row = $(newHistoryRow)
+
+    if amend
+      $('#history-table tbody tr:first-child').replaceWith(row)
+    else
+      row.hide().prependTo('#history-table tbody').fadeIn()
+
+    @ignoreNextHashChange = true
+    window.location.hash = ''
+    this._updateHistorySelection()
 
 
   # ---------------------------------------------------------------
@@ -218,11 +318,29 @@ class CodeController
 
   # -------------------------------------------------------------
   _hashChange: ->
-    data = { message: 'hash_change' }
-    if window.location.hash
-      data.sha = unescape(window.location.hash.substring(1))
+    if @ignoreNextHashChange
+      @ignoreNextHashChange = false
+    else
+      data = { message: 'hash_change' }
+      if window.location.hash && window.location.hash.length > 0
+        data.sha = unescape(window.location.hash.substring(1))
 
-    this._sendMessage data: data
+      this._sendMessage data: data
+      this._updateHistorySelection(data.sha)
+
+
+  # -------------------------------------------------------------
+  _updateHistorySelection: (sha) ->
+    if sha && sha[0] == '#'
+      sha = sha[1..]
+
+    $("#history-table tr.info").removeClass('info')
+
+    if sha
+      $("#history-table a[href='##{sha}']").closest('tr').addClass('info')
+    else
+      $("#history-table tr:first-child").addClass('info')
+      $('#history').animate scrollTop: 0, 100
 
 
   # -------------------------------------------------------------
@@ -245,10 +363,12 @@ class CodeController
   _setRunButtonStop: (stop) ->
     if stop
       $('#run').removeClass('btn-success').addClass('btn-danger').
-        data('running', true).html('<i class="icon-stop"></i> Stop')
+        data('running', true).html('<i class="icon-spinner icon-large icon-spin"></i>')
+      $('#console-spinner').show()
     else
       $('#run').removeClass('btn-danger').addClass('btn-success').
-        data('running', false).html('<i class="icon-play"></i> Run')
+        data('running', false).html('<i class="icon-play"></i>')
+      $('#console-spinner').hide()
 
 
   # -------------------------------------------------------------
@@ -261,6 +381,7 @@ class CodeController
       this._setRunButtonStop(true)
       this._clearErrors()
       @console.clear()
+      @console.toggleConsole()
       code = @codeArea.getValue()
       starter =     => Sk.importMainWithBody("<stdin>", false, code)
       error   = (e) => this._handleException(e)
@@ -387,9 +508,15 @@ class CodeController
 
   # -------------------------------------------------------------
   _skTransformUrl: (url) ->
-    # TODO Kinda fragile
     encodedUrl = encodeURIComponent(url)
-    "#{window.location.protocol}//#{window.location.host}/proxy?url=#{encodedUrl}"
+    clientHost = "#{window.location.protocol}//#{window.location.host}"
+
+    # If the URL is to the same host, just let it go through the same;
+    # otherwise, wrap it in a proxy request
+    if url.indexOf(clientHost) == 0
+      url
+    else
+      "#{window.location.protocol}//#{window.location.host}/proxy?url=#{encodedUrl}"
 
 
 # -------------------------------------------------------------
@@ -405,23 +532,12 @@ class InteractiveConsole
 
     this._createNewLine()
 
-    $('#console-toggle').click this.toggleConsole
+    $('#console-spinner').hide()
 
 
   # -------------------------------------------------------------
   toggleConsole: (action) ->
-    sidebar = $('#console')
-    top = parseInt(sidebar.css('marginTop'), 10)
-
-    newTop = if action == 'open'
-        0
-      else if action == 'close'
-        sidebar.outerHeight()
-      else
-        if top == 0 then sidebar.outerHeight() else 0
-
-    sidebar.animate marginTop: newTop, 100
-    @visible = (newTop == 0)
+    $('#dock a[href="#console"]').tab('show');
 
 
   # -------------------------------------------------------------
@@ -503,6 +619,9 @@ class InteractiveConsole
     @currentLine = $('<div class="line"></div>')
     @currentLine.addClass classes if classes
     @console_content.append @currentLine
+
+    $console = $('#console')
+    $console.scrollTop($console[0].scrollHeight);
 
 
   # -------------------------------------------------------------

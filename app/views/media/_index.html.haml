@@ -1,0 +1,21 @@
+#media-drop-zone
+  .container-fluid
+    .row-fluid
+      .span3
+        %ul.filter-list.nav.nav-list
+          = render partial: 'filter_item', locals: { icon: 'cloud', title: 'All Media', type: '*/*' }
+          = render partial: 'filter_item', locals: { icon: 'picture', title: 'Pictures', type: 'image/*' }
+          = render partial: 'filter_item', locals: { icon: 'music', title: 'Sounds', type: 'audio/*' }
+          = render partial: 'filter_item', locals: { icon: 'file-alt', title: 'Text', type: 'text/*' }
+        %p.clearfix
+          %span.btn.btn-block.btn-success.fileinput-button
+            = icon_tag('plus')
+            %span Add files...
+            %input{ type: 'file', id: 'media-upload', name: 'files[]', multiple: 'multiple', data: { url: @upload_url } }
+          #media-progress.progress.progress-striped
+            .bar
+      .span9
+        #media-area.media-area
+
+:javascript
+  window.pythy.mediaLibrary = new MediaLibrary();

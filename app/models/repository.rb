@@ -63,8 +63,12 @@ class Repository < ActiveRecord::Base
     # Commit the changes, safely ignoring a possible exception if the
     # changes actually resulted in no effective change.
     begin
-      @git.commit_all message, author: author
-      committed = true
+      @git.add
+
+      amend = should_amend?
+
+      @git.commit_all message, author: author, amend: amend, allow_empty: amend
+      commit_result = { amend: amend, commit: @git.log(1).first }
 
       # Update the updated_at timestamp of the repository with each commit;
       # this allows us to do fast queries/sorting based on last modified
@@ -74,7 +78,7 @@ class Repository < ActiveRecord::Base
       # Ignore an exception that says there was nothing to commit; we just
       # silently ignore these. Otherwise, let the exception bubble out.
       if e.message =~ /nothing to commit/
-        committed = false
+        commit_result = nil
       else
         raise e
       end
@@ -82,7 +86,21 @@ class Repository < ActiveRecord::Base
 
     # TODO unlock
 
-    committed
+    commit_result
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Returns a value indicating whether or not the next commit should
+  # amend the previous one, or if it should be a new commit. The default
+  # behavior is to amend if the commit came within 1 minute of the previous
+  # one. Subclasses can override this to provide their own logic, but they
+  # must remember to call super to retain the 1 minute threshold.
+  #
+  # Returns true if the last commit should be amended, or false to create
+  # a new commit.
+  def should_amend?
+    updated_at >= 1.minute.ago
   end
 
 
@@ -109,9 +127,83 @@ class Repository < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  # Public: Locks (TODO) the repository, yields to the passed in block that
+  # will modify the repository (for example, create tags), and then unlocks
+  # the repository.
+  #
+  # The lock used is a Redis-based mutex, so it will properly lock the
+  # repository across multiple request processes (or even multiple servers
+  # if they all share the same Redis instance).
+  #
+  def write
+    open
+
+    # TODO lock
+    
+    # Yield to the block, which will access the working directory.
+    yield @git
+
+    # TODO unlock
+  end
+
+
+  # -------------------------------------------------------------
   def ls(path)
     open
     list = Dir.entries(File.join(git_path, path)).reject { |e| e =~ /^\./ }
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Gets an array of hashes that contain information from the commit
+  # log of the repository. The keys included in these hashes by default are:
+  #
+  #  sha: the SHA of the commit
+  #  date: the date of the commit
+  #  author: the author of the commit
+  #  message: the commit message
+  #  commit: the actual Git::Object::Commit object, if more information is
+  #      desired
+  #
+  # If this method is given a block, the block takes a Commit object and is
+  # expected to return a hash that will be merged into the hashes in the
+  # array. Thus, subclasses can use the following pattern to augment the
+  # data in the log:
+  #
+  #  def history(start, count)
+  #    # preprocessing goes here
+  #    super do |commit|
+  #      { key1: value1, key2: value2, ... }
+  #    end
+  #  end
+  #
+  # start - the number of entries in the log to skip
+  # count - the number of log entries to retrieve
+  #
+  # Returns an array of hashes containing the commit log data.
+  #
+  def history(start, count)
+    commits = []
+
+    read do |git|
+      git.log(count).skip(start).each do |commit|
+        commit_info = commit_hash(commit)
+        commit_info.merge!(yield commit) if block_given?
+        commits << commit_info
+      end
+    end
+
+    commits
+  end
+
+
+  # -------------------------------------------------------------
+  def commit_hash(commit)
+    { commit: commit,
+      sha: commit.sha,
+      date: commit.date,
+      author: commit.author,
+      message: commit.message }
   end
 
 
@@ -243,6 +335,36 @@ class Repository < ActiveRecord::Base
   #
   def user_unsynched?(user)
     $redis.get(redis_key("user_unsynched:#{user.id}")) == '1'
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Gets a Boolean value indicating whether or not the specified User
+  # can "check" the repository (that is, executed against reference tests).
+  # The default value is false; subclasses should override this method if they
+  # can be checked.
+  #
+  # user - the User
+  #  
+  # Returns true if the repository can be checked, false if not.
+  #
+  def can_check?(user)
+    false
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Gets a Boolean value indicating whether or not the specified User
+  # can sync the repository (pull in the latest version if it differs from
+  # their current working copy). The default value is false; subclasses should
+  # override this method if they can be checked.
+  #
+  # user - the User
+  #  
+  # Returns true if the repository can be synched, false if not.
+  #
+  def can_sync?(user)
+    false
   end
 
 

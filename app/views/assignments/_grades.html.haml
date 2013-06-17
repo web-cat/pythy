@@ -13,7 +13,7 @@
             %th{ width: '20%' } Score
             %th{ width: '1px', style: 'border-left: none' }
         %tbody
-          - ao.course_offering.users.each do |user|
+          - ao.course_offering.users.alphabetical.each do |user|
             - repository = ao.repository_for_user(user)
             %tr
               %td

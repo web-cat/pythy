@@ -16,11 +16,14 @@
 //= require jquery/jqueryui/jquery-ui-1.10.2.custom.min
 //= require twitter/bootstrap/bootstrap
 //= require cowboy/jquery-hashchange/jquery.ba-hashchange.min
-//= require allevato/jslider/jquery.slider.all
+//= require morr/jquery-appear/jquery.appear
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
 //= require smalot/bootstrap-datetimepicker/bootstrap-datetimepicker
+//= require jherdman/javascript-relative-time-helpers/date.extensions
+//= require jquery-fileupload/basic
 //= require codemirror
-//= require codemirror/utils/matchbrackets
+//= require codemirror/addons/edit/matchbrackets
 //= require codemirror/modes/python
 //= require codemirror/modes/markdown
 //= require global
+//= require media-library

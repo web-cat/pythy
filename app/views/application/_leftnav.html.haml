@@ -1,0 +1,24 @@
+= link_to home_path, class: 'nav-tile nav-logo' do
+  %div Pythy
+= left_nav_link_to home_path, 'nav-home', 'home', 'Home'
+.dropdown
+  = left_nav_link_to home_path, 'nav-code dropdown-toggle', 'laptop', 'Code' do
+    %ul.dropdown-menu
+      %li
+        %a{href: '/'} Project 1
+      %li
+        %a{href: '/'} Project 2
+      %li
+        %a{href: '/'} Project 3
+= left_nav_link_to book_path, 'nav-book', 'book', 'Textbook'
+= left_nav_link_to home_path, 'nav-grades', 'bar-chart', 'Grades'
+.dropdown
+  = left_nav_link_to home_path, 'nav-settings dropdown-toggle', 'cogs', 'Settings' do
+    %ul.dropdown-menu.tiled
+      = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
+      = menu_link_to_if can?(:manage, Institution), icon_tag('sitemap') + ' Institutions', institutions_path
+      = menu_link_to_if can?(:manage, Term), icon_tag('calendar') + ' Terms', terms_path                
+      %li.divider
+      = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
+      = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
+      = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path

@@ -2,23 +2,6 @@
 // They will automatically be included in application.css.
 // You can use Sass (SCSS) here: http://sass-lang.com/
 
-//Style the button for projects
-
-.project {
-	padding-left: 5px;
-	padding-right: 5px;
-	padding-top: 0px;
-	padding-bottom: 0px;
-	text-align: left;
-}
-
-.btn.assignment {
-  display: block;
-  position: relative;
-  padding-left: 6px;
-  margin-bottom: 8px;
-}
-
 .assignment {
   text-align: left;
 
@@ -48,106 +31,160 @@
   }
 }
 
-.assignment-tile {
-  position: relative;
-  display: inline-block;
-  text-align: left;
-  height: 104px;
-  padding: 4px 6px;
-  margin-right: 12px;
-  margin-bottom: 12px;
+// .hang-tag {
+//   position: absolute;
+//   right: -13px;
+//   top: 6px;
+//   background-image: url(../assets/curl.png);
+//   background-repeat: no-repeat;
+//   background-attachment: scroll;
+//   background-position: right top;
+//   height: 42px;
 
-  background-color: #e8e8e8;
-  border: 1px solid #bbbbbb;
-  -webkit-border-radius: 4px;
-  -moz-border-radius: 4px;
-  border-radius: 4px;
-  -webkit-border-radius: 4px;
-  -moz-border-radius: 4px;
-  border-radius: 4px;
+//   & > span {
+//     display: block;
+//     background-color: rgb(30, 163, 255);
+//     height: 24px;
+//     font-size: 12px;
+//     color: white;
+//     text-shadow: 0 1px 1px #555;
+//     font-weight: 600;
+//     padding: 6px 4px 0 10px;
+//     margin-right: 12px;
+//     border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+//   }
+// }
+
+$assignment-tile-height: 80px;
+$assignment-title-height: 45px;
+$assignment-options-height: $assignment-tile-height - $assignment-title-height - 1;
+$assignment-score-width: 64px;
+
+.assignment-tile-wrapper {
+  position: relative;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px 3px rgba(0, 0, 0, 0.15);
+  height: $assignment-tile-height;
+}
+
+.assignment-tile-wrapper:hover {
+  & > .assignment-tile.back {
+    opacity: 1;
+  }
+}
+
+.assignment-tile {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  -webkit-transition: opacity 0.05s;
+}
+
+.assignment-tile.front {
+  text-align: left;
+  margin: 0px;
 
   .assignment-short-name {
-    font-weight: 600;
-    font-size: 18px;
+    position: absolute;
+    top: 0;
+    height: $assignment-title-height;
+    line-height: $assignment-title-height;
+    padding: 0 6px;
+    color: #222;
+    font-weight: 400;
+    font-size: 24px;
     margin-bottom: 4px;
   }
 
   .assignment-long-name {
-    font-size: 13px;
-    line-height: 15px;
-  }
-
-  .assignment-options {
     position: absolute;
-    bottom: 4px;
+    left: 0;
+    right: 0;
+    padding: 0 6px;
+    top: $assignment-title-height;
+    height: $assignment-options-height;
+    line-height: $assignment-options-height;
+    background-color: #f8f8f8;
+    border-top: 1px solid #ddd;
+    vertical-align: middle;
+    color: #666;
   }
 }
 
-/* Large desktop */
-@media (min-width: 1200px)
-{
-  .assignment-tile {
-    float: left;
-    width: 144px;
+.assignment-tile-wrapper.student .assignment-long-name {
+  margin-left: $assignment-score-width;
+}
+
+.assignment-tile-wrapper.student .assignment-tile.back {
+  margin-left: $assignment-score-width;
+}
+
+.assignment-tile-wrapper.student .assignment-score {
+  position: absolute;
+  top: $assignment-title-height;
+  width: $assignment-score-width;
+  height: $assignment-options-height;
+  line-height: $assignment-options-height;
+  background-color: #f8f8f8;
+  border-top: 1px solid #ddd;
+  vertical-align: middle;
+  color: #222;
+  font-weight: 600;
+  font-size: 20px;
+  text-align: center;
+
+  &.score-danger {
+    background-color: rgb(167, 0, 13);
+    color: white;    
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
-  .assignment-tile:nth-child(2n) {
-    margin-left: 1px;
+  &.score-warning {
+    background-color: rgb(250, 192, 0);
+    color: white;    
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
-  .assignment-tile:nth-child(4n) {
-    margin-right: 0;
+  &.score-good {
+    background-color: rgb(20, 152, 46);
+    color: white;    
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+  &.score-none {
+    background-color: rgb(83, 83, 83);
+    color: white;    
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
   }
 }
 
-/* Portrait tablet to landscape and desktop */
-@media (min-width: 980px) and (max-width: 1199px)
-{
-  .assignment-tile {
-    float: left;
-    width: 158px;
-  }
-  .assignment-tile:nth-child(3n) {
-    margin-right: 0;
-  }
-}
+.assignment-tile.back {
+  position: absolute;
+  opacity: 0;
+  top: $assignment-title-height;
+  height: $assignment-options-height;
+  line-height: $assignment-options-height;
+  background-color: #f8f8f8;
+  border-top: 1px solid #ddd;
+  vertical-align: middle;
+  color: #222;
 
-/* Portrait tablet to landscape and desktop */
-@media (min-width: 768px) and (max-width: 979px)
-{
-  .assignment-tile {
-    float: left;
-    width: 187px;
-  }
-  .assignment-tile:nth-child(2n) {
-    margin-right: 0;
-  }
-}
+  a {
+    display: inline-block;
+    height: 100%;
+    border-right: 1px solid #ddd;
+    border-left: 1px solid white;
+    text-align: center;
+    padding: 0 8px;
 
-/* Landscape phone to portrait tablet */
-@media (min-width: 480px) and (max-width: 767px)
-{
-  .assignment-tile {
-    float: left;
-    width: 29%;
-    margin-right: 2%;
-  }
-   .assignment-tile:nth-child(3n) {
-     margin-right: 0%;
-   }
-}
- 
-/* Landscape phones and down */
-@media (max-width: 479px)
-{
-  .assignment-tile {
-    margin-right: 0;
-    height: auto;
-    display: block;
-  }
-
-  .assignment-options {
-    position: absolute;
-    right: 6px;
-    top: 4px;
+    &:first-child { border-left-color: #f8f8f8; }
+    &:last-child { border-right-color: #f8f8f8; }
+    &:hover {
+      background-color: rgb(30, 168, 255);
+      text-decoration: none;
+      color: white;
+      text-shadow: 0 1px #222;
+      border-left: 1px solid rgb(30, 168, 255);
+    }
   }
 }
 

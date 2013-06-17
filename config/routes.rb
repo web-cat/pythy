@@ -40,14 +40,16 @@ Pythy::Application.routes.draw do
     resources :assignment_checks
   end
 
-  resources :institutions, shallow: true do
-    resources :departments do
-      resources :courses do
-        resources :assignments
-        resources :course_offerings do
-          resources :assignment_offerings
-          resources :course_enrollments
-          resources :example_repositories, path: 'examples'
+  shallow do
+    resources :institutions do
+      resources :departments do
+        resources :courses do
+          resources :assignments
+          resources :course_offerings do
+            resources :assignment_offerings
+            resources :course_enrollments
+            resources :example_repositories, path: 'examples'
+          end
         end
       end
     end
@@ -65,6 +67,14 @@ Pythy::Application.routes.draw do
   match code_pattern => 'code#message', via: :post, constraints: { rest: /.+/ }
 
   match 'home(/:institution(/:course(/:term(/:crn))))' => 'home#index'
+
+  # Route for accessing the media library.
+  medias_pattern = 'media(/user/:user)(/assignment/:assignment)'
+  media_pattern = "#{medias_pattern}(/:filename)"
+  match medias_pattern => 'media#index', via: :get, constraints: { filename: /.+/ }
+  match media_pattern => 'media#show', via: :get, constraints: { filename: /.+/ }
+  match media_pattern => 'media#create', via: :post, constraints: { filename: /.+/ }
+  match 'media/:id' => 'media#destroy', via: :delete
 
   # External content proxy, to get around HTTPS issues when Python code makes
   # requests to external sites.

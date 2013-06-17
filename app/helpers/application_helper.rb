@@ -17,9 +17,9 @@ module ApplicationHelper
   # 
   def flash_class(level)
     case level
-    when :notice then 'alert-info'
-    when :error then 'alert-error'
-    when :alert then ''
+    when :notice then 'flash-notice'
+    when :error then 'flash-error'
+    when :alert then 'flash-alert'
     end
   end
 
@@ -83,9 +83,16 @@ HTML
   end
 
   # -------------------------------------------------------------
-  def dropdown_tag
-    content_tag :a, :href => '#', :class => 'dropdown-toggle',
-      :'data-toggle' => 'dropdown' do
+  def dropdown_tag(options = {})
+    options.merge! :href => '#', :'data-toggle' => 'dropdown'
+
+    if options[:class]
+      options[:class] += ' dropdown-toggle'
+    else
+      options[:class] = 'dropdown-toggle'
+    end
+
+    content_tag :a, options do
       yield
     end
   end
@@ -330,6 +337,62 @@ HTML
   # -------------------------------------------------------------
   def percentage(value)
     "#{value.round(2)}%"
+  end
+
+
+  # -------------------------------------------------------------
+  def left_nav_link_to(url, link_class, icon_class, title, &block)
+    (link_to url, class: 'nav-tile ' + link_class do
+      (content_tag :div, class: 'item-icon' do
+        content_tag :i, nil, class: "icon-#{icon_class}"
+      end) +
+      (content_tag :div, title, class: 'item-title')
+    end) +
+    (block_given? ? capture(&block) : '')
+  end
+
+
+  # -------------------------------------------------------------
+  def book_path
+    'http://interactivepython.org/courselib/static/thinkcspy/index.html'
+  end
+
+
+  # -------------------------------------------------------------
+  def class_partial_exists?(object, prefix)
+    partial_name = "#{controller_name}/#{prefix}/_#{object.class.name.underscore}"
+    lookup_context.find_all(partial_name).any?
+  end
+
+
+  # -------------------------------------------------------------
+  def render_class_partial(object, prefix, options={})
+    if class_partial_exists?(object, prefix)
+      partial_name = "#{controller_name}/#{prefix}/#{object.class.name.underscore}"
+      options.merge! partial: partial_name
+      render options
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def body_tag
+    body_class = controller_name
+    if session[:original_user]
+      body_class += ' impersonation'
+    end
+
+    content_tag :body, class: body_class do
+      yield
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def live_date_tag(date)
+    content_tag :span, class: 'live-date', data: { date: date.to_i * 1000 } do
+      l date
+    end
   end
 
 end

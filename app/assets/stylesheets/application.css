@@ -16,5 +16,6 @@
 //= require smalot/bootstrap-datetimepicker/datetimepicker
  *= require bootstrap_and_overrides
  *= require font-awesome
+ *= require jquery.fileupload-ui
  *= require global
  */

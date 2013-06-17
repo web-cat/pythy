@@ -20,15 +20,18 @@ class Ability
 
       # A user should only be able to update himself or herself (assuming no
       # other permissions granted below by the global role).
-      can :update, User do |target_user|
+      can [:show, :update], User do |target_user|
         target_user == user
       end
+
+      can :index, User if user.global_role.can_edit_system_configuration?
 
       process_global_role user
       process_courses user
       process_assignments user
       process_repositories user
       process_assignment_checks user
+      process_media_items user
     end
   end
 
@@ -227,6 +230,22 @@ class Ability
         role = co.role_for_user(user)
         role.can_view_other_submissions?
       end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  # Private: Process media item-related permissions.
+  #
+  # user - the user
+  #
+  def process_media_items(user)
+    can :read, MediaItem do |item|
+      item.user == user || (item.assignment && can?(:read, item.assignment))
+    end
+
+    can :manage, MediaItem do |item|
+      item.user == user || (item.assignment && can?(:manage, item.assignment))
     end
   end
 

@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130111190807) do
+ActiveRecord::Schema.define(:version => 20130518031137) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -140,6 +140,14 @@ ActiveRecord::Schema.define(:version => 20130111190807) do
 
   add_index "institutions", ["abbreviation"], :name => "index_institutions_on_abbreviation", :unique => true
   add_index "institutions", ["domain"], :name => "index_institutions_on_domain", :unique => true
+
+  create_table "media_items", :force => true do |t|
+    t.integer  "user_id"
+    t.integer  "assignment_id"
+    t.string   "media_item"
+    t.datetime "created_at",    :null => false
+    t.datetime "updated_at",    :null => false
+  end
 
   create_table "rails_admin_histories", :force => true do |t|
     t.text     "message"

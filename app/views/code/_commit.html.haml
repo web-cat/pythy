@@ -1,0 +1,16 @@
+%tr{ data: { date: commit[:date].to_i * 1000 } }
+  %td
+    %a{ href: "\##{commit[:sha]}" }= l commit[:date]
+    %span.relative-date
+  %td
+    - check = commit[:assignment_check]
+    - if check
+      - if check.status == AssignmentCheck::COMPLETED
+        = link_to code_check_results_link(check), method: :post, remote: true do
+          = score_badge check.overall_score
+      - elsif check.status == AssignmentCheck::TIMEOUT
+        %small.text-error Timed out
+      - elsif check.status == AssignmentCheck::FAILED
+        %small.text-error Internal error
+  %td
+    = commit[:message]

@@ -7,7 +7,7 @@ module HomeHelper
 
 
   # -------------------------------------------------------------
-  def home_path(model)
+  def home_path(model=nil)
     path_parts = []
 
     if model.is_a?(CourseOffering)
@@ -74,19 +74,26 @@ module HomeHelper
 
 
   # -------------------------------------------------------------
-  def assignment_date_wrapper(offering)
-    span_class = nil
+  def assignment_date_tag(offering)
+    span_class = 'live-date hang-tag small'
 
     if offering.past_due?
-      span_class = 'label label-important'
+      span_class += ' danger'
     elsif offering.effectively_due_at
       if offering.effectively_due_at - Time.now < 3.days
-        span_class = 'label label-warning'
+        span_class += ' caution'
+      else
+        span_class += ' good'
       end
+    else
+      return
     end
 
-    content_tag :span, class: span_class do
-      yield
+    content_tag :div, class: span_class, data: {
+      date: offering.effectively_due_at.to_i * 1000,
+      format: 'Due {0}'
+    } do
+      ""
     end
   end
 
@@ -138,19 +145,15 @@ module HomeHelper
       elsif score < 90
         btn_color = 'warning'
       else
-        btn_color = 'success'
+        btn_color = 'good'
       end
 
-      content_tag :div, class: "score-container btn btn-#{btn_color}" do
-        (content_tag :span, 'Score:') +
-        (content_tag :div, class: 'score' do
-          "#{score.round}%"
-        end)
+      content_tag :div, class: "assignment-score score-#{btn_color}" do
+        "#{score.round}%"
       end
     else
-      content_tag :div, class: "score-container btn btn-inverse" do
-        (content_tag :span, 'Score:') +
-        (content_tag :div, '--%', class: 'score')
+      content_tag :div, class: "assignment-score score-none" do
+        '--%'
       end
     end
   end

@@ -1,9 +1,12 @@
-= link_to code_path(not_started_assignment), class: 'btn btn-block assignment' do
-  .assignment-title
-    = succeed ':' do
-      = not_started_assignment.assignment.short_name
-    = not_started_assignment.assignment.long_name
-  .subtext
-    = assignment_date_wrapper(not_started_assignment) do
-      %i.icon-calendar
-      = assignment_date_text(not_started_assignment)
+.assignment-tile-wrapper
+  .assignment-tile.front{ href: assignment_url(not_started_assignment.assignment) }
+    = assignment_date_tag(not_started_assignment)
+    .assignment-short-name><= not_started_assignment.assignment.short_name
+    .assignment-long-name><= not_started_assignment.assignment.long_name
+  .assignment-tile.back
+    = link_to code_path(not_started_assignment) do
+      = icon_tag('laptop')
+      Code
+    = link_to not_started_assignment.assignment do
+      = icon_tag('list-ol')
+      Description

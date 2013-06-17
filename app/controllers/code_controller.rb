@@ -7,7 +7,7 @@ class CodeController < FriendlyUrlController
   DEFAULT_FILE = 'main.py'
 
   ALLOWED_MESSAGES = %w(hash_change add_user remove_user unsync resync
-    ping check start_over check_results)
+    ping check start_over check_results history)
 
   before_filter :authenticate_user!
   before_filter :find_repository
@@ -15,6 +15,11 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   def show
     @subscribe_channel = @repository.event_channel(nil)
+
+    @repository.read do
+      path = File.join(@repository.git_path, @filename)
+      FileUtils.touch path unless File.exists?(path)
+    end
 
     if @repository.is_a? AssignmentRepository
       a = @repository.assignment_offering.assignment
@@ -45,11 +50,18 @@ class CodeController < FriendlyUrlController
       git.add path
     end
 
+    @commit_hash = @repository.commit_hash(@committed[:commit])
+
     respond_to do |format|
       if @committed
         publish(:code) do
           render_to_string template: 'code/update_code',
-            locals: { code: code, force: false }
+            locals: {
+              code: code,
+              commit: @commit_hash,
+              amend: @committed[:amend],
+              force: false
+            }
         end
       end
 
@@ -221,8 +233,6 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   def start_over
     begin
-      # FIXME When we support assignments with starter repos, we want to
-      # re-clone that repo instead of just deleting the file.
       @repository.start_over
 
       code = ''
@@ -244,14 +254,25 @@ class CodeController < FriendlyUrlController
 
 
   # -------------------------------------------------------------
-  # Called when a new user opens the code controller for a particular
-  # repository.
   def check_results
     assignment_check = AssignmentCheck.find(params[:check])
 
     respond_to do |format|
       format.js { render template: 'code/check_results',
         locals: { assignment_check: assignment_check } }
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def history
+    start = params[:start]
+
+    commits = @repository.history(start, 100)
+
+    respond_to do |format|
+      format.js { render template: 'code/add_history',
+        locals: { commits: commits } }
     end
   end
 
@@ -275,7 +296,7 @@ class CodeController < FriendlyUrlController
       @repository = ExampleRepository.find_by_id(id)
     elsif parts.first == 'assignments'
       if @term
-        # It's a student trying to access their person repository
+        # It's a student trying to access their personal repository
         # for an assignment.
 
         url_part = parts.second
@@ -324,6 +345,15 @@ class CodeController < FriendlyUrlController
       return
     end
 
+    # If the path goes to a directory, make sure to append the default file
+    # name instead.
+    @repository.read do
+      path = File.join(@repository.git_path, @filename)
+      if File.directory?(path)
+        @filename = File.join(@filename, DEFAULT_FILE)
+      end
+    end
+
     # Make sure the user has access to read the repository, or raise a
     # not-found exception if it wasn't found.
     if @repository
@@ -331,7 +361,7 @@ class CodeController < FriendlyUrlController
 
       @repository.read do |git|
         begin
-          @hashes = git.log.map { |commit| commit.sha }
+          @commits = git.gblob(@filename).log(nil).to_a
         rescue
           # If the above fails, it's because the repo doesn't have a
           # HEAD yet (most likely) or it's busted (hopefully not).
@@ -339,7 +369,7 @@ class CodeController < FriendlyUrlController
           # TODO: We should probably make sure every repository has
           # a HEAD when it's created, by committing a default
           # .gitignore file or something similar.
-          @hashes = []
+          @commits = []
         end
       end
     else

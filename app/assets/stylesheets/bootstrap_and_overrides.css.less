@@ -11,9 +11,24 @@
                  "Bitstream Vera Sans Mono", "Courier New", monospace;
 @textColor: @black;
 
-//@linkColor: #566E1F;
-//@btnPrimaryBackground:              #638613;
-//@btnPrimaryBackgroundHighlight:     darken(@btnPrimaryBackground, 10%);
+@pythyDangerColor: rgb(167, 0, 13);
+@pythyWarningColor: rgb(250, 192, 0);
+@pythySuccessColor: rgb(20, 152, 46);
+@pythyInfoColor: rgb(30, 163, 255);
+
+@btnPrimaryBackground:              darken(rgb(30, 163, 255), 10%);
+@btnPrimaryBackgroundHighlight:     darken(@btnPrimaryBackground, 10%);
+
+@btnSuccessBackground: rgb(20, 152, 46);
+@btnSuccessBackgroundHighlight: darken(@btnSuccessBackground, 10%);
+
+@btnWarningBackground: rgb(250, 192, 0);
+@btnWarningBackgroundHighlight: darken(@btnWarningBackground, 10%);
+
+@btnDangerBackground: rgb(167, 0, 13);
+@btnDangerBackgroundHighlight: darken(@btnDangerBackground, 10%);
+
+//@linkColor: rgb(30, 163, 255);
 
 // manual theme stuff (should this be elsewhere?)
 html, body {
@@ -21,53 +36,7 @@ html, body {
 }
 
 body {
-  background: #393939 url('/assets/bg.png') top left repeat;
-}
-
-#main-container {
-  background-color: white;
-  color: black;
-  padding: 0 10px;
-  min-height: 100%;
-  box-shadow: 0px -5px 7px 2px rgba(0, 0, 0, 0.5);
-}
-
-#main-container-inner {
-  padding-top: 50px;
-}
-
-/* steal the bootstrap <legend> style for h1 because it looks nice */
-#main-container-inner h1 {
-  font-weight: normal;
-  display: block;
-  margin: 0 0 5px 0;
-  width: 100%;
-  padding: 0;
-  font-size: 21px;
-  line-height: 40px;
-  color: #333;
-  border: 0;
-  border-bottom: 1px solid #E5E5E5;
-}
-
-#main-container-inner h1.no-border {
-  border-bottom: 0;
-  margin: 0;
-}
-
-
-/* font awesome tweaks */
-[class^="icon-"]::before, [class*=" icon-"]::before {
-  font-weight: 400;
-}
-
-/* improve icon display on bootstrap buttons */
-.btn i {
-  padding-right: 5px;
-}
-
-.btn i:last-child {
-  padding-right: 0;
+  padding-top: 60px;
 }
 
 /* twitter bootstrap responsive tweaks */
@@ -87,83 +56,20 @@ body {
     padding: 0;
     box-shadow: 0px -5px 8px 5px rgba(0, 0, 0, 0.7);
   }
-
-  #main-container-inner {
-    padding-top: 7px;
-  }
-
 }
 
-/* twitter bootstrap tweaks */
-.navbar-inverse .navbar-inner {
-  background-color: #37431C;
-  background-image: -moz-linear-gradient(top, #607236, #1d250b);
-  background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#607236), to(#1d250b));
-  background-image: -webkit-linear-gradient(top, #607236, #1d250b);
-  background-image: -o-linear-gradient(top, #607236, #1d250b);
-  background-image: linear-gradient(to bottom, #607236, #1d250b);
-  background-repeat: repeat-x;
-  border: 0px none;
-  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff607236', endColorstr='#ff1d250b', GradientType=0);
+/* font awesome tweaks */
+[class^="icon-"]::before, [class*=" icon-"]::before {
+  font-weight: 400;
 }
 
-.navbar-fixed-top .container {
-  padding: 0;
+/* improve icon display on bootstrap buttons */
+.btn i {
+  padding-right: 5px;
 }
 
-.navbar-inverse .brand,
-.navbar-inverse .nav > li > a {
-  color: white;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
-}
-
-.navbar {
-  font-weight: 600;
-}
-
-.navbar-inverse .brand {
-  font-weight: 600;
-  font-size: 24px;
-  padding: 8px 20px 8px;
-}
-
-.navbar .nav > li > a {
-  padding: 8px 12px 8px;
-}
-
-.navbar-inner {
-  min-height: 38px;
-}
-
-.navbar-fixed-top .navbar-inner, .navbar-static-top .navbar-inner {
-  -webkit-box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1), 0 1px 10px rgba(0, 0, 0, 0.1);
-  -moz-box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1), 0 1px 10px rgba(0, 0, 0, 0.1);
-  /*box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 10px rgba(0, 0, 0, 0.5);*/
-  box-shadow: 0px -5px 8px 5px rgba(0, 0, 0, 0.7);
-}
-
-.navbar .nav > li > a {
-  background: transparent url('/assets/navbar-separator.png') left center no-repeat;
-}
-
-.navbar-inverse .divider-vertical {
-  border: 0 none;
-}
-
-.navbar .divider-vertical {
-  background: transparent url('/assets/navbar-separator.png') left center no-repeat;
-  height: 38px;
-  width: 2px;
-  margin: 0;
-  border: 0 none;
-}
-
-.navbar-inverse .nav .active > a, .navbar-inverse .nav .active > a:hover, .navbar-inverse .nav .active > a:focus {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-.dropdown-menu .active > a, .dropdown-menu .active > a:hover {
-  color: rgba(255, 255, 255, 1.0);
+.btn i:last-child {
+  padding-right: 0;
 }
 
 /* font awesome tweaks */
@@ -172,7 +78,7 @@ body {
 }
 
 /* override built-in blue form glow */
-/*textarea,
+textarea,
 input[type="text"],
 input[type="password"],
 input[type="datetime"],
@@ -189,10 +95,10 @@ input[type="tel"],
 input[type="color"],
 .uneditable-input {
   &:focus {
-    border-color: rgba(86,110,31,.8);
-    .box-shadow(~"inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(86,110,31,.6)");
+    border-color: rgba(30, 163, 255, 0.8);
+    .box-shadow(~"inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(30, 163, 255, 0.6)");
   }
-}*/
+}
 
 /* modify form appearance a bit */
 legend {
@@ -205,9 +111,8 @@ legend {
 }
 
 h3 {
-  font-weight: 500;
+  font-weight: 600;
 }
-
 
 td .alert {
   text-align: center;
@@ -257,19 +162,4 @@ form textarea + .CodeMirror {
 
 form textarea + .CodeMirror.cm-s-markdown {
   font-family: @sansFontFamily;
-}
-
-// Dark panels give us some nice options for docking sidebars and such.
-// Put this class on such a panel to get the background and text colors;
-// elements placed on these panels will need to have their styling adjusted
-// to look good (e.g., progress bars).
-
-.dark-panel {
-  background-color: rgba(0, 0, 0, 0.9);
-  color: #eee;
-}
-
-.dark-panel .progress {
-  #gradient > .vertical(#060606, #0a0a0a);
-  .box-shadow(inset 0 0px 3px rgba(255,255,255,.4));  
 }

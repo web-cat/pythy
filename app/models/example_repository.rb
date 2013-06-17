@@ -37,6 +37,12 @@ class ExampleRepository < Repository
   end
 
 
+  # -------------------------------------------------------------
+  def can_sync?(requesting_user)
+    requesting_user != user
+  end
+
+
   private
 
   # -------------------------------------------------------------

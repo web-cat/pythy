@@ -8,10 +8,11 @@ class AssignmentCheck < ActiveRecord::Base
   has_many :check_outcomes
 
   attr_accessible :assignment_repository_id, :number,
-    :status, :overall_score, :extra
+    :status, :overall_score, :extra, :commit_sha
 
   serialize :extra, Hash
 
+  before_create :store_commit_sha
   after_create :create_git_tag
 
 
@@ -62,12 +63,21 @@ class AssignmentCheck < ActiveRecord::Base
   private
 
   # -------------------------------------------------------------
+  def store_commit_sha
+    assignment_repository.read do |git|
+      self.commit_sha = git.object('HEAD').sha
+    end
+  end
+
+
+  # -------------------------------------------------------------
   # Private: Tags the current HEAD of the repository with a tag that denotes
-  # this check attempt.
+  # this check attempt, and records the SHA of the HEAD in the database.
   #
   def create_git_tag
-    git = assignment_repository.open
-    git.add_tag git_tag
+    assignment_repository.write do |git|
+      git.add_tag git_tag
+    end
   end
 
 end

@@ -37,6 +37,24 @@ module CodeHelper
 
 
   # -------------------------------------------------------------
+  def score_badge(score)
+    score ||= 0
+
+    if score < 70
+      bar_color = 'label-important'
+    elsif score < 90
+      bar_color = 'label-warning'
+    else
+      bar_color = 'label-success'
+    end
+
+    content_tag :span, class: "label #{bar_color}" do
+      "#{score.round}%"
+    end
+  end
+
+
+  # -------------------------------------------------------------
   def outcome_bar(outcome)
     if outcome.score && outcome.possible_score
       score = 100.0 * outcome.score / outcome.possible_score
@@ -101,6 +119,20 @@ module CodeHelper
   def skulpt_javascript_include_tags
     javascript_include_tag('internal/skulpt') +
     javascript_include_tag('internal/builtin')
+  end
+
+
+  # -------------------------------------------------------------
+  def action_button_tag(options = {})
+    link_to(options[:url] || 'javascript:void(0)',
+      id: options[:id],
+      class: "btn #{options[:class] || ''}",
+      rel: 'tooltip',
+      title: options[:tooltip],
+      disabled: options[:disabled],
+      data: { placement: 'left' }) do
+        icon_tag(options[:icon]) + (block_given? && yield || '')
+    end
   end
 
 end

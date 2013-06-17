@@ -1,5 +1,14 @@
-.assignment-tile.btn{ href: assignment_url(instructor_assignment) }
-  .assignment-short-name><= instructor_assignment.short_name
-  .assignment-long-name><= instructor_assignment.long_name
-  .assignment-options<
-    = link_to 'View code', code_path(instructor_assignment.assignment_reference_repository)
+.assignment-tile-wrapper
+  .assignment-tile.front{ href: assignment_url(instructor_assignment) }
+    .assignment-short-name><= instructor_assignment.short_name
+    .assignment-long-name><= instructor_assignment.long_name
+  .assignment-tile.back
+    = link_to code_path(instructor_assignment.assignment_reference_repository) do
+      = icon_tag('laptop')
+      Code
+    = link_to instructor_assignment do
+      = icon_tag('list-ol')
+      Description
+    = link_to assignment_path(instructor_assignment, anchor: 'grades') do
+      = icon_tag('tasks')
+      Grades

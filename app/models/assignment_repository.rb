@@ -35,6 +35,36 @@ class AssignmentRepository < Repository
 
 
   # -------------------------------------------------------------
+  # Public: Returns a value indicating whether or not the next commit should
+  # amend the previous one, or if it should be a new commit. This subclass
+  # retains the 1 minute threshold of the superclass, but also adds the
+  # condition that a commit that is associated with a check should never be
+  # amended.
+  #
+  # Returns true if the last commit should be amended, or false to create
+  # a new commit.
+  def should_amend?
+    super && assignment_checks.most_recent.commit_sha != head_sha
+  end
+
+
+  # -------------------------------------------------------------
+  def history(start, count)
+    checks = assignment_checks.index_by(&:commit_sha)
+
+    super do |commit|
+      { assignment_check: checks[commit.sha] }
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def can_check?(user)
+    true
+  end
+
+
+  # -------------------------------------------------------------
   def changed_since_last_check?
     most_recent = assignment_checks.most_recent
 

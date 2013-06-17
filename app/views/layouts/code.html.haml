@@ -2,6 +2,7 @@
 %html
   %head
     %title!= content_for?(:title) ? 'Pythy &ndash; ' + content_for(:title) : 'Pythy'
+    %meta{ name: 'viewport', content: 'width=device-width, initial-scale=1.0' }
     = stylesheet_link_tag 'application', media: 'all'
     = controller_stylesheet_link_tag
     = javascript_include_tag 'application'
@@ -11,10 +12,10 @@
     = skulpt_javascript_include_tags
     = csrf_meta_tags
     = favicon_link_tag '/favicon.png', type: 'image/png'
-  %body
+  = body_tag do
     = render partial: 'navbar'
-    #main-container.container
-      #main-container-inner
+    .container
+      .row
         = yield
 
     = render partial: 'flashbar'

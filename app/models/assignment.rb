@@ -11,11 +11,13 @@ class Assignment < ActiveRecord::Base
 
   accepts_nested_attributes_for :assignment_offerings
 
+  after_create :create_reference_repository
+  before_validation :set_url_part
+
+  validates :url_part, uniqueness: { scope: :course_id,
+    message: 'cannot collide with the URL for another assignment in the same course' }
   validates :short_name, presence: true
   validates :long_name, presence: true
-
-  before_validation :set_url_part
-  after_create :create_reference_repository
 
 
   # -------------------------------------------------------------

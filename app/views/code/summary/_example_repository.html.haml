@@ -1,0 +1,12 @@
+%h3.slim
+  Example:
+  = @repository.name
+  %small
+    = surround '(', ')' do
+      = @repository.course_offering.course.department_name_and_number
+
+This example was created by
+= @repository.user.display_name(true)
+at
+= succeed '.' do
+  %strong= l @repository.created_at
