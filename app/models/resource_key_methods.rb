@@ -11,6 +11,8 @@ module ResourceKeyMethods
   # -------------------------------------------------------
   def generate_resource_key
     unless self.resource_key
+      key = nil
+
       loop do
         key = SecureRandom.urlsafe_base64(10)
         break unless self.class.where(resource_key: key).exists?
