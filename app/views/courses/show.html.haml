@@ -1,19 +1,16 @@
 %ul.breadcrumb
   %li
-    = link_to @course.department.institution.display_name, @course.department.institution
-    %span.divider /
-  %li
-    = link_to @course.department.name, department_path(@course.department)
+    = link_to @course.institution.display_name, @course.institution
     %span.divider /
   %li.active
-    = @course.department_name_and_number
+    = @course.number
   %li.pull-right
     = link_to edit_course_path(@course) do
       %i.icon-pencil
       Edit...
 
 %h2.page-header
-  = @course.department_name_and_number
+  = @course.number
   %small
     = @course.name
 

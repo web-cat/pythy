@@ -3,7 +3,7 @@
   = @repository.name
   %small
     = surround '(', ')' do
-      = @repository.course_offering.course.department_name_and_number
+      = @repository.course_offering.course.number
 
 This example was created by
 = @repository.user.display_name(true)

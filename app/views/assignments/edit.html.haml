@@ -1,12 +1,9 @@
 %ul.breadcrumb
   %li
-    = link_to @assignment.course.department.institution.display_name, @assignment.course.department.institution
+    = link_to @assignment.course.institution.display_name, @assignment.course.institution
     %span.divider /
   %li
-    = link_to @assignment.course.department.name, department_path(@assignment.course.department)
-    %span.divider /
-  %li
-    = link_to @assignment.course.department_name_and_number, @assignment.course
+    = link_to @assignment.course.number, @assignment.course
     %span.divider /
   %li.active
     = @assignment.short_name

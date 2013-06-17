@@ -1,7 +1,7 @@
 .row
   .span12
     %h2
-      = @course.department_name_and_number
+      = @course.number
       %small
         = @offerings.first.term.display_name
         = surround '(', ')' do

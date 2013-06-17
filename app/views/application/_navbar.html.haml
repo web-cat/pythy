@@ -9,7 +9,7 @@
             = dropdown_tag do
               = icon_tag('home icon-large')
               - if @course
-                = @course.department_name_and_number
+                = @course.number
               - else
                 Courses
               %span.caret
@@ -20,7 +20,7 @@
               - current_user.course_offerings.where(term_id: @term.id).each do |offering|
                 %li
                   = link_to home_path(offering) do
-                    %strong= offering.course.department_name_and_number
+                    %strong= offering.course.number
                     \-
                     = offering.course.name
                     = surround '(', ')' do

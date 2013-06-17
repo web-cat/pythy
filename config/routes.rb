@@ -42,14 +42,12 @@ Pythy::Application.routes.draw do
 
   shallow do
     resources :institutions do
-      resources :departments do
-        resources :courses do
-          resources :assignments
-          resources :course_offerings do
-            resources :assignment_offerings
-            resources :course_enrollments
-            resources :example_repositories, path: 'examples'
-          end
+      resources :courses do
+        resources :assignments
+        resources :course_offerings do
+          resources :assignment_offerings
+          resources :course_enrollments
+          resources :example_repositories, path: 'examples'
         end
       end
     end

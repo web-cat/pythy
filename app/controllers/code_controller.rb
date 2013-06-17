@@ -23,14 +23,14 @@ class CodeController < FriendlyUrlController
 
     if @repository.is_a? AssignmentRepository
       a = @repository.assignment_offering.assignment
-      @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
+      @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
       @summary = a.brief_summary_html(link: assignment_path(a))
     elsif @repository.is_a? AssignmentReferenceRepository
       a = @repository.assignment
-      @page_title = "#{a.course.department_name_and_number} &ndash; #{a.short_name}: #{a.long_name}"
+      @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
       @summary = a.brief_summary_html(link: assignment_path(a))
     elsif @repository.is_a? ExampleRepository
-      @page_title = "#{@repository.course_offering.course.department_name_and_number} &ndash; Example: #{@repository.name}"
+      @page_title = "#{@repository.course_offering.course.number} &ndash; Example: #{@repository.name}"
       @summary = @repository.description
     end
   end

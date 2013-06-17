@@ -1,12 +1,9 @@
 %ul.breadcrumb
   %li
-    = link_to @course_offering.course.department.institution.display_name, @course_offering.course.department.institution
+    = link_to @course_offering.course.institution.display_name, @course_offering.course.institution
     %span.divider /
   %li
-    = link_to @course_offering.course.department.name, department_path(@course_offering.course.department)
-    %span.divider /
-  %li
-    = link_to @course_offering.course.department_name_and_number, course_path(@course_offering.course)
+    = link_to @course_offering.course.number, course_path(@course_offering.course)
     %span.divider /
   %li.active
     = @course_offering.crn

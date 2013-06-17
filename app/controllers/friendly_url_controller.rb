@@ -16,7 +16,7 @@ class FriendlyUrlController < ApplicationController
     @institution = Institution.from_path_component(params[:institution]).first
 
     if @institution
-      @course = Course.from_path_component(params[:course], @institution).first
+      @course = Course.from_path_component(params[:course]).first
 
       if @course
         @term = Term.from_path_component(params[:term]).first

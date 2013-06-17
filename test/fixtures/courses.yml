@@ -2,10 +2,12 @@
 
 cs1064:
   name: Computational Problem Solving in Python
-  number: 1064
-  department: cs_at_vt
+  number: CS 1064
+  url_part: cs-1064
+  institution: vt
 
 cs1124:
   name: Intro to Media Computation
-  number: 1124
-  department: cs_at_test
+  number: CS 1124
+  url_part: cs-1124
+  institution: test

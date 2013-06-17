@@ -8,7 +8,7 @@
           = @repository.assignment_offering.assignment.long_name
           %small
             = surround '(', ')' do
-              = @repository.assignment_offering.assignment.course.department_name_and_number
+              = @repository.assignment_offering.assignment.course.number
 
       = raw @repository.assignment_offering.assignment.brief_summary_html
 

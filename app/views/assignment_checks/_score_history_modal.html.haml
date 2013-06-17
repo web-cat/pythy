@@ -6,7 +6,7 @@
       %strong= @assignment_repository.assignment_offering.assignment.short_name
       %small
         = surround '(', ')' do
-          = @assignment_repository.assignment_offering.course_offering.course.department_name_and_number
+          = @assignment_repository.assignment_offering.course_offering.course.number
 
   .modal-body
     #score-history-chart{ style: 'width: 770px; height: 350px;'}

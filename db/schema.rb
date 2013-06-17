@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130518031137) do
+ActiveRecord::Schema.define(:version => 20130617145542) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -29,6 +29,7 @@ ActiveRecord::Schema.define(:version => 20130518031137) do
     t.text     "extra"
     t.datetime "created_at",                                              :null => false
     t.datetime "updated_at",                                              :null => false
+    t.string   "commit_sha"
   end
 
   create_table "assignment_offerings", :force => true do |t|
@@ -91,8 +92,9 @@ ActiveRecord::Schema.define(:version => 20130518031137) do
     t.integer  "crn"
     t.string   "label"
     t.string   "url"
-    t.datetime "created_at", :null => false
-    t.datetime "updated_at", :null => false
+    t.datetime "created_at",              :null => false
+    t.datetime "updated_at",              :null => false
+    t.boolean  "self_enrollment_allowed"
   end
 
   create_table "course_roles", :force => true do |t|
@@ -107,18 +109,10 @@ ActiveRecord::Schema.define(:version => 20130518031137) do
   create_table "courses", :force => true do |t|
     t.string   "name"
     t.string   "number"
-    t.integer  "department_id"
-    t.datetime "created_at",    :null => false
-    t.datetime "updated_at",    :null => false
-  end
-
-  create_table "departments", :force => true do |t|
-    t.integer  "institution_id"
-    t.string   "name"
-    t.string   "abbreviation"
-    t.string   "url_part"
     t.datetime "created_at",     :null => false
     t.datetime "updated_at",     :null => false
+    t.integer  "institution_id"
+    t.string   "url_part"
   end
 
   create_table "global_roles", :force => true do |t|
@@ -144,9 +138,12 @@ ActiveRecord::Schema.define(:version => 20130518031137) do
   create_table "media_items", :force => true do |t|
     t.integer  "user_id"
     t.integer  "assignment_id"
-    t.string   "media_item"
+    t.string   "file"
     t.datetime "created_at",    :null => false
     t.datetime "updated_at",    :null => false
+    t.text     "info"
+    t.string   "content_type"
+    t.integer  "file_size"
   end
 
   create_table "rails_admin_histories", :force => true do |t|
@@ -208,6 +205,7 @@ ActiveRecord::Schema.define(:version => 20130518031137) do
     t.integer  "global_role_id"
     t.string   "first_name"
     t.string   "last_name"
+    t.string   "resource_key"
   end
 
   add_index "users", ["email"], :name => "index_users_on_email", :unique => true

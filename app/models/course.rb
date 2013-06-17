@@ -1,48 +1,34 @@
 #
 # A course represents a course (which may have multiple sections; see
-# course_offering.rb) in a department, such as "CS 1064".
+# course_offering.rb) at an institution, such as "CS 1064".
 #
 class Course < ActiveRecord::Base
   
   # Relationships
-  belongs_to  :department
+  belongs_to  :institution
   has_many    :course_offerings
   has_many    :assignments
 
-  attr_accessible :department_id, :name, :number
+  attr_accessible :institution_id, :name, :number
+
+  before_validation :set_url_part
 
   validates :number, presence: true
   validates :name, presence: true
+  validates :url_part,
+    presence: true,
+    uniqueness: { case_sensitive: false }
 
 
   #~ Class methods ............................................................
 
   # -------------------------------------------------------------
-  def self.from_path_component(path, institution)
-    match = /(?<department>[a-z0-9]+)-(?<course_number>[a-z0-9]+)/.match(path)
-    if match
-      joins(:department).where(<<-SQL ,
-        departments.url_part = ? and
-        courses.number = ? and
-        departments.institution_id = ?
-        SQL
-        match[:department], match[:course_number], institution.id)
-    else
-      where('1 = 0')
-    end
+  def self.from_path_component(component)
+    where(url_part: component)
   end
 
 
   #~ Instance methods .........................................................
-
-  # -------------------------------------------------------------
-  # Gets a string representing the short name of the course using its
-  # department name and course number. For example, "CS 1064".
-  #
-  def department_name_and_number
-  	"#{department.abbreviation} #{number}"
-  end
-
 
   # -------------------------------------------------------------
   def offering_with_crn(crn, term)
@@ -62,18 +48,21 @@ class Course < ActiveRecord::Base
   end
 
   # -------------------------------------------------------------
-  def url_part
-    "#{department.url_part}-#{number}"
-  end
-
-
-  # -------------------------------------------------------------
   # Public: Gets the path to the directory where repositories and other
   # resources for this Course will be stored.
   #
   # Returns the path to the Course's storage directory.
   def storage_path
-    File.join(department.institution.storage_path, url_part)
+    File.join(institution.storage_path, url_part)
   end
+
+
+  private
+
+  # -------------------------------------------------------------
+  def set_url_part
+    self.url_part = url_part_safe(number)
+  end
+
 
 end

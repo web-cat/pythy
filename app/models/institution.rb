@@ -1,6 +1,6 @@
 class Institution < ActiveRecord::Base
 
-  has_many    :departments
+  has_many    :courses
   has_many    :users
 
   attr_accessible :display_name, :domain, :abbreviation
@@ -22,9 +22,7 @@ class Institution < ActiveRecord::Base
   
   validates :url_part,
     presence: true,
-    uniqueness: {
-      case_sensitive: false
-    }
+    uniqueness: { case_sensitive: false }
 
 
   #~ Class methods ............................................................

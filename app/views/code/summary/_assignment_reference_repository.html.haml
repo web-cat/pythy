@@ -3,7 +3,7 @@
     = @repository.assignment.long_name
     %small
       = surround '(', ')' do
-        = @repository.assignment.course.department_name_and_number
+        = @repository.assignment.course.number
       %span.label.label-important Reference repository
   .pull-right.header-buttons
     = link_to edit_assignment_path(@repository.assignment), class: 'btn', title: 'Edit this assignment', rel: 'tooltip' do

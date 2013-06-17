@@ -1,9 +1,9 @@
 class CoursesController < ApplicationController
 
   before_filter :authenticate_user!
-  load_and_authorize_resource :department
+  load_and_authorize_resource :institution
   load_and_authorize_resource :course,
-    through: :department, shallow: true
+    through: :institution, shallow: true
 
   # -------------------------------------------------------------
   # GET /courses
@@ -85,7 +85,7 @@ class CoursesController < ApplicationController
     @course.destroy
 
     respond_to do |format|
-      format.html { redirect_to department_courses_url(@course.department) }
+      format.html { redirect_to institution_courses_url(@course.institution) }
       format.json { head :no_content }
     end
   end

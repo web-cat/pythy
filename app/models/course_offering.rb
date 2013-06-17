@@ -11,7 +11,7 @@ class CourseOffering < ActiveRecord::Base
 
   has_many    :users, through: :course_enrollments
 
-  attr_accessible :course_id, :crn, :label, :term_id, :url
+  attr_accessible :course_id, :crn, :label, :term_id, :url, :self_enrollment_allowed
 
   validates :term_id, presence: true
   validates :crn, presence: true
@@ -51,7 +51,7 @@ class CourseOffering < ActiveRecord::Base
   # Returns the path to the CourseOffering's storage directory.
   def storage_path
     File.join(
-      course.department.institution.storage_path,
+      course.institution.storage_path,
       course.url_part,
       term.url_part,
       crn.to_s)

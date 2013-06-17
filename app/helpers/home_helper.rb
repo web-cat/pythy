@@ -18,7 +18,7 @@ module HomeHelper
 
     if model.is_a?(Course)
       path_parts.unshift model.url_part
-      model = model.department.institution
+      model = model.institution
     end
 
     if model.is_a?(Institution)
@@ -41,7 +41,7 @@ module HomeHelper
         path_parts.unshift model.assignment.url_part
         path_parts.unshift 'assignments'
         path_parts.unshift model.assignment.course.url_part
-        model = model.assignment.course.department.institution
+        model = model.assignment.course.institution
     else
       if model.is_a?(ExampleRepository)
         # TODO use a friendlier name
@@ -58,7 +58,7 @@ module HomeHelper
         path_parts.unshift model.crn.to_s
         path_parts.unshift model.term.url_part
         path_parts.unshift model.course.url_part
-        model = model.course.department.institution
+        model = model.course.institution
       end
     end
 
