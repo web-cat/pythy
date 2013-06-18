@@ -1,0 +1,31 @@
+%h2
+  Account Settings
+
+= twitter_bootstrap_form_for(resource, as: resource_name, url: registration_path(resource_name), html: { class: 'form-horizontal', method: :put }) do |f|
+
+  .row
+    .span6
+      = f.fieldset 'Log-in Information' do
+        = f.email_field :email do
+          %span.help-block
+            Your e-mail address is the name you use to log in to Pythy.
+            If you change it, you must use the new address the next time
+            you log in.
+
+        = f.password_field :current_password do
+          %span.help-block
+            You must enter your current password to update your profile.
+
+        = f.password_field :password, 'New password', autocomplete: 'off' do
+          %span.help-block
+            Leave blank if you do not want to change it.
+
+        = f.password_field :password_confirmation, autocomplete: 'off'
+
+    .span6
+      = f.fieldset 'Personal Information' do
+        = f.text_field :first_name
+        = f.text_field :last_name
+
+  = f.actions do
+    = f.submit 'Update Profile'
