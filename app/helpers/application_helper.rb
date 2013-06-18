@@ -395,4 +395,13 @@ HTML
     end
   end
 
+
+  # -------------------------------------------------------------
+  def gravatar_tag(user, size=nil)
+    link_to user do
+      image_tag(user.gravatar_url(size: size), class: 'gravatar',
+        style: "width: #{size}px; height: #{size}px")
+    end
+  end
+
 end

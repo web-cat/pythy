@@ -56,6 +56,7 @@ gem 'jquery-fileupload-rails'  # Better support for file uploads
 gem 'mini_magick'     # ImageMagick command-line interface
 gem 'uuidtools'       # For generating passkeys for models
 gem 'highcharts-rails', '~> 3.0.0'  # For beautiful client-side charts
+gem 'gravtastic'      # For Gravatar integration
 
 # Gems for server-side event support.
 gem 'redis'

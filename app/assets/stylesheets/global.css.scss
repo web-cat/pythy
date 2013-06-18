@@ -133,7 +133,24 @@ form.form-bordered {
     &.nav-user     {
       @include nav-link($nav-color-orange);
 
-      a.impersonation {
+      & > a {
+        padding-top: 2px;
+        padding-bottom: 3px;
+
+        & > img {
+          margin-right: 4px;
+          width: 30px;
+          height: 30px;
+          vertical-align: middle;
+        }
+
+        & > span, & > i {
+          line-height: 30px;
+          vertical-align: middle;
+        }
+      }
+
+      & > a.impersonation {
         border-top-color: lighten($nav-color-red, 10%);
         background: $nav-color-red;
       }
@@ -270,6 +287,36 @@ body.impersonation .navbar-inner {
 .hang-tag.neutral {
   &.small  { background-image: url(../assets/curl-gray-small.png); }
   & > span { background-color: $nav-color-gray; }
+}
+
+img.gravatar {
+  margin-right: 4px;
+}
+
+table td.has_gravatar {
+  position: relative;
+  padding-left: 44px;
+
+  img.gravatar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 36px;
+    height: 36px;
+  }
+}
+
+table.table-condensed td.has_gravatar {
+  position: relative;
+  padding-left: 36px;
+
+  img.gravatar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 28px;
+    height: 28px;
+  }
 }
 
 .header-buttons {

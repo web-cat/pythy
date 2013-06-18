@@ -16,7 +16,8 @@
           - ao.course_offering.users.alphabetical.each do |user|
             - repository = ao.repository_for_user(user)
             %tr
-              %td
+              %td.has_gravatar
+                = gravatar_tag(user, 28)
                 - if repository
                   = link_to user.display_name, repository
                 - else

@@ -51,7 +51,7 @@
         - if current_user
           %li.dropdown.nav-user
             = dropdown_tag do
-              %i.icon-user.icon-large
+              = image_tag(current_user.gravatar_url(size: 30))
               %span.hidden-phone
                 = current_user.display_name
               %i.icon-caret-down.hidden-phone

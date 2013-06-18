@@ -24,6 +24,16 @@
 
     .span6
       = f.fieldset 'Personal Information' do
+        .control-group
+          %label.control-label User image
+          .controls
+            = link_to 'http://gravatar.com/emails' do
+              = image_tag resource.gravatar_url(size: 210), class: 'gravatar'
+            %span.help-block
+              Change your avatar at
+              = succeed '.' do
+                = link_to 'gravatar.com', 'http://gravatar.com/emails'
+
         = f.text_field :first_name
         = f.text_field :last_name
 
