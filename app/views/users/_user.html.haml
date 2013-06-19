@@ -1,5 +1,6 @@
 %tr
-  %td
+  %td.has_gravatar
+    = gravatar_tag(user, 28)
     = full_name_or_none(user, muted: true, query: true)
   %td
     = link_to user do

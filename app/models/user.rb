@@ -8,9 +8,9 @@ class User < ActiveRecord::Base
   include ResourceKeyMethods
 
   include Gravtastic
-  gravtastic secure: true, default: "https://pythy.cs.vt.edu/assets/no-avatar.png"
+  gravtastic secure: true, default: 'mm'
 
-  delegate    :can?, :cannot?, :to => :ability
+  delegate    :can?, :cannot?, to: :ability
 
   belongs_to  :global_role
   

@@ -9,14 +9,33 @@
       %i.icon-pencil
       Edit
 
-%table.table
-  %tbody
-    %tr
-      %th Full Name
-      %td= full_name_or_none(@user)
-    %tr
-      %th E-mail
-      %td= @user.email
-    %tr
-      %th Global Role
-      %td= @user.global_role.name
+.row
+  .span3
+    = gravatar_tag(@user, 210)
+
+  .span9
+    %h2= full_name_or_none(@user)
+    %table.table
+      %tbody
+        %tr
+          %th E-mail
+          %td= mail_to @user.email
+        %tr
+          %th Global Role
+          %td= @user.global_role.name
+
+    %h3 Course Enrollments
+    %table.table
+      %tbody
+        - @user.course_enrollments.each do |ce|
+          %tr
+            %td
+              = succeed ':' do
+                = link_to_if_can :show, ce.course_offering.course do
+                  = ce.course_offering.course.number
+              = ce.course_offering.course.name
+              = link_to_if_can :show, ce.course_offering do
+                = surround '(', ')' do
+                  = ce.course_offering.crn
+            %td= ce.course_offering.term.display_name
+            %td= ce.course_role.name

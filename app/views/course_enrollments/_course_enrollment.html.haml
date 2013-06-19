@@ -1,5 +1,7 @@
 %tr
-  %td= link_to course_enrollment.user.display_name, course_enrollment.user
+  %td.has_gravatar
+    = gravatar_tag(course_enrollment.user, 28)
+    = link_to course_enrollment.user.display_name, course_enrollment.user
   %td= course_enrollment.user.email
   %td= course_enrollment.course_role.name
   %td= link_to_destroy course_enrollment, remote: true
