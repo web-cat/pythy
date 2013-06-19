@@ -34,8 +34,7 @@
               = succeed '.' do
                 = link_to 'gravatar.com', 'http://gravatar.com/emails'
 
-        = f.text_field :first_name
-        = f.text_field :last_name
+        = f.text_field :full_name
 
   = f.actions do
     = f.submit 'Update Profile'

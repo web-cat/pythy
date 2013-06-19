@@ -42,6 +42,30 @@ body.setup {
   padding-top: 60px;
 }
 
+body.landing {
+  padding-top: 0;
+
+  .jumbo-title {
+    padding: 50px 0;
+    margin-bottom: 20px;
+    background-image: url(/assets/landing-header-bg.png);
+    background-color: black;
+    background-repeat: no-repeat;
+
+    h1 {
+      color: white;
+      font-size: 72px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+
+      small {
+        color: #ccc;
+        font-weight: 300;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+      }
+    }
+  }
+}
+
 .close {
   opacity: 0.3;
   filter: alpha(opacity=30);

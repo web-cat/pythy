@@ -5,14 +5,12 @@ class Authentication < ActiveRecord::Base
   attr_accessible :provider, :uid
 
   def apply_omniauth(user, omniauth)
-    puts omniauth.to_yaml
-
     if user.email.blank?
       user.email = omniauth['info']['email']
     end
 
-    user.first_name ||= omniauth['info']['first_name']
-    user.last_name ||= omniauth['info']['last_name']
+    user.full_name ||= [omniauth['info']['first_name'],
+      omniauth['info']['last_name']].join(' ')
     
     # Generate a dummy password for the user.
     user.password ||= Devise.friendly_token.first(20)

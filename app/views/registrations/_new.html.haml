@@ -3,10 +3,7 @@
   = f.email_field :email
   = f.password_field :password
   = f.password_field :password_confirmation
-
-  = f.label 'Your name' do |name|
-    = name.text_field :first_name, class: 'input-small', placeholder: 'First name'
-    = name.text_field :last_name, class: 'input-small', placeholder: 'Last name'
+  = f.text_field :full_name
 
   = f.actions do
     = f.submit 'Sign up'

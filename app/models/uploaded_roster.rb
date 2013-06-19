@@ -130,18 +130,13 @@ class UploadedRoster
           # If the full name column was provided, parse it to get the first
           # and last names separately (they must be comma-delimited).
           full_name = row[columns[COLUMN_FULL_NAME]]
-          if full_name =~ /([^,]+)\s*,\s*(.*)/
-            last_name = $1
-            first_name = $2
-          else
-            last_name = full_name
-            first_name = nil
-          end
         else
           # Otherwise, just pull the first and last names from their own
-          # columns.
-          first_name = row[columns[COLUMN_FIRST_NAME]]
-          last_name = row[columns[COLUMN_LAST_NAME]]
+          # columns and merge them into a full name.
+          full_name = [
+            row[columns[COLUMN_FIRST_NAME]],
+            row[columns[COLUMN_LAST_NAME]]
+          ].reject { |name| name.blank? }.join(' ')
         end
 
         if columns[COLUMN_PASSWORD]
@@ -159,8 +154,7 @@ class UploadedRoster
           # course.
           user = User.create(
             email: email,
-            first_name: first_name,
-            last_name: last_name,
+            full_name: full_name,
             password: password)
 
           enrollment = CourseEnrollment.create(
@@ -174,7 +168,8 @@ class UploadedRoster
           # If the user already exists, only enroll him/her if not already
           # enrolled in the course.
           unless CourseEnrollment.where(
-            course_offering_id: @course_offering.id, user_id: user.id).exists?
+            course_offering_id: @course_offering.id,
+            user_id: user.id).exists?
 
             enrollment = CourseEnrollment.create(
               course_offering: @course_offering,

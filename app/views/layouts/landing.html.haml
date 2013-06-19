@@ -9,5 +9,10 @@
     = csrf_meta_tags
     = favicon_link_tag '/favicon.png', type: 'image/png'
   %body.landing
+    .jumbo-title
+      .container
+        %h1
+          Pythy
+          %small the online Python learning environment
     = render partial: 'flashbar'
     = yield

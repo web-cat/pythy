@@ -1,8 +1,7 @@
 = pythy_form_for @user do |f|
 
   = f.text_field :email
-  = f.text_field :first_name
-  = f.text_field :last_name
+  = f.text_field :full_name
   = f.collection_select :global_role_id , 'Global Role', GlobalRole.all, :id, :name , :prompt => true
 
   = f.actions do

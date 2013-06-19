@@ -1,5 +1,13 @@
-.row
-  .span8.offset2
-    .well
-      %h3.page-header Sign in to Pythy
-      = render :partial => 'sessions/ldap'
+.container
+  .row
+    .span6
+      %h2
+        Already signed up?
+        %small Sign in below.
+      = render partial: 'sessions/sign_in'
+
+    .span6
+      %h2
+        New user?
+        %small Create your account below.
+      = render partial: 'registrations/new'

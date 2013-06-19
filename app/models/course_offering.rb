@@ -7,7 +7,7 @@ class CourseOffering < ActiveRecord::Base
   has_many    :assignment_offerings
 
   has_many    :course_enrollments, include: [:course_role, :user],
-              order: 'course_roles.id asc, users.last_name asc, users.first_name asc'
+              order: 'course_roles.id asc, users.full_name asc'
 
   has_many    :users, through: :course_enrollments
 

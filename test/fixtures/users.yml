@@ -6,18 +6,15 @@
 #
 test_student:
   email: test_student@vt.edu
-  first_name: Test
-  last_name: Student
+  full_name: Test Student
   global_role: regular_role
 
 test_teacher:
   email: test_teacher@vt.edu
-  first_name: Test
-  last_name: Teacher
+  full_name: Test Teacher
   global_role: instructor_role
 
 test_grader:
   email: test_grader@vt.edu
-  first_name: Test
-  last_name: Grader
+  full_name: Test Grader
   global_role: regular_role

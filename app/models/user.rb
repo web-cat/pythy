@@ -30,9 +30,8 @@ class User < ActiveRecord::Base
     :recoverable, :trackable, :validatable
 
   # Setup accessible (or protected) attributes for your model
-  attr_accessible :first_name, :last_name, :email,
-    :password, :password_confirmation, :remember_me,
-    :global_role_id, :course_offerings, :course_enrollments
+  attr_accessible :full_name, :email, :password, :password_confirmation,
+    :remember_me, :global_role_id, :course_offerings, :course_enrollments
 
   before_create :set_default_role
 
@@ -43,12 +42,11 @@ class User < ActiveRecord::Base
       arel = self.arel_table
       pattern = "%#{query}%"
       where(arel[:email].matches(pattern).or(
-            arel[:last_name].matches(pattern).or(
-            arel[:first_name].matches(pattern))))
+            arel[:full_name].matches(pattern)))
     end
   }
 
-  scope :alphabetical, order('last_name asc, first_name asc, email asc')
+  scope :alphabetical, order('full_name asc, email asc')
 
 
   #~ Class methods ............................................................
@@ -87,28 +85,10 @@ class User < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
-  def full_name(first_name_first=false)
-    if !last_name.blank? && !first_name.blank?
-      if first_name_first
-        "#{first_name} #{last_name}"
-      else
-        "#{last_name}, #{first_name}"
-      end
-    elsif !last_name.blank?
-      last_name
-    elsif !first_name.blank?
-      first_name
-    else
-      nil
-    end
-  end
-
-
-  # -------------------------------------------------------------
   # Gets the user's "display name", which is their full name if it is in the
   # database, otherwise it is their e-mail address.
-  def display_name(first_name_first=false)
-    full_name.blank? ? email : full_name(first_name_first)
+  def display_name
+    full_name.blank? ? email : full_name
   end
 
 

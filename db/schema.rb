@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130617205241) do
+ActiveRecord::Schema.define(:version => 20130619172521) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -109,8 +109,8 @@ ActiveRecord::Schema.define(:version => 20130617205241) do
   create_table "courses", :force => true do |t|
     t.string   "name"
     t.string   "number"
-    t.datetime "created_at",     :null => false
-    t.datetime "updated_at",     :null => false
+    t.datetime "created_at",      :null => false
+    t.datetime "updated_at",      :null => false
     t.integer  "organization_id"
     t.string   "url_part"
   end
@@ -202,9 +202,8 @@ ActiveRecord::Schema.define(:version => 20130617205241) do
     t.datetime "created_at",                             :null => false
     t.datetime "updated_at",                             :null => false
     t.integer  "global_role_id"
-    t.string   "first_name"
-    t.string   "last_name"
     t.string   "resource_key"
+    t.string   "full_name"
   end
 
   add_index "users", ["email"], :name => "index_users_on_email", :unique => true
