@@ -341,18 +341,6 @@ HTML
 
 
   # -------------------------------------------------------------
-  def left_nav_link_to(url, link_class, icon_class, title, &block)
-    (link_to url, class: 'nav-tile ' + link_class do
-      (content_tag :div, class: 'item-icon' do
-        content_tag :i, nil, class: "icon-#{icon_class}"
-      end) +
-      (content_tag :div, title, class: 'item-title')
-    end) +
-    (block_given? ? capture(&block) : '')
-  end
-
-
-  # -------------------------------------------------------------
   def book_path
     'http://interactivepython.org/courselib/static/thinkcspy/index.html'
   end
@@ -401,6 +389,18 @@ HTML
     link_to user do
       image_tag(user.gravatar_url(size: size), class: 'gravatar',
         style: "width: #{size}px; height: #{size}px")
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def link_to_if_can(action, object)
+    if can?(action, object)
+      link_to object do
+        yield
+      end
+    else
+      yield
     end
   end
 
