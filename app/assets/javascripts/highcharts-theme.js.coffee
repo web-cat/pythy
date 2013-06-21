@@ -33,6 +33,9 @@ Highcharts.setOptions
       animation:
         duration: 250
 
+  credits:
+    enabled: false
+
   title:
     style:
       color: textColor,

@@ -51,7 +51,6 @@ $ ->
           yAxis:
             title: { text: '# of Students' },
             tickInterval: 1
-          credits: { enabled: false },
           legend: { enabled: false },
           plotOptions:
             column:

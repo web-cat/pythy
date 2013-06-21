@@ -4,17 +4,6 @@ data = <%= raw @scores.to_json %>
 # Append the modal to the page body.
 $('body').append '<%= j render partial: "score_history_modal" %>'
 
-# options = {
-#   width: 770,
-#   height: 350,
-#   pointSize: 4,
-#   tooltip: { isHtml: true },
-#   hAxis: { title: 'Check Number' },
-#   vAxis: { format: '#%', minValue: 0, maxValue: 1 },
-#   legend: { position: 'none' },
-#   chartArea: { left: '8%', top: '2%', width: '90%', height: '88%' }
-# }
-
 # FIXME: Figure out how to make underlays work nicely with multiple Twitter
 # Bootstrap modals before making this public.
 # google.visualization.events.addListener chart, 'select', ->
@@ -40,7 +29,6 @@ $('#score_history_modal').on 'shown', ->
       title: { text: 'Score' },
       min: 0,
       max: 100,
-    credits: { enabled: false },
     legend: { enabled: false },
     series: [ { name: 'Score', data: data } ]
 
