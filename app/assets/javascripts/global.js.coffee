@@ -159,6 +159,57 @@ window.pythy =
       options.onYes()
 
 
+  # -------------------------------------------------------------
+  percentage: (value) ->
+    "#{Math.round(value * 100) / 100}%"
+
+
+# =========================================================================
+# A utility class for calculating statistics from values in an array.
+class Statistics
+
+  # -------------------------------------------------------------
+  constructor: (@array) ->
+    @array.sort()
+
+
+  # -------------------------------------------------------------
+  minimum: ->
+    if @array.length == 0
+      0.0
+    else
+      @array[0]
+
+
+  # -------------------------------------------------------------
+  maximum: ->
+    if @array.length == 0
+      0.0
+    else
+      @array[@array.length - 1]
+
+
+  # -------------------------------------------------------------
+  mean:  ->
+    if @array.length == 0
+      0.0
+    else
+      (@array.reduce (a, b) -> a + b) / @array.length
+
+
+  # -------------------------------------------------------------
+  median: ->
+    if @array.length == 0
+      0.0
+    else if @array.length % 2 == 0
+      (@array[@array.length / 2 - 1] + @array[@array.length / 2]) / 2
+    else
+      @array[(@array.length - 1) / 2]
+
+
+window.pythy.Statistics = Statistics # export
+
+
 # -------------------------------------------------------------
 # TODO convert to Coffeescript
 `$.rails.allowAction = function(element) {

@@ -375,6 +375,34 @@ h1.slim, h2.slim, h3.slim, h4.slim, h5.slim, h6.slim {
   margin: 0;
 }
 
+h3.btn-line-height {
+  line-height: 30px;
+  margin-bottom: 4px;
+}
+
+a[data-toggle='collapse'] i.icon-chevron-right {
+  font-size: 18px;
+  margin-left: 4px;
+  margin-right: 4px;
+  color: #333;
+}
+
+a[data-toggle='collapse'] i.icon-chevron-right::before {
+  -webkit-transform: rotate(90deg);
+  -moz-transform: rotate(90deg);
+  -ms-transform: rotate(90deg);
+  -o-transform: rotate(90deg);
+  transform: rotate(90deg);
+}
+
+a[data-toggle='collapse'].collapsed i.icon-chevron-right::before {
+  -webkit-transform: rotate(0deg);
+  -moz-transform: rotate(0deg);
+  -ms-transform: rotate(0deg);
+  -o-transform: rotate(0deg);
+  transform: rotate(0deg);
+}
+
 .CodeMirror {
   line-height: 16px;
 }

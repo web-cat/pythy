@@ -27,40 +27,6 @@ class AssignmentsController < ApplicationController
     @summary = @assignment.brief_summary_html
     @description = @assignment.description_html
 
-    scores = []
-    @score_summary = {
-      minimum: 0.0,
-      maximum: 0.0,
-      median: 0.0,
-      mean: 0.0
-    }
-
-    @assignment_offerings.each do |ao|
-      ao.course_offering.users.each do |user|
-        repository = ao.repository_for_user(user)
-
-        if repository
-          check = repository.assignment_checks.most_recent
-
-          if check
-            score = check.overall_score
-
-            if score
-              scores << score
-              @score_summary[:maximum] = score if score > @score_summary[:maximum]
-              @score_summary[:minimum] = score if score < @score_summary[:minimum]
-            end
-          end
-        end
-      end
-    end
-
-    if scores.length > 0
-      scores.sort!
-      @score_summary[:mean] = scores.inject(0.0) { |sum, el| sum + el } / scores.size
-      @score_summary[:median] = median(scores)
-    end
-
     respond_to do |format|
       format.html # show.html.erb
       format.json { render :json => @assignment }
@@ -141,18 +107,6 @@ class AssignmentsController < ApplicationController
     @assignment_offerings =
       @assignment.assignment_offerings.joins(:course_offering).
         order('course_offerings.crn asc').select { |ao| can? :read, ao }
-  end
-
-
-  # -------------------------------------------------------------
-  def median(array)
-    if array.length == 0
-      0.0
-    elsif array.length % 2 == 0
-      (array[array.length / 2 - 1] + array[array.length / 2]) / 2
-    else
-      array[(array.length - 1) / 2]
-    end
   end
 
 end

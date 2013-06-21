@@ -56,6 +56,26 @@ class CourseRole < ActiveRecord::Base
   end
 
 
+  # -------------------------------------------------------------
+  def staff?
+    can_manage_course ||
+    can_manage_assignments ||
+    can_grade_submissions ||
+    can_view_other_submissions
+  end
+
+
+  # -------------------------------------------------------------
+  def order_number
+    number = 0
+    number |= 8 if can_manage_course
+    number |= 4 if can_manage_assignments
+    number |= 2 if can_grade_submissions
+    number |= 1 if can_view_other_submissions
+    number
+  end
+
+
   #~ Instance methods .........................................................
 
   private

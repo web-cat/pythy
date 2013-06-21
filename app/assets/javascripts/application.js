@@ -27,3 +27,6 @@
 //= require codemirror/modes/markdown
 //= require global
 //= require media-library
+//= require highcharts
+//= require highcharts/highcharts-more
+//= require highcharts-theme

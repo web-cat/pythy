@@ -5,3 +5,13 @@
 #assignment_description_control_group .CodeMirror {
   height: 300px;
 }
+
+.chart.grade-histogram {
+  width: 100%;
+  height: 200px;
+}
+
+table.grade-summary {
+  td:first-child { width: 67%; }
+  td:last-child { width: 33% };
+}

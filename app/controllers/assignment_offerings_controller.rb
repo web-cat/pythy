@@ -25,7 +25,7 @@ class AssignmentOfferingsController < ApplicationController
     respond_to do |format|
       format.html
       format.js
-      format.json { render json: @assignment_offering }
+      format.json #{ render json: @assignment_offering }
     end
   end
 

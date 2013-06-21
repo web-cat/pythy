@@ -29,6 +29,7 @@ gem 'twitter_bootstrap_form_for',
 gem 'font-awesome-rails'
 gem 'codemirror-rails'
 gem 'daemon'
+gem 'rabl'            # JSON generation
 
 # Gems for authentication and authorization.
 gem 'devise'

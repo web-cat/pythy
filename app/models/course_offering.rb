@@ -25,9 +25,46 @@ class CourseOffering < ActiveRecord::Base
   # this CourseOffering.
   #
   def managers
-    User.joins(:course_enrollments => :course_role).where(
+    User.joins(course_enrollments: :course_role).where(
       course_enrollments: { course_offering_id: id },
       course_roles: { can_manage_course: true })
+  end
+
+
+  # -------------------------------------------------------------
+  # Public: Gets a relation representing all Users who are students in
+  # this CourseOffering.
+  #
+  # Returns a relation representing all users who are students in this
+  # CourseOffering.
+  #
+  def students
+    User.joins(course_enrollments: :course_role).where(
+      course_enrollments: {
+        course_offering_id: id,
+        course_role_id: CourseRole.student
+      })
+  end
+
+
+  # -------------------------------------------------------------
+  def users_sorted_by_role(options = {})
+    result = course_enrollments.sort do |a, b|
+      aon = a.course_role.order_number
+      bon = b.course_role.order_number
+
+      if aon != bon
+        aon <=> bon
+      else
+        a.user.full_name <=> b.user.full_name
+      end
+    end
+
+    if options[:reversed]
+      result.map(&:user).reverse
+    else
+      result.map(&:user)
+    end
   end
 
 

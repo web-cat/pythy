@@ -92,7 +92,15 @@ class AssignmentOffering < ActiveRecord::Base
   end
 
 
-# -------------------------------------------------------------
+  # -------------------------------------------------------------
+  def assignment_repositories_without_staff
+    assignment_repositories.reject do |repo|
+      repo.assignment_offering.course_offering.role_for_user(repo.user).staff?
+    end
+  end
+
+
+  # -------------------------------------------------------------
   # Can't be private.
   def to_csv_internal(csv, options={})
     header = options[:header]

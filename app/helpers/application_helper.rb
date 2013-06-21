@@ -404,4 +404,10 @@ HTML
     end
   end
 
+
+  # -------------------------------------------------------------
+  def chart_placeholder_tag(classname, options=nil)
+    content_tag :div, nil, class: "chart #{classname}", data: options
+  end
+
 end

@@ -67,4 +67,5 @@
     - if can? :edit, @assignment
       #grades.tab-pane
         - if can? :manage, @assignment
-          = render partial: 'grades'
+          - @assignment_offerings.each do |ao|
+            = render partial: 'assignment_offerings/grades', locals: { assignment_offering: ao, visible: true }

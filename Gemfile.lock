@@ -182,6 +182,8 @@ GEM
     pyu-ruby-sasl (0.0.3.3)
     quiet_assets (1.0.2)
       railties (>= 3.1, < 5.0)
+    rabl (0.8.5)
+      activesupport (>= 2.3.14)
     rack (1.4.5)
     rack-cache (1.2)
       rack (>= 0.4)
@@ -317,6 +319,7 @@ DEPENDENCIES
   omniauth-facebook
   omniauth-ldap!
   quiet_assets
+  rabl
   rails (= 3.2.11)
   rails_admin
   redcarpet
