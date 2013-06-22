@@ -12,12 +12,12 @@ class MediaController < ApplicationController
   # -------------------------------------------------------------
   def index
     @user = requesting_user
-    assignment_id = params[:assignment]
+    #assignment_id = params[:assignment]
     type = type_pattern_to_query(params[:type])
 
-    @assignment = Assignment.find_by_id(assignment_id)
+    #@assignment = Assignment.find_by_id(assignment_id)
 
-    authorize! :read, @user
+    authorize! :show, @user
     #authorize! :read, @assignment if @assignment
 
     if @user
@@ -26,18 +26,18 @@ class MediaController < ApplicationController
       @user_media = MediaItem.where('0 = 1')
     end
 
-    if assignment_id
-      @assignment_media = MediaItem.where(assignment_id: assignment_id)
-    else
-      @assignment_media = MediaItem.where('0 = 1')
-    end
+    #if assignment_id
+    #  @assignment_media = MediaItem.where(assignment_id: assignment_id)
+    #else
+    #  @assignment_media = MediaItem.where('0 = 1')
+    #end
 
     if type
       @user_media = @user_media.where('content_type like ?', type)
-      @assignment_media = @assignment_media.where('content_type like ?', type)
+    #  @assignment_media = @assignment_media.where('content_type like ?', type)
     end
 
-    @media = { user: @user_media, assignment: @assignment_media }
+    @media = { user: @user_media } #, assignment: @assignment_media }
 
     respond_to do |format|
       format.html
@@ -57,18 +57,18 @@ class MediaController < ApplicationController
     files = params[:files]
 
     @user = requesting_user
-    assignment_id = params[:assignment]
+    #assignment_id = params[:assignment]
 
     media_items = {
       uploaded: [],
       errors: []
     }
 
-    if @user || assignment_id
+    if @user #|| assignment_id
       files.each do |file|
         media_item = MediaItem.create(
           user_id: @user ? @user.id : nil,
-          assignment_id: assignment_id,
+          #assignment_id: assignment_id,
           file: file)
         
         if media_item.save
@@ -111,8 +111,8 @@ class MediaController < ApplicationController
     user = requesting_user
     if user
       @upload_url = "/media/user/#{user.id}"
-    elsif params[:assignment]
-      @upload_url = "/media/assignment/#{params[:assignment]}"
+    #elsif params[:assignment]
+    #  @upload_url = "/media/assignment/#{params[:assignment]}"
     end
   end
 

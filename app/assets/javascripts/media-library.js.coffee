@@ -67,13 +67,13 @@ class MediaLibrary
       list = $('#media-area')
       list.empty()
 
-      if data.assignment.length > 0
-        section = $('<div id="media-section-assignment">').addClass('media-section').appendTo(list)
-        $('<div>').addClass('section-title').text('Media for this assignment').appendTo(section)
-        thumbs = $('<ul>').addClass('media-list').appendTo(section)
+      # if data.assignment.length > 0
+      #   section = $('<div id="media-section-assignment">').addClass('media-section').appendTo(list)
+      #   $('<div>').addClass('section-title').text('Media for this assignment').appendTo(section)
+      #   thumbs = $('<ul>').addClass('media-list').appendTo(section)
 
-        for item in data.assignment
-          this._createThumbnail(item).appendTo(thumbs)
+      #   for item in data.assignment
+      #     this._createThumbnail(item).appendTo(thumbs)
 
       if data.user.length > 0
         section = $('<div id="media-section-user">').addClass('media-section').appendTo(list)

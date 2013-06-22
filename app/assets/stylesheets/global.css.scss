@@ -34,35 +34,61 @@ body {
   padding-bottom: 40px;
 }
 
-body.code {
-  padding-bottom: 0;
-}
-
 body.setup {
   padding-top: 60px;
 }
 
 body.landing {
   padding-top: 0;
+}
 
-  .jumbo-title {
-    padding: 50px 0;
-    margin-bottom: 20px;
-    background-image: url(/assets/landing-header-bg.png);
-    background-color: black;
-    background-repeat: no-repeat;
+.jumbo-title {
+  color: white;
 
-    h1 {
-      color: white;
-      font-size: 72px;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  padding: 50px 0;
+  margin-bottom: 20px;
+  background-image: url(/assets/landing-header-bg.png);
+  background-color: black;
+  background-repeat: no-repeat;
 
-      small {
-        color: #ccc;
-        font-weight: 300;
-        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
-      }
+  h1 {
+    font-size: 72px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+
+    small {
+      color: #ccc;
+      font-weight: 300;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
     }
+  }
+
+  p.lead {
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1.25;
+    margin-top: 10px;
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .jumbo-title {
+    padding: 25px 20px;
+    margin-left: -20px;
+    margin-right: -20px;
+  }
+
+  #flashbar {
+    margin-left: -20px;
+    margin-right: -20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .jumbo-title {
+    h1 { font-size: 40px; line-height: 28px; }
+    p.lead { font-size: 16px; }
   }
 }
 
@@ -71,9 +97,9 @@ body.landing {
   filter: alpha(opacity=30);
 }
 
-.navbar-fixed-top .container {
-  padding: 0;
-}
+//.navbar-fixed-top .container {
+//  padding: 0;
+//}
 
 form.form-bordered {
   border: 1px solid #e0e0e0;
@@ -119,7 +145,7 @@ form.form-bordered {
     color: rgb(232, 255, 216);
     font-weight: 600;
     font-size: 24px;
-    padding: 8px 20px 8px 0;
+    padding: 8px 20px 8px 20px;
   }
 
   .navbar-inner {
@@ -378,6 +404,17 @@ h1.slim, h2.slim, h3.slim, h4.slim, h5.slim, h6.slim {
 h3.btn-line-height {
   line-height: 30px;
   margin-bottom: 4px;
+}
+
+.btn-header-container {
+  margin: 10px 0;
+}
+
+span.btn-aligned {
+  line-height: 30px;
+  margin-right: 6px;
+  vertical-align: middle;
+  display: inline-block;
 }
 
 a[data-toggle='collapse'] i.icon-chevron-right {

@@ -56,7 +56,9 @@ $ ->
   # -------------------------------------------------------------
   # Make the close button dismiss (by sliding up) flash divs.
   $('.close[data-dismiss="flash"]').click ->
-    $(this).closest('.flash').animate height: 0, -> $(this).remove()
+    $(this).closest('.flash').animate height: 0, ->
+      $(this).trigger 'hidden'
+      $(this).remove()
 
 
   # -------------------------------------------------------------

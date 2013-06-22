@@ -1,13 +1,8 @@
 .container
   .row
     .span6
-      %h2
-        Already signed up?
-        %small Sign in below.
+      %h2.page-header Already have an account?
       = render partial: 'sessions/sign_in'
-
     .span6
-      %h2
-        New user?
-        %small Create your account below.
+      %h2.page-header New user?
       = render partial: 'registrations/new'

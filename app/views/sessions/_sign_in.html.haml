@@ -1,7 +1,7 @@
-= twitter_bootstrap_form_for(resource, as: resource_name, url: session_path(resource), html: { class: 'form-horizontal form-bordered' }) do |f|
+= twitter_bootstrap_form_for(resource, as: resource_name, url: session_path(resource), html: { class: 'form-horizontal' }) do |f|
   %fieldset
-    = f.email_field :email
-    = f.password_field :password do
+    = f.email_field :email, class: 'input-medium'
+    = f.password_field :password, class: 'input-medium' do
       %span.help-block
         Forgot your password?
         = link_to 'Click here to reset it.', new_password_path(resource_name)

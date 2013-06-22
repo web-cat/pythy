@@ -2,13 +2,16 @@
   .row-fluid
     .span8
       .clearfix
-        %h3.slim.pull-left
+        %h3.slim
           = succeed ':' do
             = @repository.assignment_offering.assignment.short_name
           = @repository.assignment_offering.assignment.long_name
           %small
             = surround '(', ')' do
               = @repository.assignment_offering.assignment.course.number
+
+            - if @repository.user != current_user
+              %span.label.label-warning= @repository.user.display_name
 
       = raw @repository.assignment_offering.assignment.brief_summary_html
 

@@ -24,14 +24,15 @@ class CodeController < FriendlyUrlController
     if @repository.is_a? AssignmentRepository
       a = @repository.assignment_offering.assignment
       @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
-      @summary = a.brief_summary_html(link: assignment_path(a))
     elsif @repository.is_a? AssignmentReferenceRepository
       a = @repository.assignment
       @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
-      @summary = a.brief_summary_html(link: assignment_path(a))
     elsif @repository.is_a? ExampleRepository
       @page_title = "#{@repository.course_offering.course.number} &ndash; Example: #{@repository.name}"
-      @summary = @repository.description
+    end
+
+    if @repository.warn_if_not_owner? && @repository.user != current_user
+      flash[:alert] = "You are viewing a repository that belongs to #{@repository.user.display_name}."
     end
   end
 
@@ -286,55 +287,92 @@ class CodeController < FriendlyUrlController
 
 
   # -------------------------------------------------------------
-  def find_repository
-    parts = @rest ? @rest.split('/') : []
+  def find_example_repository_from_path_parts(parts)
+    id = parts.second
+    @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
 
-    if parts.first == 'example'
-      id = parts.second
+    @repository = ExampleRepository.find_by_id(id)
+  end
+
+
+  # -------------------------------------------------------------
+  def find_assignment_repository_from_path_parts(parts)
+    if @term
+      # It's a student trying to access their personal repository
+      # for an assignment.
+
+      url_part = parts.second
       @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
 
-      @repository = ExampleRepository.find_by_id(id)
-    elsif parts.first == 'assignments'
-      if @term
-        # It's a student trying to access their personal repository
-        # for an assignment.
+      assignment = AssignmentOffering.joins(:assignment).where(
+        assignments: { url_part: url_part },
+        course_offering_id: @offerings.first.id).first
 
-        url_part = parts.second
-        @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
+      relation = AssignmentRepository.where(
+        user_id: current_user.id,
+        assignment_offering_id: assignment.id)
 
-        assignment = AssignmentOffering.joins(:assignment).where(
-          assignments: { url_part: url_part },
-          course_offering_id: @offerings.first.id).first
+      # Create the repository if it doesn't exist.
+      # TODO improve permission checks
+      @repository = relation.first || relation.create
+    else
+      # It's an instructor trying to access the reference repository
+      # for an assignment.
 
-        relation = AssignmentRepository.where(
-          user_id: current_user.id,
-          assignment_offering_id: assignment.id)
+      url_part = parts.second
+      @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
+
+      assignment = Assignment.where(url_part: url_part).first
+
+      if assignment
+        relation = AssignmentReferenceRepository.where(
+          assignment_id: assignment.id)
 
         # Create the repository if it doesn't exist.
         # TODO improve permission checks
-        @repository = relation.first || relation.create
-      else
-        # It's an instructor trying to access the reference repository
-        # for an assignment.
+        @repository = relation.first
 
-        url_part = parts.second
-        @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
-
-        assignment = Assignment.where(url_part: url_part).first
-
-        if assignment
-          relation = AssignmentReferenceRepository.where(
-            assignment_id: assignment.id)
-
-          # Create the repository if it doesn't exist.
-          # TODO improve permission checks
-          @repository = relation.first
-
-          if @repository.nil? && can?(:edit, assignment)
-            @repository = relation.create(user_id: current_user.id)
-          end
+        if @repository.nil? && can?(:edit, assignment)
+          @repository = relation.create(user_id: current_user.id)
         end
       end
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def find_student_repository_from_path_parts(parts)
+    # Course staff trying to access another student's repository for
+    # an assignment.
+
+    user_id = parts.shift.to_i
+    url_part = parts.shift
+    @filename = parts.length > 0 ? File.join(parts) : DEFAULT_FILE
+
+    assignment = AssignmentOffering.joins(:assignment).where(
+      assignments: { url_part: url_part },
+      course_offering_id: @offerings.first.id).first
+
+    relation = AssignmentRepository.where(
+      user_id: user_id,
+      assignment_offering_id: assignment.id)
+
+    # TODO improve permission checks
+    @repository = relation.first
+  end
+
+
+  # -------------------------------------------------------------
+  def find_repository
+    parts = @rest ? @rest.split('/') : []
+
+    case parts.first
+    when 'example'
+      find_example_repository_from_path_parts(parts)
+    when 'assignments'
+      find_assignment_repository_from_path_parts(parts)
+    else
+      find_student_repository_from_path_parts(parts)
     end
 
     # Prevent access to dot-files.
@@ -345,31 +383,17 @@ class CodeController < FriendlyUrlController
       return
     end
 
-    # If the path goes to a directory, make sure to append the default file
-    # name instead.
-    @repository.read do
-      path = File.join(@repository.git_path, @filename)
-      if File.directory?(path)
-        @filename = File.join(@filename, DEFAULT_FILE)
-      end
-    end
-
-    # Make sure the user has access to read the repository, or raise a
-    # not-found exception if it wasn't found.
     if @repository
+      # Make sure the user has access to read the repository, or raise a
+      # not-found exception if it wasn't found.
       authorize! :read, @repository
 
+      # If the path goes to a directory, make sure to append the default file
+      # name instead.
       @repository.read do |git|
-        begin
-          @commits = git.gblob(@filename).log(nil).to_a
-        rescue
-          # If the above fails, it's because the repo doesn't have a
-          # HEAD yet (most likely) or it's busted (hopefully not).
-          #
-          # TODO: We should probably make sure every repository has
-          # a HEAD when it's created, by committing a default
-          # .gitignore file or something similar.
-          @commits = []
+        path = File.join(@repository.git_path, @filename)
+        if File.directory?(path)
+          @filename = File.join(@filename, DEFAULT_FILE)
         end
       end
     else

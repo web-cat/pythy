@@ -44,6 +44,14 @@ class Assignment < ActiveRecord::Base
   end
 
 
+  # -------------------------------------------------------------
+  def can_view_submissions_for_any_offering?(user)
+    assignment_offerings.any? do |ao|
+      ao.course_offering.role_for_user(user).can_view_other_submissions?
+    end
+  end
+
+
   private
 
   # -------------------------------------------------------------

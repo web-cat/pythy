@@ -25,7 +25,7 @@
   .assignment_summary
     = raw @summary
 
-  - if can? :edit, @assignment
+  - if @assignment.can_view_submissions_for_any_offering?(current_user)
     %ul.nav.nav-tabs
       = tab_tag :description, 'Description', active: true
       = tab_tag :grades, 'Grades'
@@ -64,8 +64,7 @@
         .row
           .span8
             = raw @description
-    - if can? :edit, @assignment
+    - if @assignment.can_view_submissions_for_any_offering?(current_user)
       #grades.tab-pane
-        - if can? :manage, @assignment
-          - @assignment_offerings.each do |ao|
-            = render partial: 'assignment_offerings/grades', locals: { assignment_offering: ao, visible: true }
+        - @assignment_offerings.each do |ao|
+          = render partial: 'assignment_offerings/grades', locals: { assignment_offering: ao, visible: true }

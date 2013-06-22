@@ -2,58 +2,15 @@
 // They will automatically be included in application.css.
 // You can use Sass (SCSS) here: http://sass-lang.com/
 
-.assignment {
-  text-align: left;
-
-  .assignment-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 3px;
-  }
-  .subtext {
-    font-size: 12px;
-    line-height: 15px;
-    font-weight: 600;
-    color: #888;
-  }
-  .score-container {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    bottom: 4px;
-    width: 50px;
-    font-size: 12px;
-
-    .score {
-      font-size: 24px;
-      font-weight: 600;
-    }
-  }
+body.home {
+  padding-top: 38px;
 }
 
-// .hang-tag {
-//   position: absolute;
-//   right: -13px;
-//   top: 6px;
-//   background-image: url(../assets/curl.png);
-//   background-repeat: no-repeat;
-//   background-attachment: scroll;
-//   background-position: right top;
-//   height: 42px;
-
-//   & > span {
-//     display: block;
-//     background-color: rgb(30, 163, 255);
-//     height: 24px;
-//     font-size: 12px;
-//     color: white;
-//     text-shadow: 0 1px 1px #555;
-//     font-weight: 600;
-//     padding: 6px 4px 0 10px;
-//     margin-right: 12px;
-//     border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-//   }
-// }
+@media (max-width: 979px) {
+  body.home {
+    padding-top: 0;
+  }
+}
 
 $assignment-tile-height: 80px;
 $assignment-title-height: 45px;
@@ -79,7 +36,7 @@ $assignment-score-width: 64px;
   top: 0;
   right: 0;
   bottom: 0;
-  -webkit-transition: opacity 0.05s;
+  cursor: pointer;
 }
 
 .assignment-tile.front {
@@ -106,7 +63,7 @@ $assignment-score-width: 64px;
     top: $assignment-title-height;
     height: $assignment-options-height;
     line-height: $assignment-options-height;
-    background-color: #f8f8f8;
+    background-color: #f4f4f8;
     border-top: 1px solid #ddd;
     vertical-align: middle;
     color: #666;
@@ -127,7 +84,7 @@ $assignment-score-width: 64px;
   width: $assignment-score-width;
   height: $assignment-options-height;
   line-height: $assignment-options-height;
-  background-color: #f8f8f8;
+  background-color: #f4f4f8;
   border-top: 1px solid #ddd;
   vertical-align: middle;
   color: #222;
@@ -163,7 +120,7 @@ $assignment-score-width: 64px;
   top: $assignment-title-height;
   height: $assignment-options-height;
   line-height: $assignment-options-height;
-  background-color: #f8f8f8;
+  background-color: #f4f4f8;
   border-top: 1px solid #ddd;
   vertical-align: middle;
   color: #222;
@@ -176,8 +133,8 @@ $assignment-score-width: 64px;
     text-align: center;
     padding: 0 8px;
 
-    &:first-child { border-left-color: #f8f8f8; }
-    &:last-child { border-right-color: #f8f8f8; }
+    &:first-child { border-left-color: #f4f4f8; }
+    &:last-child { border-right-color: #f4f4f8; }
     &:hover {
       background-color: rgb(30, 168, 255);
       text-decoration: none;

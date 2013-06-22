@@ -368,6 +368,21 @@ class Repository < ActiveRecord::Base
   end
 
 
+  # -------------------------------------------------------------
+  # Public: Gets a Boolean value indicating whether or not the code view should
+  # display a warning banner if this repository is being viewed by a user who
+  # did not create it. The default value is false; subclasses should override
+  # this method if they can be checked.
+  #
+  # user - the User
+  #  
+  # Returns true if the code view should display a warning, false if not.
+  #
+  def warn_if_not_owner?
+    false
+  end
+
+
   private
 
   # -------------------------------------------------------------

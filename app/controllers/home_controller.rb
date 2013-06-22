@@ -1,5 +1,6 @@
 class HomeController < FriendlyUrlController
 
+  layout 'no_container'
   before_filter :authenticate_user!
 
   # -------------------------------------------------------------
@@ -13,14 +14,14 @@ class HomeController < FriendlyUrlController
       # FIXME This isn't right, but I'm not sure yet how to ask Cancan whether
       # the current ability can create new assignment offerings for a course
       # offering.
-      instructor = @offerings.first.role_for_user(
-        current_user).try(:can_manage_assignments?)
+      staff = @offerings.first.role_for_user(
+        current_user).staff?
 
       @offerings.each do |offering|
         @examples |= offering.example_repositories.where(
           source_repository_id: nil)
 
-        if instructor
+        if staff
           assignments = offering.assignment_offerings
           @assignments |= assignments.map { |ao| ao.assignment }
         else
@@ -45,11 +46,21 @@ class HomeController < FriendlyUrlController
       @examples.sort! { |a, b| b.created_at <=> a.created_at }
       @assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
       @started_assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
-      @not_started_assignments.sort! { |a, b| b.effectively_due_at <=> a.effectively_due_at }
+      @not_started_assignments.sort! { |a, b|
+        if a.effectively_due_at.nil? && b.effectively_due_at.nil?
+          0
+        elsif b.effectively_due_at.nil?
+          1
+        elsif a.effectively_due_at.nil?
+          -1
+        else
+          b.effectively_due_at <=> a.effectively_due_at
+        end
+      }
 
       respond_to do |format|
         format.html do
-          render instructor ? 'index_instructor' : 'index'
+          render staff ? 'index_staff' : 'index'
         end
       end
     else

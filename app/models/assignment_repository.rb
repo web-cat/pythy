@@ -65,6 +65,12 @@ class AssignmentRepository < Repository
 
 
   # -------------------------------------------------------------
+  def warn_if_not_owner?
+    true
+  end
+
+
+  # -------------------------------------------------------------
   def changed_since_last_check?
     most_recent = assignment_checks.most_recent
 

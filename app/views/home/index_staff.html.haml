@@ -1,0 +1,66 @@
+.jumbo-title
+  .container
+    .row
+      .span8
+        %h1.slim
+          = @course.number
+        %p.lead
+          = @course.name
+      .span4
+        .pull-right
+          %span.btn-aligned Viewing:
+          .btn-group
+            %a.btn.btn-inverse.dropdown-toggle{ href: '#', data: { toggle: 'dropdown' }}
+              - if params[:crn]
+                = "#{@offerings.first.crn} (#{@offerings.first.label})"
+              - else
+                = "All #{@offerings.first.term.display_name} offerings"
+              %span.caret
+            %ul.dropdown-menu.pull-right
+              %li
+                = link_to "All #{@offerings.first.term.display_name} offerings", home_path(@course, term: @offerings.first.term)
+              %li.divider
+              %li.nav-header
+                = "#{@offerings.first.term.display_name} Offerings"
+              - @offerings.each do |co|
+                %li
+                  = link_to "#{co.crn} (#{co.label})", home_path(co)
+
+          - if can? :edit, @offerings.first
+            - if params[:crn]
+              = link_to icon_tag('cog'), course_offering_path(@offerings.first), class: 'btn btn-inverse', title: 'Manage this course offering', rel: 'tooltip'
+            - elsif
+              = link_to icon_tag('cog'), course_path(@offerings.first.course), class: 'btn btn-inverse', title: 'Manage this course', rel: 'tooltip'
+
+      / %small
+      /   = @offerings.first.term.display_name
+      /   = surround '(', ')' do
+      /     = raw @offerings.map { |o| link_to_if(o.crn.to_s != params[:crn], o.crn, home_path(o)) }.join(', ')
+      /   - if @offerings.count == 1 && can?(:edit, @offerings.first)
+      /     = link_to 'Manage', course_offering_path(@offerings.first)
+      /   - elsif @offerings.count > 1
+      /     = link_to 'Manage', course_path(@offerings.first.course)
+
+.container
+  .row
+    .span7
+      .btn-header-container.clearfix
+        %h3.pull-left.slim.btn-line-height Assignments
+        - if @offerings.any? { |o| o.role_for_user(current_user).can_manage_assignments? }
+          .pull-right
+            = link_to icon_tag('plus') + ' New...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn', remote: true
+
+      #assignments
+        = render(partial: 'home/instructor_assignment', collection: @assignments) || render(partial: 'home/no_assignments')
+
+
+    .span5
+      .btn-header-container.clearfix
+        %h3.pull-left.slim.btn-line-height Instructor Examples
+        - if @offerings.any? { |o| o.role_for_user(current_user).can_manage_assignments? }
+          .pull-right
+            = link_to icon_tag('plus') + ' New...', new_course_offering_example_repository_path(@offerings.first), class: 'btn', remote: true
+
+      %table.examples
+        %tbody#example_repositories
+          = render(@examples) || render(partial: 'example_repositories/empty')

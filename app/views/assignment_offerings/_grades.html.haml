@@ -27,7 +27,7 @@
             %td.has_gravatar
               = gravatar_tag(user, 28)
               - if repository
-                = link_to user.display_name, repository
+                = link_to user.display_name, staff_code_url(repository)
               - else
                 = user.display_name
               

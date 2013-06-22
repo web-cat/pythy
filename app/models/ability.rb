@@ -209,6 +209,13 @@ class Ability
     # that they can manage.
     # TODO probably make it so that only the creator can manage but other
     # instructors can edit
+    can :read, AssignmentReferenceRepository do |repository|
+      repository.assignment.assignment_offerings.any? do |ao|
+        role = ao.course_offering.role_for_user(user)
+        role.can_view_other_submissions?
+      end
+    end
+
     can :manage, AssignmentReferenceRepository do |repository|
       can? :manage, repository.assignment
     end

@@ -13,9 +13,6 @@ class CodeController
       matchBrackets: true,
       extraKeys: { Tab: (cm) -> cm.replaceSelection('  ', 'end') }
 
-    #$(window).resize => this._updateCodeSize()
-    #this._updateCodeSize()
-
     # Highlight the line the cursor is currently on (and kill the
     # highlighting when the editor doesn't have the focus).
     @codeArea.on 'cursorActivity', =>
@@ -34,13 +31,6 @@ class CodeController
 
     @console = new InteractiveConsole()
 
-    # $('html').click (e) =>
-    #   this.toggleSidebar('close')
-    #   @console.toggleConsole('close')
-
-    # $('#sidebar').click (e) => e.stopPropagation()
-    # $('#console').click (e) => e.stopPropagation()
-
     this._initializeSkulpt()
 
     $('#check').data('loading-text', '<i class="icon-spinner icon-spin"></i>')
@@ -51,7 +41,6 @@ class CodeController
     $('#check').click (e) => this._checkCode()
     $('#start-over').click (e) => this._startOver()
     $('#media').click (e) => this._openMediaLibrary()
-    $('#sidebar-toggle').click this.toggleSidebar
     $(window).hashchange => this._hashChange()
 
     window.setInterval (=> this._updateHistoryTimestamps()), 1000
@@ -263,21 +252,6 @@ class CodeController
     @ignoreNextHashChange = true
     window.location.hash = ''
     this._updateHistorySelection()
-
-
-  # ---------------------------------------------------------------
-  toggleSidebar: (action) ->
-    sidebar = $('#sidebar')
-    left = parseInt(sidebar.css('marginLeft'), 10)
-
-    newLeft = if action == 'open'
-        0
-      else if action == 'close'
-        sidebar.outerWidth()
-      else
-        if left == 0 then sidebar.outerWidth() else 0
-
-    sidebar.animate marginLeft: newLeft, 100
 
 
   # ---------------------------------------------------------------
@@ -636,3 +610,12 @@ class InteractiveConsole
 # Export
 window.CodeController = CodeController
 window.InteractiveConsole = InteractiveConsole
+
+$ ->
+  adjustCodeTop = ->
+    codeTop = $('#flashbar').height() + 38
+    $('#code-area').css 'top', "#{codeTop}px"
+    $('#action-bar').css 'top', "#{codeTop}px"
+
+  $('#flashbar .flash').on 'hidden', adjustCodeTop
+  adjustCodeTop()
