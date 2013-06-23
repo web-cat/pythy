@@ -16,7 +16,7 @@ class CourseOfferingsController < ApplicationController
 
     respond_to do |format|
       format.html # index.html.erb
-      format.json { render :json => @course_offerings }
+      format.json { render json: @course_offerings }
     end
   end
 
@@ -30,7 +30,7 @@ class CourseOfferingsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.js
-      format.json { render :json => @course_offering }
+      format.json { render json: @course_offering }
     end
   end
 
@@ -41,7 +41,7 @@ class CourseOfferingsController < ApplicationController
   def new
     respond_to do |format|
       format.html # new.html.erb
-      format.json { render :json => @course_offering }
+      format.json { render json: @course_offering }
     end
   end
 
@@ -56,13 +56,17 @@ class CourseOfferingsController < ApplicationController
   # POST /course_offerings
   # POST /course_offerings.json
   def create
+    @course_offering.course_enrollments.build(
+      user_id: current_user.id,
+      course_role_id: CourseRole.lead_instructor.id)
+
     respond_to do |format|
       if @course_offering.save
-        format.html { redirect_to @course_offering, :notice => 'Course offering was successfully created.' }
-        format.json { render :json => @course_offering, :status => :created, :location => @course_offering }
+        format.html { redirect_to @course_offering, notice: 'Course offering was successfully created.' }
+        format.json { render json: @course_offering, status: :created, location: @course_offering }
       else
-        format.html { render :action => "new" }
-        format.json { render :json => @course_offering.errors, :status => :unprocessable_entity }
+        format.html { render action: 'new' }
+        format.json { render json: @course_offering.errors, status: :unprocessable_entity }
       end
     end
   end
@@ -76,11 +80,11 @@ class CourseOfferingsController < ApplicationController
 
     respond_to do |format|
       if @course_offering.update_attributes(params[:course_offering])
-        format.html { redirect_to @course_offering, :notice => 'Course offering was successfully updated.' }
+        format.html { redirect_to @course_offering, notice: 'Course offering was successfully updated.' }
         format.json { head :no_content }
       else
-        format.html { render :action => "edit" }
-        format.json { render :json => @course_offering.errors, :status => :unprocessable_entity }
+        format.html { render action: 'edit' }
+        format.json { render json: @course_offering.errors, status: :unprocessable_entity }
       end
     end
   end
@@ -93,7 +97,7 @@ class CourseOfferingsController < ApplicationController
     @course_offering.destroy
 
     respond_to do |format|
-      format.html { redirect_to course_offerings_url(@course_offering.course) }
+      format.html { redirect_to course_course_offerings_url(@course_offering.course) }
       format.json { head :no_content }
     end
   end
