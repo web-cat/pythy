@@ -13,13 +13,13 @@
 //= require jquery
 //= require jquery_ujs
 //= require jquery.remotipart
-//= require jquery/jqueryui/jquery-ui-1.10.2.custom.min
 //= require twitter/bootstrap/bootstrap
 //= require cowboy/jquery-hashchange/jquery.ba-hashchange.min
 //= require morr/jquery-appear/jquery.appear
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
 //= require smalot/bootstrap-datetimepicker/bootstrap-datetimepicker
 //= require jherdman/javascript-relative-time-helpers/date.extensions
+//= require silviomoreto/bootstrap-select/bootstrap-select.min
 //= require jquery-fileupload/basic
 //= require codemirror
 //= require codemirror/addons/edit/matchbrackets

@@ -1,5 +1,9 @@
 $ ->
   # -------------------------------------------------------------
+  # Convert all select tags to Bootstrap dropdowns.
+  $('select').selectpicker()
+
+  # -------------------------------------------------------------
   # Enable tooltips.
   $('[rel=tooltip]').tooltip
     placement: 'bottom',
