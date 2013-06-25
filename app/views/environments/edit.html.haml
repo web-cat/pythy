@@ -1,0 +1,9 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Environments', environments_path
+    %span.divider /
+  %li.active
+    = @environment.name
+    (editing)
+
+= render 'form'

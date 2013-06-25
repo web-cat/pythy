@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20130623191637) do
+ActiveRecord::Schema.define(:version => 20130625202241) do
 
   create_table "activity_logs", :force => true do |t|
     t.integer  "user_id"
@@ -109,10 +109,18 @@ ActiveRecord::Schema.define(:version => 20130623191637) do
   create_table "courses", :force => true do |t|
     t.string   "name"
     t.string   "number"
-    t.datetime "created_at",      :null => false
-    t.datetime "updated_at",      :null => false
+    t.datetime "created_at",             :null => false
+    t.datetime "updated_at",             :null => false
     t.integer  "organization_id"
     t.string   "url_part"
+    t.integer  "default_environment_id"
+  end
+
+  create_table "environments", :force => true do |t|
+    t.string   "name"
+    t.text     "preamble"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   create_table "global_roles", :force => true do |t|
@@ -170,6 +178,7 @@ ActiveRecord::Schema.define(:version => 20130623191637) do
     t.integer  "course_offering_id"
     t.integer  "assignment_id"
     t.integer  "source_repository_id"
+    t.integer  "environment_id"
   end
 
   create_table "system_configurations", :force => true do |t|

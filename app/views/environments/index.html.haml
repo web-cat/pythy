@@ -1,0 +1,18 @@
+%ul.breadcrumb
+  %li.active
+    Environments
+  %li.pull-right
+    = link_to 'New...', new_environment_path
+
+%table.table.table-striped.table-bordered
+  %thead
+    %tr
+      %th Name
+      %th= icon_tag('cog')
+  %tbody
+    - @environments.each do |environment|
+      %tr
+        %td= link_to environment.name, environment
+        %td
+          = link_to icon_tag('pencil'), edit_environment_path(environment)
+          = link_to_destroy environment

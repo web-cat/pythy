@@ -200,6 +200,7 @@ module HomeHelper
     can?(:manage, Term) ||
     can?(:manage, GlobalRole) ||
     can?(:manage, CourseRole) ||
+    can?(:manage, Environment) ||
     can?(:manage, SystemConfiguration)
   end
 

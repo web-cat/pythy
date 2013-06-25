@@ -45,6 +45,7 @@
               %li.divider
               = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
               = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
+              = menu_link_to_if can?(:manage, Environment), icon_tag('globe') + ' Environments', environments_path                
               = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
         - if current_user
           %li.dropdown.nav-user

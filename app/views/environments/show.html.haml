@@ -1,0 +1,16 @@
+%ul.breadcrumb
+  %li
+    = link_to 'Environments', environments_path
+    %span.divider /
+  %li.active
+    = @environment.name
+  %li.pull-right
+    = link_to edit_environment_path(@environment) do
+      %i.icon-pencil
+      Edit...
+
+%h2
+  = @environment.name
+
+- # FIXME make this more attractive
+%pre= @environment.preamble

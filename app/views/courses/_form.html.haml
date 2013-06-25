@@ -10,5 +10,7 @@
     %span.help-block
       The full course title (for example, "Introduction to Python").
 
+  = f.collection_select :default_environment_id, 'Default environment', Environment.all, :id, :name, prompt: '(none)'
+
   = f.actions do
     = f.submit

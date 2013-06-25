@@ -12,6 +12,12 @@ class AssignmentReferenceRepository < Repository
 
 
   # -------------------------------------------------------------
+  def environment
+    read_attribute(:environment) || assignment.course.default_environment
+  end
+
+
+  # -------------------------------------------------------------
   # Public: Gets the path to the root of the repository's storage area.
   #
   def git_path

@@ -4,6 +4,9 @@ include ApplicationHelper   # Brings in needs_initial_setup?
 
 Pythy::Application.routes.draw do
 
+  resources :environments
+
+
   mount RailsAdmin::Engine => 'rails_admin'
   mount Sidekiq::Web, at: '/sidekiq'
 

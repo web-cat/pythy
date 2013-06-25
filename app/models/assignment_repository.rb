@@ -7,6 +7,13 @@ class AssignmentRepository < Repository
 
 
   # -------------------------------------------------------------
+  def environment
+    read_attribute(:environment) ||
+      assignment_offering.course_offering.course.default_environment
+  end
+
+
+  # -------------------------------------------------------------
   # Public: Gets the path to the root of the repository's storage area. This
   # folder has two subfolders: 'code', which is the location of the actual
   # Git repository holding the student's code (that is, .../code/.git), and

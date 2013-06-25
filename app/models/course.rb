@@ -6,15 +6,17 @@ class Course < ActiveRecord::Base
   
   # Relationships
   belongs_to  :organization
+  belongs_to  :default_environment, class_name: 'Environment'
   has_many    :course_offerings
   has_many    :assignments
 
-  attr_accessible :organization_id, :name, :number
+  attr_accessible :organization_id, :name, :number, :default_environment_id
 
   before_validation :set_url_part
 
   validates :number, presence: true
   validates :name, presence: true
+  validates :default_environment, presence: true
   validates :url_part,
     presence: true,
     uniqueness: { case_sensitive: false }

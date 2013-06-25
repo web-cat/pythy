@@ -10,8 +10,15 @@ class ExampleRepository < Repository
 
   validates :name, presence: true
   validates :course_offering_id, presence: true
+  validates :environment, presence: true
 
   after_create :create_git_repo
+
+
+  # -------------------------------------------------------------
+  def environment
+    read_attribute(:environment) || course_offering.course.default_environment
+  end
 
 
   # -------------------------------------------------------------

@@ -53,6 +53,7 @@ class Ability
     if user.global_role.can_edit_system_configuration?
       can :manage, ActivityLog
       can :manage, CourseRole
+      can :manage, Environment
       can :manage, GlobalRole
       can :manage, Organization
       can :manage, Term

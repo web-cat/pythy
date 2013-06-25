@@ -1,6 +1,7 @@
 class Repository < ActiveRecord::Base
 
   belongs_to :user
+  belongs_to :environment
 
   attr_accessible :user_id
 

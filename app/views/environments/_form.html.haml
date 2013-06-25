@@ -1,0 +1,13 @@
+= pythy_form_for @environment do |f|
+
+  = f.text_field :name do
+    %span.help-block
+      The human-readable name of the environment.
+
+  = f.text_area :preamble, rows: 5, class: 'input-xxlarge' do
+    .help-block
+      Any code required to execute before student code (for example,
+      additional import statements).
+
+  = f.actions do
+    = f.submit
