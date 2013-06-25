@@ -454,7 +454,7 @@ class CodeController
     }
 
     # Configure the media comp module's foreign function interface.
-    window.mediacompffi = {
+    window.mediaffi = {
       customizeMediaURL: (url) =>
         this._mcCustomizeMediaURL(url)
       writePictureTo: (dataURL, path, continueWith) =>
