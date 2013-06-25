@@ -1,18 +1,28 @@
 module CodeHelper
 
   # -------------------------------------------------------------
-  def user_list_item_tag(repository, user)
-    css_class = nil
+  def user_list_item_class(repository, user)
+    if user.can? :manage, repository
+      'indicator manager'
+    elsif repository.user_unsynched?(user)
+      'indicator unsynched'
+    else
+      nil
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def user_list_item_title(repository, user)
+    title = user.display_name
 
     if user.can? :manage, repository
-      css_class = 'text-success'
+      title += ' (manager)'
     elsif repository.user_unsynched?(user)
-      css_class = 'text-warning'
+      title += ' (unsynched)'
     end
 
-    content_tag :span, class: css_class do
-      yield
-    end
+    title
   end
 
 

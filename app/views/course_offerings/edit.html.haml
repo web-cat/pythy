@@ -6,7 +6,7 @@
     = link_to @course_offering.course.number, course_path(@course_offering.course)
     %span.divider /
   %li.active
-    = @course_offering.crn
+    = @course_offering.short_label
     (editing)
 
 = render 'form'

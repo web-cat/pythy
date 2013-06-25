@@ -17,8 +17,8 @@
       %tbody
         - offerings.each do |course_offering|
           %tr
-            %td= link_to course_offering.crn, course_offering
-            %td= course_offering.label
+            %td= link_to course_offering.short_label, course_offering
+            %td= course_offering.long_label
             %td
               = link_to icon_tag('pencil'), edit_course_offering_path(course_offering)
               = link_to_destroy course_offering

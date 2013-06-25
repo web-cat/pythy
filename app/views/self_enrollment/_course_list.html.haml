@@ -1,0 +1,20 @@
+- courses.each do |course, offerings|
+  %h3.slim
+    = course.number
+    %small
+      = course.name
+  %table.table.table-condensed
+    %tbody
+      - offerings.each do |offering|
+        %tr
+          %td= link_to_if link_to_offerings, offering.short_label, home_path(offering)
+          %td= offering.long_label
+          %td.text-right
+            - if offering.user_enrolled?(current_user)
+              %span.muted
+                - enrollment = offering.course_enrollments.where(user_id: current_user.id).first
+                = enrollment.course_role.name
+            - else
+              = form_tag '/self_enroll/enroll', class: 'form-basic form-inline' do
+                = hidden_field_tag :course_offering, offering.id
+                = submit_tag 'Enroll', class: 'btn btn-mini'

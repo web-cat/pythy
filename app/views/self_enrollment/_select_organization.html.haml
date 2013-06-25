@@ -1,0 +1,7 @@
+.well.well-small
+  %p Which school or organization is hosting the course?
+  = select_tag :organization, options_for_select(organizations), { id: 'self-enroll-organization', prompt: '(select an organization)', data: { width: '100%' } }
+
+  #select-term
+
+#enroll-course-list

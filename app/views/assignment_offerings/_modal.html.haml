@@ -25,7 +25,7 @@
           .help-block
             If unchecked, the assignment will only be created in the offering with CRN
             = succeed '.' do
-              %strong= @assignment_offering.course_offering.crn
+              %strong= @assignment_offering.course_offering.short_label
 
     .modal-footer
       = f.submit

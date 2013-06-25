@@ -44,6 +44,12 @@ class ApplicationController < ActionController::Base
 
 
   # -------------------------------------------------------------
+  def forbidden
+    raise CanCan::AccessDenied.new('Forbidden')
+  end
+
+
+  # -------------------------------------------------------------
   def modal_form_errors(model)
     render template: 'application/modal_form_errors', locals: { model: model }
   end

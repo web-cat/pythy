@@ -31,10 +31,7 @@
         - @assignment_offerings.each_with_index do |offering, index|
           %tr
             %td
-              = offering.course_offering.crn
-              - if offering.course_offering.label
-                = surround '(', ')' do
-                  = offering.course_offering.label
+              = offering.course_offering.full_label
               = hidden_field_tag "assignment[assignment_offerings_attributes][#{index}][id]", offering.id
             %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][opens_at]", (l(offering.opens_at) rescue nil), class: 'inline datetimepicker'
             %td= text_field_tag "assignment[assignment_offerings_attributes][#{index}][due_at]", (l(offering.due_at) rescue nil), class: 'inline datetimepicker'

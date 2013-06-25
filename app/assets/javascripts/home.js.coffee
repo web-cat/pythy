@@ -5,3 +5,22 @@
 $ ->
   $('.assignment-tile').on 'click', (e) ->
     window.location.href = $(this).attr('href')
+
+  $('body').on 'change', '#self-enroll-organization', (e) ->
+    $.get '/self_enroll/select_organization',
+      organization: $(this).val()
+
+  $('body').on 'change', '#self-enroll-term', (e) ->
+    $.get '/self_enroll/select_term',
+      organization: $('#self-enroll-organization').val(),
+      term: $(this).val()
+
+  # Subscribe to event channels if the appropriate DOM node is present.
+  if $('#example_event_channel').length
+    channel = $('#example_event_channel').val()
+    jug = window.pythy.juggernaut()
+    jug.subscribe channel, (data) ->
+      $.ajax window.location.href,
+        dataType: 'script',
+        data:
+          command: 'refresh_examples'

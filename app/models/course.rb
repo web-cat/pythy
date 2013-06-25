@@ -31,8 +31,8 @@ class Course < ActiveRecord::Base
   #~ Instance methods .........................................................
 
   # -------------------------------------------------------------
-  def offering_with_crn(crn, term)
-    course_offerings.where(crn: crn, term_id: term.id).first
+  def offering_with_short_label(short_label, term)
+    course_offerings.where(short_label: short_label, term_id: term.id).first
   end
 
 

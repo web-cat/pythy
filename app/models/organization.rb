@@ -17,8 +17,6 @@ class Organization < ActiveRecord::Base
 
   validates :display_name, presence: true
   
-  validates :domain, presence: true, uniqueness: { case_sensitive: false }
-  
   validates :url_part,
     presence: true,
     uniqueness: { case_sensitive: false }
@@ -39,6 +37,12 @@ class Organization < ActiveRecord::Base
     File.join(
       SystemConfiguration.first.storage_path,
       url_part)
+  end
+
+
+  # -------------------------------------------------------------
+  def matches_user?(user)
+    domain.blank? || user.email =~ /@#{Regex.escape(domain)}$/
   end
 
 

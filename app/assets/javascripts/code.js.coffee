@@ -1,9 +1,15 @@
 class CodeController
 
   # -------------------------------------------------------------
-  constructor: (@channel, @isEditor) ->
+  constructor: () ->
+    $codearea = $('#codearea')
+
+    @channel = $codearea.data('channel')
+    @isEditor = ($codearea.data('editor') == true)
+    @mediaKey = $codearea.data('user-media-key')
+
     # Convert the text area to a CodeMirror widget.
-    @codeArea = CodeMirror.fromTextArea $('#codearea')[0],
+    @codeArea = CodeMirror.fromTextArea $codearea[0],
       mode: { name: "python", version: 3, singleLineStringErrors: false },
       lineNumbers: true,
       gutters: ["CodeMirror-linenumbers"]
@@ -49,9 +55,6 @@ class CodeController
     $('#history .next-page').appear()
     $(document.body).on 'appear', '#history .next-page', => this._loadNextHistoryPage()
     this._loadNextHistoryPage()
-
-    window.pythy.mediaLibraryOptions =
-      mediaLinkClicked: (link) => this._insertHrefIntoCode(link)
 
     this._subscribe()
     this._updateHistorySelection(window.location.hash)
@@ -106,6 +109,12 @@ class CodeController
   # ---------------------------------------------------------------
   _isQuote: (ch) ->
     ch == '"' || ch == "'"
+
+
+  # ---------------------------------------------------------------
+  _openMediaLibrary: ->
+    window.pythy.showMediaModal
+      mediaLinkClicked: (link) => this._insertHrefIntoCode(link)
 
 
   # ---------------------------------------------------------------
@@ -175,7 +184,6 @@ class CodeController
         , 500
 
     window.onbeforeunload = (e) =>
-      #pythy.code.sendChangeRequest()
       this._sendMessage async: false, data: message: 'remove_user'
       null
 
@@ -213,11 +221,6 @@ class CodeController
       $('#check').tooltip('hide')
       $('#check').button('loading')
       this._sendMessage data: message: 'check'
-
-
-  # ---------------------------------------------------------------
-  _openMediaLibrary: ->
-    $.get('/media.js', dataType: 'script')
 
 
   # ---------------------------------------------------------------
@@ -265,17 +268,7 @@ class CodeController
 
   # ---------------------------------------------------------------
   _subscribe: ->
-    if window.location.protocol == 'https:'
-      @jug = new Juggernaut(
-        protocol: 'https', port: '8080', secure: true,
-        host: window.location.hostname)
-    else
-      @jug = new Juggernaut(
-        protocol: 'http', port: '8080', secure: false,
-        host: window.location.hostname)
-
-    $.ajaxSetup beforeSend: (xhr) =>
-      xhr.setRequestHeader "X-Session-ID", @jug.sessionID
+    @jug = window.pythy.juggernaut()
 
     this._subscribeToCode()
 
@@ -460,6 +453,14 @@ class CodeController
       transformUrl: (url) => this._skTransformUrl(url)
     }
 
+    # Configure the media comp module's foreign function interface.
+    window.mediacompffi = {
+      customizeMediaURL: (url) =>
+        this._mcCustomizeMediaURL(url)
+      writePictureTo: (dataURL, path, continueWith) =>
+        this._mcWritePictureTo(dataURL, path, continueWith)
+    }
+
 
   # -------------------------------------------------------------
   _skOutput: (text) ->
@@ -491,6 +492,22 @@ class CodeController
       url
     else
       "#{window.location.protocol}//#{window.location.host}/proxy?url=#{encodedUrl}"
+
+
+  # -------------------------------------------------------------
+  _mcWritePictureTo: (dataURL, path, continueWith) ->
+    window.pythy.uploadFileFromDataURL(path, dataURL).done (e, data) ->
+      continueWith(null)
+
+
+  # -------------------------------------------------------------
+  _mcCustomizeMediaURL: (url) ->
+    if /^https?:\/\//.test(url)
+      url
+    else
+      # If it doesn't have a protocol, then treat it as if it's a filename of
+      # something in the media library.
+      "#{window.location.protocol}//#{window.location.host}/m/u/#{@mediaKey}/#{url}"
 
 
 # -------------------------------------------------------------
@@ -612,6 +629,8 @@ window.CodeController = CodeController
 window.InteractiveConsole = InteractiveConsole
 
 $ ->
+  window.codeController = new CodeController()
+
   adjustCodeTop = ->
     codeTop = $('#flashbar').height() + 38
     $('#code-area').css 'top', "#{codeTop}px"

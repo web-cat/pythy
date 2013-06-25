@@ -11,10 +11,11 @@ class CourseOffering < ActiveRecord::Base
 
   has_many    :users, through: :course_enrollments
 
-  attr_accessible :course_id, :crn, :label, :term_id, :url, :self_enrollment_allowed
+  attr_accessible :course_id, :short_label, :long_label, :term_id,
+    :url, :self_enrollment_allowed
 
   validates :term_id, presence: true
-  validates :crn, presence: true
+  validates :short_label, presence: true
 
 
   # -------------------------------------------------------------
@@ -48,6 +49,16 @@ class CourseOffering < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  def full_label
+    if long_label.blank?
+      short_label
+    else
+      "#{short_label} (#{long_label})"
+    end
+  end
+
+
+  # -------------------------------------------------------------
   def users_sorted_by_role(options = {})
     result = course_enrollments.sort do |a, b|
       aon = a.course_role.order_number
@@ -75,6 +86,12 @@ class CourseOffering < ActiveRecord::Base
 
 
   # -------------------------------------------------------------
+  def user_enrolled?(user)
+    course_enrollments.where(user_id: user.id).any?
+  end
+
+
+  # -------------------------------------------------------------
   def role_for_user(user)
     enrollment = course_enrollments.where(user_id: user.id).first
     enrollment ? enrollment.course_role : nil
@@ -91,7 +108,7 @@ class CourseOffering < ActiveRecord::Base
       course.organization.storage_path,
       course.url_part,
       term.url_part,
-      crn.to_s)
+      short_label)
   end
 
 end

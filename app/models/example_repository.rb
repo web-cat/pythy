@@ -62,6 +62,11 @@ class ExampleRepository < Repository
       unless File.exists?(path)
         FileUtils.mkdir_p path
         Git.init(path)
+
+        commit(user, 'Initial repository setup.') do |git|
+          FileUtils.touch File.join(path, 'main.py')
+          git.add '.'
+        end
       end
     end
   end

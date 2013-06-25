@@ -106,7 +106,7 @@ class AssignmentsController < ApplicationController
   def get_assignment_offerings
     @assignment_offerings =
       @assignment.assignment_offerings.joins(:course_offering).
-        order('course_offerings.crn asc').select { |ao| can? :read, ao }
+        order('course_offerings.short_label asc').select { |ao| can? :read, ao }
   end
 
 end

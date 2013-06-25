@@ -41,7 +41,7 @@ class AssignmentOffering < ActiveRecord::Base
     CSV.generate do |csv|
       header = true
       offerings.each do |offering|
-        offering.to_csv_internal(csv, crn: true, header: header)
+        offering.to_csv_internal(csv, short_label: true, header: header)
         header = false
       end
     end
@@ -104,7 +104,7 @@ class AssignmentOffering < ActiveRecord::Base
   # Can't be private.
   def to_csv_internal(csv, options={})
     header = options[:header]
-    crn = options[:crn]
+    short_label = options[:short_label]
 
     if header
       row = []

@@ -180,8 +180,6 @@ class Ability
   # user - the user
   #
   def process_repositories(user)    
-    # TODO implement.
-
     can :read, ExampleRepository do |repository|
       can? :read, repository.course_offering
     end

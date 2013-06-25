@@ -6,7 +6,7 @@
     = link_to @course_offering.course.number, course_path(@course_offering.course)
     %span.divider /
   %li.active
-    = @course_offering.crn
+    = @course_offering.short_label
     = surround '(', ')' do
       = @course_offering.term.display_name
   %li.pull-right
@@ -17,11 +17,14 @@
 %h2.page-header
   = @course_offering.course.number
   = surround '(', ')' do
-    = @course_offering.crn
+    = @course_offering.short_label
   %small
-    = succeed ',' do
+    - if @course_offering.long_label.blank?
       = @course_offering.term.display_name
-    = @course_offering.label
+    - else
+      = succeed ',' do
+        = @course_offering.term.display_name
+      = @course_offering.long_label
 
 .clearfix
   %h3.pull-left Course Staff and Enrolled Students

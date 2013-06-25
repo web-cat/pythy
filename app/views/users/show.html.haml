@@ -36,6 +36,6 @@
               = ce.course_offering.course.name
               = link_to_if_can :show, ce.course_offering do
                 = surround '(', ')' do
-                  = ce.course_offering.crn
+                  = ce.course_offering.short_label
             %td= ce.course_offering.term.display_name
             %td= ce.course_role.name

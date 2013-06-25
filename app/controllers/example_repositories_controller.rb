@@ -40,6 +40,9 @@ class ExampleRepositoriesController < ApplicationController
 
     respond_to do |format|
       if @example_repository.save
+        Juggernaut.publish @example_repository.course_offering.event_channel('examples'),
+          {}, except: request.headers['X-Session-ID']
+
         format.js
         format.html { redirect_to @example_repository, notice: 'Example repository was successfully created.' }
         format.json { render json: @example_repository, status: :created, location: @example_repository }
@@ -64,6 +67,16 @@ class ExampleRepositoriesController < ApplicationController
 
   # -------------------------------------------------------------
   def destroy
+    offering = @example_repository.course_offering
+    @example_repository.destroy
+
+    Juggernaut.publish offering.event_channel('examples'),
+      {}, except: request.headers['X-Session-ID']
+
+    respond_to do |format|
+      format.html { redirect_to view_context.home_path(offering) }
+      format.json { head :no_content }
+    end
   end
 
 end

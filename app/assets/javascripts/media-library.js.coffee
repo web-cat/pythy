@@ -1,11 +1,17 @@
+# =========================================================================
+# Encapsulates the behavior of the media library.
+#
 class MediaLibrary
 
   # -------------------------------------------------------------
-  constructor: () ->
-    options = window.pythy.mediaLibraryOptions || {}
+  constructor: (options = {}) ->
     @filter_type = options.filterType || '*/*'
     @mediaLinkClicked = options.mediaLinkClicked
+    @canceled = options.canceled
 
+
+  # -------------------------------------------------------------
+  start: ->
     @url = $('#media-upload').data('url')
 
     $('#media-upload').fileupload
@@ -20,7 +26,7 @@ class MediaLibrary
           pythy.alert msg
 
         this.refreshList()
-        
+
         $('#media-progress .bar').css 'width', '0%'
       progressall: (e, data) ->
         progress = parseInt(data.loaded / data.total * 100, 10)
@@ -42,7 +48,17 @@ class MediaLibrary
 
 
   # -------------------------------------------------------------
+  showAsModal: ->
+    $.ajax('/media', dataType: 'script').complete =>
+      this.start()
+      $('#media_library_modal').on 'hidden', ->
+        if !@mediaLinkWasClicked && @canceled
+          @canceled()
+
+
+  # -------------------------------------------------------------
   _mediaLinkClicked: (link) =>
+    @mediaLinkWasClicked = true
     if @mediaLinkClicked
       @mediaLinkClicked(link)
 
@@ -124,5 +140,107 @@ escape = (s) -> (''+s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
         .replace(/'/g, '&#x27;').replace(/\//g,'&#x2F;')
 
-# Export
-window.MediaLibrary = MediaLibrary
+
+# ---------------------------------------------------------------
+# A helper function that returns a Uint8Array (suitable for uploading to
+# the media library as a blob) from a Base64 encoded string (i.e., a data:
+# URL).
+base64keyStr = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+decode64 = (input) ->
+  output = []
+  chr1 = ""
+  chr2 = ""
+  chr3 = ""
+  enc1 = ""
+  enc2 = ""
+  enc3 = ""
+  enc4 = ""
+  i = 0
+
+  # remove all characters that are not A-Z, a-z, 0-9, +, /, or =
+  base64test = /[^A-Za-z0-9\+\/\=]/g
+  if base64test.exec(input)
+    console.log """There were invalid base64 characters in the input text.\n
+      Valid base64 characters are A-Z, a-z, 0-9, '+', '/',and '='\n'
+      Expect errors in decoding.
+      """
+
+  input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "")
+
+  loop
+    enc1 = base64keyStr.indexOf(input.charAt(i++))
+    enc2 = base64keyStr.indexOf(input.charAt(i++))
+    enc3 = base64keyStr.indexOf(input.charAt(i++))
+    enc4 = base64keyStr.indexOf(input.charAt(i++))
+
+    chr1 = (enc1 << 2) | (enc2 >> 4)
+    chr2 = ((enc2 & 15) << 4) | (enc3 >> 2)
+    chr3 = ((enc3 & 3) << 6) | enc4
+
+    output.push chr1
+
+    if enc3 != 64
+      output.push chr2
+
+    if enc4 != 64
+      output.push chr3
+
+    chr1 = chr2 = chr3 = ""
+    enc1 = enc2 = enc3 = enc4 = ""
+    break if i >= input.length
+
+  new Uint8Array(output)
+
+
+# Exports
+
+# ---------------------------------------------------------------
+# Shows the media library as a modal dialog.
+#
+# Options:
+#   mediaLinkClicked: a function that is called when one of the media items
+#     is clicked. This function takes the <a> element as its argument so
+#     that you can access the href of the media item that was selected.
+#     The modal is *not* automatically closed; you must close it by calling
+#     $('#media_library_modal').modal('hide').
+#
+#   canceled: a function that is called if the modal is canceled without
+#     making a selection. This is called after the modal has already been
+#     closed.
+#
+#   filterType: a MIME type filter with wildcards that will be used to
+#     initially filter the list. Example: 'image/*', 'audio/*', '*/*'
+#
+window.pythy.showMediaModal = (options) ->
+  ml = new MediaLibrary(options)
+  window.pythy.mediaLibrary = ml
+  ml.showAsModal()
+
+
+# -------------------------------------------------------------
+# Uploads a file (whose content is specified as a data: URL) to the media
+# library belonging to the user currently logged into the calling browser
+# window.
+#
+# @param filename the name that the file should take
+# @param dataURL the data: URL containing the file contents
+#
+# @returns the jQuery XHR so that callbacks (like success/error/complete)
+#     can be chained to the request
+#
+window.pythy.uploadFileFromDataURL = (filename, dataURL) ->
+  uploader = $('<input type="file" name="files[]">')
+  uploader.fileupload url: '/media', dataType: 'json'
+
+  match = /data:([^;]+);base64,(.*)/.exec(dataURL)
+  contentType = match[1]
+  data = decode64(match[2])
+
+  # We can't send a filename with the blob, so we're going to send it as
+  # form data instead and MediaController will look for overrides in the
+  # filename[] parameter and use those if found.
+  blob = new Blob([data.buffer], { type: contentType, name: filename })
+
+  uploader.fileupload 'send',
+    files: [blob],
+    formData: { 'filenames[0]': filename }

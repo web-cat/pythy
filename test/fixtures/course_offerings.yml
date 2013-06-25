@@ -3,13 +3,13 @@
 cs1064_12345:
   course: cs1064
   term: spring2013
-  crn: 12345
-  label: MWF 11:00
+  short_label: 12345
+  long_label: MWF 11:00
   url: http://courses.cs.vt.edu/cs1064
 
 cs1064_12346:
   course: cs1064
   term: spring2013
-  crn: 12346
-  label: TR 12:00
+  short_label: 12346
+  long_label: TR 12:00
   url: http://courses.cs.vt.edu/cs1064

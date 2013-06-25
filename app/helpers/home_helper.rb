@@ -12,7 +12,7 @@ module HomeHelper
     path_parts = []
 
     if model.is_a?(CourseOffering)
-      path_parts.unshift model.crn.to_s
+      path_parts.unshift model.short_label
       term = model.term
       model = model.course
     end
@@ -60,7 +60,7 @@ module HomeHelper
       end
 
       if model.is_a?(CourseOffering)
-        path_parts.unshift model.crn.to_s
+        path_parts.unshift model.short_label
         path_parts.unshift model.term.url_part
         path_parts.unshift model.course.url_part
         model = model.course.organization
@@ -90,7 +90,7 @@ module HomeHelper
     end
 
     if model.is_a?(CourseOffering)
-      path_parts.unshift model.crn.to_s
+      path_parts.unshift model.short_label
       path_parts.unshift model.term.url_part
       path_parts.unshift model.course.url_part
       model = model.course.organization
@@ -206,7 +206,7 @@ module HomeHelper
 
   # -------------------------------------------------------------
   def current_course_offering?(course_offering)
-    course_offering.crn.to_s == params[:crn] &&
+    course_offering.short_label == params[:offering] &&
       course_offering.term.url_part == params[:term]
   end
 

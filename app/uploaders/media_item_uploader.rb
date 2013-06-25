@@ -13,12 +13,14 @@ class MediaItemUploader < CarrierWave::Uploader::Base
 
   # -------------------------------------------------------------
   # Override the directory where uploaded files will be stored.
-  # This is a sensible default for uploaders that are meant to be mounted:
+  # See in media_controller.rb that we overwrite files with the same name
+  # instead of adding them with a different idea, so the mount location
+  # below is safe even though it doesn't contain the MediaItem id.
   def store_dir
     if model.assignment
-      "m/a/#{model.assignment.resource_key}/#{model.id}"
+      "m/a/#{model.assignment.resource_key}"
     elsif model.user
-      "m/u/#{model.user.resource_key}/#{model.id}"
+      "m/u/#{model.user.resource_key}"
     else
       nil
     end
@@ -40,7 +42,10 @@ class MediaItemUploader < CarrierWave::Uploader::Base
     process :efficient_conversion => [64, 64]
 
     def full_filename(for_file)
-      for_file.sub(/\.[^.]+\z/, '_thumb.png')
+      dir_only = File.dirname(for_file)
+      file_only = File.basename(for_file)
+      file_only.sub! /\.[^.]+\z/, '_thumb.png'
+      File.join(dir_only, '_thumbs', file_only)
     end 
   end
 

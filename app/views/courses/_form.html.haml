@@ -1,8 +1,8 @@
 = pythy_form_for @course.organization, @course do |f|
 
-  = f.collection_select :organization_id, 'Organization', Organization.all, :id, :name, prompt: '(none)'
+  = f.collection_select :organization_id, 'Organization', Organization.all, :id, :display_name, prompt: '(none)'
 
-  = f.text_field :number
+  = f.text_field :number do
     %span.help-block
       The course number prefixed by its departmental abbreviation (for example, "CS 110"). There are no restrictions on the format of this string so different types of organizations can use it differently (for example, "Sandbox" or "Playground" might be appropriate).
 

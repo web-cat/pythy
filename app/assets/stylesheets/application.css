@@ -10,11 +10,11 @@
  *
  *= require_self
  *= require codemirror
- *= require jquery/jqueryui/jquery-ui-1.10.2.custom.min
- *= require allevato/jslider/jquery.slider.min
  *= require eternicode/bootstrap-datepicker/datepicker.css
 //= require smalot/bootstrap-datetimepicker/datetimepicker
+ *= require silviomoreto/bootstrap-select/bootstrap-select.min
  *= require bootstrap_and_overrides
+ *= require jquery/jqueryui/jquery-ui-1.10.3.custom.min
  *= require font-awesome
  *= require jquery.fileupload-ui
  *= require global

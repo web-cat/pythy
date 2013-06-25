@@ -97,10 +97,6 @@ body.landing {
   filter: alpha(opacity=30);
 }
 
-//.navbar-fixed-top .container {
-//  padding: 0;
-//}
-
 form.form-bordered {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -111,6 +107,10 @@ form.form-bordered {
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
   }
+}
+
+form.form-basic {
+  margin: 0;
 }
 
 #flashbar {
@@ -440,6 +440,50 @@ a[data-toggle='collapse'].collapsed i.icon-chevron-right::before {
   transform: rotate(0deg);
 }
 
+.modal-body.has-typeahead {
+   overflow: visible
+}
+
+ul.gravatar-list {
+  margin: 0;
+
+  li {
+    position: relative;
+    display: inline-block;
+    list-style-type: none;
+    margin: 0 1px 1px 0;
+
+    &.indicator:after {
+      content: "";
+      position: absolute;
+      display: block;
+      right: 0;
+      bottom: 0;
+      width: 5px;
+      height: 5px;
+      border-left: 1px solid white;
+      border-top: 1px solid white;
+    }
+
+    &.indicator.manager:after {
+      background: $nav-color-green;
+    }
+
+    &.indicator.unsynched:after {
+      background: $nav-color-gold;
+    }
+
+    a {
+      display: inline-block;
+    }
+
+    img.gravatar {
+      display: inline-block;
+      margin-right: 0;
+    }
+  }
+}
+
 .CodeMirror {
   line-height: 16px;
 }
@@ -492,7 +536,61 @@ table td p.hint {
 }
 
 
-// Styled used in the media library.
+#Sk-canvasModal {
+  .modal-footer {
+    form.form-inline {
+      margin-bottom: 0;
+    }
+
+    label {
+      margin: 0 5px 0 0;
+      line-height: 30px;
+      vertical-align: middle;
+    }
+    
+    label[for="canvas-y"] {
+      margin-left: 10px;
+    }
+
+    td {
+      line-height: 30px;
+      vertical-align: middle;
+    }
+
+    td.canvas-color-label {
+      padding: 0 5px 0 15px;
+    }
+
+    td#canvas-red {
+      font-weight: 600;
+      color: $nav-color-red;
+      text-align: center;
+      width: 2em;
+    }
+    
+    td#canvas-green {
+      font-weight: 600;
+      color: $nav-color-green;
+      text-align: center;
+      width: 2em;
+    }
+
+    td#canvas-blue {
+      font-weight: 600;
+      color: $nav-color-blue;
+      text-align: center;
+      width: 2em;
+      padding-right: 15px;
+    }
+
+    td#canvas-color-swatch {
+      width: 30px;
+      border: 1px solid #333;
+    }
+  }
+}
+
+// Styles used in the media library.
 
 .media-area {
   height: 300px;

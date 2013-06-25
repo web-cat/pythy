@@ -4,10 +4,19 @@
     %span.help-block
       The full displayable name of the organization.
 
-  = f.text_field :abbreviation
+  = f.text_field :abbreviation do
+    %span.help-block
+      A short abbreviation that will be used in URLs.
 
   .controls
     .alert.alert-info#url_part
+
+  = f.text_field :domain do
+    %span.help-inline (Optional)
+    %span.help-block
+      The e-mail domain used by members of this organization.
+      If present, it can be used to restrict courses in an
+      organization only to users within that domain.
 
   = f.actions do
     = f.submit

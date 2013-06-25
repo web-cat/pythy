@@ -57,6 +57,8 @@ class Repository < ActiveRecord::Base
     # Yield to the block, which will manipulate the working directory.
     yield @git
 
+    has_message = !message.nil?
+
     message ||= "Updated by #{user.display_name}"
     author = "#{user.display_name} <#{user.email}>"
 
@@ -65,7 +67,11 @@ class Repository < ActiveRecord::Base
     begin
       @git.add
 
-      amend = should_amend?
+      if has_message
+        amend = false
+      else
+        amend = should_amend?
+      end
 
       @git.commit_all message, author: author, amend: amend, allow_empty: amend
       commit_result = { amend: amend, commit: @git.log(1).first }

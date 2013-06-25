@@ -11,8 +11,8 @@
           %span.btn-aligned Viewing:
           .btn-group
             %a.btn.btn-inverse.dropdown-toggle{ href: '#', data: { toggle: 'dropdown' }}
-              - if params[:crn]
-                = "#{@offerings.first.crn} (#{@offerings.first.label})"
+              - if params[:offering]
+                = @offerings.first.full_label
               - else
                 = "All #{@offerings.first.term.display_name} offerings"
               %span.caret
@@ -24,22 +24,13 @@
                 = "#{@offerings.first.term.display_name} Offerings"
               - @offerings.each do |co|
                 %li
-                  = link_to "#{co.crn} (#{co.label})", home_path(co)
+                  = link_to co.full_label, home_path(co)
 
           - if can? :edit, @offerings.first
-            - if params[:crn]
+            - if params[:offering]
               = link_to icon_tag('cog'), course_offering_path(@offerings.first), class: 'btn btn-inverse', title: 'Manage this course offering', rel: 'tooltip'
             - elsif
               = link_to icon_tag('cog'), course_path(@offerings.first.course), class: 'btn btn-inverse', title: 'Manage this course', rel: 'tooltip'
-
-      / %small
-      /   = @offerings.first.term.display_name
-      /   = surround '(', ')' do
-      /     = raw @offerings.map { |o| link_to_if(o.crn.to_s != params[:crn], o.crn, home_path(o)) }.join(', ')
-      /   - if @offerings.count == 1 && can?(:edit, @offerings.first)
-      /     = link_to 'Manage', course_offering_path(@offerings.first)
-      /   - elsif @offerings.count > 1
-      /     = link_to 'Manage', course_path(@offerings.first.course)
 
 .container
   .row

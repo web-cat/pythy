@@ -5,9 +5,12 @@
       = close_button_tag dismiss: 'modal'
       %h3 Add User Manually
 
-    .modal-body
+    .modal-body.has-typeahead
       #flashbar-placeholder
-      = f.collection_select :user_id, 'User', User.all, :id, :display_name
+      = f.label :user_id, 'User' do
+        = f.hidden_field :user_id
+        = text_field_tag :user_name, nil, class: 'input-xlarge typeahead-user', autocomplete: 'off'
+
       = f.collection_select :course_role_id, 'Role', CourseRole.all, :id, :name
       = hidden_field_tag :type, @type
 

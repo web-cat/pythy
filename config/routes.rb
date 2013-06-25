@@ -53,18 +53,23 @@ Pythy::Application.routes.draw do
     end
   end
 
+  match 'typeaheads/user', to: 'typeaheads#user'
+
   match 'course_offering/:course_offering_id/upload_roster/:action',
     controller: 'upload_roster', as: 'upload_roster'
+
+  match 'self_enroll/:action',
+    controller: 'self_enrollment', as: 'self_enrollment'
 
   # Route for viewing code. The constraints allow project and file names to
   # include dots, which would normally be interpreted by Rails' router as a
   # format indicator.
-  code_pattern = 'code(/:organization(/:course(/:term(/:crn(/:rest)))))'
+  code_pattern = 'code(/:organization(/:course(/:term(/:offering(/:rest)))))'
   match code_pattern => 'code#show', via: :get, constraints: { rest: /.+/ }
   match code_pattern => 'code#update', via: :put, constraints: { rest: /.+/ }
   match code_pattern => 'code#message', via: :post, constraints: { rest: /.+/ }
 
-  match 'home(/:organization(/:course(/:term(/:crn))))' => 'home#index'
+  match 'home(/:organization(/:course(/:term(/:offering))))' => 'home#index'
 
   # Route for accessing the media library.
   medias_pattern = 'media(/user/:user)(/assignment/:assignment)'

@@ -385,8 +385,8 @@ HTML
 
 
   # -------------------------------------------------------------
-  def gravatar_tag(user, size=nil)
-    link_to user do
+  def gravatar_tag(user, size = nil, link_options = {})
+    link_to user, link_options do
       image_tag(user.gravatar_url(size: size), class: 'gravatar',
         style: "width: #{size}px; height: #{size}px")
     end
@@ -406,7 +406,7 @@ HTML
 
 
   # -------------------------------------------------------------
-  def chart_placeholder_tag(classname, options=nil)
+  def chart_placeholder_tag(classname, options = nil)
     content_tag :div, nil, class: "chart #{classname}", data: options
   end
 

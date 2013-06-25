@@ -44,7 +44,12 @@ class AssignmentRepository < Repository
   # Returns true if the last commit should be amended, or false to create
   # a new commit.
   def should_amend?
-    super && assignment_checks.most_recent.commit_sha != head_sha
+    check = assignment_checks.most_recent
+    if check
+      super && check.commit_sha != head_sha
+    else
+      super
+    end
   end
 
 

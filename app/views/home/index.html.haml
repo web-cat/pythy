@@ -1,41 +1,40 @@
-.row
-  .span12
-    %h2
-      = @course.number
-      %small
-        = @offerings.first.term.display_name
-        = surround '(', ')' do
-          = raw @offerings.map { |o| link_to_if(o.crn.to_s != params[:crn], o.crn, home_path(o)) }.join(', ')
-        - if @offerings.count == 1 && can?(:edit, @offerings.first)
-          = link_to 'Manage', course_offering_path(@offerings.first)
-        - elsif @offerings.count > 1
-          = link_to 'Manage', course_path(@offerings.first.course)
+.jumbo-title
+  .container
+    .row
+      .span8
+        %h1.slim
+          = @course.number
+        %p.lead
+          = @course.name
 
-.row
-  .span7
-    %h3 Recent Work
+.container
+  .row
+    .span7
+      %h3 Recent Work
 
-    #started_assignments
-      = render(partial: 'home/started_assignment', collection: @started_assignments) || render(partial: 'home/no_started_assignments')
+      #started_assignments
+        = render(partial: 'home/started_assignment', collection: @started_assignments) || render(partial: 'home/no_started_assignments')
 
-  .span5
-    %h3 Not Yet Started
+    .span5
+      %h3 Not Yet Started
 
-    -# FIXME This isn't right, but I'm not sure yet how to ask Cancan whether
-    -# the current ability can create new assignment offerings for a course
-    -# offering.
-    - if @offerings.first.role_for_user(current_user).try(:can_manage_assignments?)
-      %p
-        = link_to 'Create a new assignment...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
+      -# FIXME This isn't right, but I'm not sure yet how to ask Cancan whether
+      -# the current ability can create new assignment offerings for a course
+      -# offering.
+      - if @offerings.first.role_for_user(current_user).try(:can_manage_assignments?)
+        %p
+          = link_to 'Create a new assignment...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
 
-    #not_started_assignments
-      = render(partial: 'home/not_started_assignment', collection: @not_started_assignments) || render(partial: 'home/no_assignments')
-    
-    %h3 Instructor Examples
-    - if can? :manage, @offerings.first
-      %p
-        = link_to 'Create a new example...', new_course_offering_example_repository_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
-    %table.examples
-      %tbody#example_repositories
-        -# FIXME should be the union of all offerings' examples below
-        = render(@examples) || render(partial: 'example_repositories/empty')
+      #not_started_assignments
+        = render(partial: 'home/not_started_assignment', collection: @not_started_assignments) || render(partial: 'home/no_assignments')
+      
+      %h3 Instructor Examples
+      = hidden_field_tag :example_event_channel, @offerings.first.event_channel('examples')
+
+      - if can? :manage, @offerings.first
+        %p
+          = link_to 'Create a new example...', new_course_offering_example_repository_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
+      %table.examples
+        %tbody#example_repositories
+          -# FIXME should be the union of all offerings' examples below
+          = render(@examples) || render(partial: 'example_repositories/empty')

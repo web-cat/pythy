@@ -51,10 +51,9 @@ class CodeController < FriendlyUrlController
       git.add path
     end
 
-    @commit_hash = @repository.commit_hash(@committed[:commit])
-
     respond_to do |format|
       if @committed
+        @commit_hash = @repository.commit_hash(@committed[:commit])
         publish(:code) do
           render_to_string template: 'code/update_code',
             locals: {

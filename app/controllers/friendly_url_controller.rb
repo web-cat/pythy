@@ -22,8 +22,8 @@ class FriendlyUrlController < ApplicationController
         @term = Term.from_path_component(params[:term]).first
 
         if @term
-          if params[:crn]
-            offering = @course.offering_with_crn(params[:crn], @term)
+          if params[:offering]
+            offering = @course.offering_with_short_label(params[:offering], @term)
             @offerings << offering if can?(:show, offering)
           else
             offerings = @course.offerings_for_user(current_user, @term)
@@ -33,7 +33,7 @@ class FriendlyUrlController < ApplicationController
           # Put the rest of the path together again.
           parts = []
           parts << params[:term] if params[:term]
-          parts << params[:crn] if params[:crn]
+          parts << params[:offering] if params[:offering]
           parts << params[:rest] if params[:rest]
           @rest = parts.empty? ? nil : File.join(parts)
         end

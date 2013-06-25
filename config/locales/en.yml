@@ -21,7 +21,6 @@ en:
   activerecord:
     attributes:
       course_offering:
-        crn: "CRN"
         url: "URL"
 
       user:

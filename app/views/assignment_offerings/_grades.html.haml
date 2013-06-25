@@ -4,9 +4,9 @@
     %a{ href: 'javascript:void(0)', data: { toggle: 'collapse', target: "#grades_#{course_offering.id}" } }
       %h3.slim.btn-line-height
         = icon_tag('chevron-right')
-        = course_offering.crn
+        = course_offering.short_label
         = surround '(', ')' do
-          = course_offering.label
+          = course_offering.short_label
   .span4
     = link_to assignment_path(@assignment, format: :csv), class: 'btn btn-primary btn-block' do
       = icon_tag('bar-chart')

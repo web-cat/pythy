@@ -1,4 +1,3 @@
 - users.each do |user|
-  %li
-    = user_list_item_tag(@repository, user) do
-      = user.full_name
+  %li{ class: user_list_item_class(@repository, user) }><
+    = gravatar_tag(user, 30, rel: 'tooltip', title: user_list_item_title(@repository, user))

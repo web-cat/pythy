@@ -16,25 +16,25 @@ class UserTest < ActiveSupport::TestCase
 
   # -------------------------------------------------------------
   test "should find student enrolled in course offering" do
-    assert @student.course_offerings.where(crn: '12345').exists?
+    assert @student.course_offerings.where(short_label: '12345').exists?
   end
 
 
   # -------------------------------------------------------------
   test "should not find student managing course offering" do
-    assert !@student.managing_course_offerings.where(crn: '12345').exists?
+    assert !@student.managing_course_offerings.where(short_label: '12345').exists?
   end
 
 
   # -------------------------------------------------------------
   test "should find teacher enrolled in course offering" do
-    assert @teacher.course_offerings.where(crn: '12345').exists?
+    assert @teacher.course_offerings.where(short_label: '12345').exists?
   end
 
 
   # -------------------------------------------------------------
   test "should find teacher managing course offering" do
-    assert @teacher.managing_course_offerings.where(crn: '12345').exists?
+    assert @teacher.managing_course_offerings.where(short_label: '12345').exists?
   end
 
 end

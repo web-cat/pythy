@@ -5,6 +5,10 @@ class HomeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def index
+    command = params[:command]
+
+    @organization_list = Organization.all.map { |o| [o.display_name, o.id] }
+
     if @offerings.any?
       @not_started_assignments = []
       @started_assignments = []
@@ -59,12 +63,12 @@ class HomeController < FriendlyUrlController
       }
 
       respond_to do |format|
-        format.html do
-          render staff ? 'index_staff' : 'index'
-        end
+        format.html { render staff ? 'index_staff' : 'index' }
+        format.js { render command }
       end
     else
       offerings = current_user.course_offerings
+      @courses = offerings.group_by { |co| co.course }
 
       if offerings.count == 0
         respond_to do |format|
@@ -75,13 +79,13 @@ class HomeController < FriendlyUrlController
       elsif offerings.count == 1
         respond_to do |format|
           format.html do
-            redirect_to view_context.home_path(offerings.first)
+            render 'index_no_courses'
           end
         end
       else        
         respond_to do |format|
           format.html do
-            render 'index_many_courses'
+            render 'index_no_courses'
           end
         end
       end

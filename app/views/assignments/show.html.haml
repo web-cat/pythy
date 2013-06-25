@@ -43,11 +43,7 @@
           %tbody
             - @assignment_offerings.each do |offering|
               %tr{ class: offering.visible? ? nil : 'warning' }
-                %td
-                  = offering.course_offering.crn
-                  - if offering.course_offering.label
-                    = surround '(', ')' do
-                      = offering.course_offering.label
+                %td= offering.course_offering.full_label
                 %td= datetime_or_none offering.opens_at
                 %td= datetime_or_none offering.due_at
                 %td= datetime_or_none offering.closes_at

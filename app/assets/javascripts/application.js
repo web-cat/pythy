@@ -14,6 +14,7 @@
 //= require jquery_ujs
 //= require jquery.remotipart
 //= require twitter/bootstrap/bootstrap
+//= require jquery/jqueryui/jquery-ui-1.10.3.custom.min
 //= require cowboy/jquery-hashchange/jquery.ba-hashchange.min
 //= require morr/jquery-appear/jquery.appear
 //= require eternicode/bootstrap-datepicker/bootstrap-datepicker
@@ -27,6 +28,7 @@
 //= require codemirror/modes/markdown
 //= require global
 //= require media-library
+//= require typeaheads
 //= require highcharts
 //= require highcharts/highcharts-more
 //= require highcharts-theme

@@ -18,7 +18,7 @@ class CourseOfferingsControllerTest < ActionController::TestCase
 
   test "should create course_offering" do
     assert_difference('CourseOffering.count') do
-      post :create, :course_offering => { :course_id => @course_offering.course_id, :crn => @course_offering.crn, :label => @course_offering.label, :term_id => @course_offering.term_id, :url => @course_offering.url }
+      post :create, :course_offering => { :course_id => @course_offering.course_id, :short_label => @course_offering.short_label, :long_label => @course_offering.long_label, :term_id => @course_offering.term_id, :url => @course_offering.url }
     end
 
     assert_redirected_to course_offering_path(assigns(:course_offering))
@@ -35,7 +35,7 @@ class CourseOfferingsControllerTest < ActionController::TestCase
   end
 
   test "should update course_offering" do
-    put :update, :id => @course_offering, :course_offering => { :course_id => @course_offering.course_id, :crn => @course_offering.crn, :label => @course_offering.label, :term_id => @course_offering.term_id, :url => @course_offering.url }
+    put :update, :id => @course_offering, :course_offering => { :course_id => @course_offering.course_id, :short_label => @course_offering.short_label, :long_label => @course_offering.long_label, :term_id => @course_offering.term_id, :url => @course_offering.url }
     assert_redirected_to course_offering_path(assigns(:course_offering))
   end
 
