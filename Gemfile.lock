@@ -86,7 +86,7 @@ GEM
     coffee-script (2.2.0)
       coffee-script-source
       execjs
-    coffee-script-source (1.6.2)
+    coffee-script-source (1.5.0)
     commonjs (0.2.6)
     connection_pool (1.1.0)
     daemon (1.1.0)
@@ -295,6 +295,7 @@ DEPENDENCIES
   carrierwave
   codemirror-rails
   coffee-rails (~> 3.2.1)
+  coffee-script-source (= 1.5.0)
   daemon
   delocalize
   devise
