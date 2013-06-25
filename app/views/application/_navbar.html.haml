@@ -4,29 +4,30 @@
       = link_to root_url, class: 'brand hidden-phone' do
         %span.hidden-phone Pythy
       %ul.nav
-        %li.dropdown.nav-courses
-          = dropdown_tag do
-            = icon_tag('home icon-large')
-            - if @course
-              = @course.number
-            - else
-              Courses
-            %span.caret
-          %ul.dropdown-menu
-            - Term.latest_first.each do |term|
-              - offerings = current_user.course_offerings.where(term_id: term.id)
-              - if offerings.any?
-                %li.nav-header
-                  Courses You Are In During
-                  = term.display_name
-                - offerings.each do |offering|
-                  %li
-                    = link_to home_path(offering) do
-                      %strong= offering.course.number
-                      \-
-                      = offering.course.name
-                      = surround '(', ')' do
-                        = offering.short_label
+        - if current_user
+          %li.dropdown.nav-courses
+            = dropdown_tag do
+              = icon_tag('home icon-large')
+              - if @course
+                = @course.number
+              - else
+                Courses
+              %span.caret
+            %ul.dropdown-menu
+              - Term.latest_first.each do |term|
+                - offerings = current_user.course_offerings.where(term_id: term.id)
+                - if offerings.any?
+                  %li.nav-header
+                    Courses You Are In During
+                    = term.display_name
+                  - offerings.each do |offering|
+                    %li
+                      = link_to home_path(offering) do
+                        %strong= offering.course.number
+                        \-
+                        = offering.course.name
+                        = surround '(', ')' do
+                          = offering.short_label
         %li.nav-book
           %a{ href: 'http://interactivepython.org/courselib/static/thinkcspy/index.html', target: '_blank' }
             %i.icon-book.icon-large
