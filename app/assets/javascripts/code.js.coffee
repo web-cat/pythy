@@ -69,7 +69,13 @@ class CodeController
       this._trackChanges()
 
 
-  #~ Private methods ..........................................................
+  # ---------------------------------------------------------------
+  setPreamble: (preamble) ->
+    @preamble = preamble
+
+    # TODO optimize
+    @preambleLines = @preamble.split('\n').length - 1
+
 
   # ---------------------------------------------------------------
   _dockTabShown: (e) ->
@@ -349,7 +355,7 @@ class CodeController
       this._clearErrors()
       @console.clear()
       @console.toggleConsole()
-      code = @codeArea.getValue()
+      code = @preamble + @codeArea.getValue()
       starter =     => Sk.importMainWithBody("<stdin>", false, code)
       error   = (e) => this._handleException(e)
       success =     => @console.success(); this._cleanup()
@@ -376,6 +382,10 @@ class CodeController
 
   # -------------------------------------------------------------
   _handleError: (error) ->
+    # Adjust the line numbers to make up for the preamble.
+    error.start.line -= @preambleLines if error.start
+    error.end.line -= @preambleLines if error.end
+
     # Print the error at the bottom of the console.
     @console.error error
 
@@ -396,12 +406,10 @@ class CodeController
         widget = $('<div class="error-widget"></div>')
         widget.text "Error: #{error.message}"
         @lastErrorWidget = @codeArea.addLineWidget(start.line, widget[0])
-#        @codeArea.markText(start, end, "syntax-highlight") 
-#        @codeArea.setGutterMarker(start.line, "CodeMirror-linenumbers", marker)
 
         # Move the cursor to the error line in the code editor and give it
         # the focus.
-        @codeArea.setCursor error.start.line - 1, error.start.ch
+        @codeArea.setCursor start.line, start.ch
         @codeArea.focus()
 
 

@@ -130,8 +130,14 @@ class CodeController < FriendlyUrlController
     end
 
     respond_to do |format|
-      format.js { render template: 'code/update_code',
-        locals: { code: code, force: true } }
+      format.js {
+        render template: 'code/update_code',
+          locals: {
+            code: code,
+            environment: @repository.environment,
+            force: true
+          }
+      }
     end
     
   end
