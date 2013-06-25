@@ -216,6 +216,24 @@ class Statistics
 window.pythy.Statistics = Statistics # export
 
 
+# ---------------------------------------------------------------
+# Creates a new Juggernaut instance with the proper hostname.
+window.pythy.juggernaut = ->
+  if window.location.protocol == 'https:'
+    juggernaut = new Juggernaut(
+      protocol: 'https', port: '8080', secure: true,
+      host: window.location.hostname)
+  else
+    juggernaut = new Juggernaut(
+      protocol: 'http', port: '8080', secure: false,
+      host: window.location.hostname)
+
+  $.ajaxSetup beforeSend: (xhr) =>
+    xhr.setRequestHeader "X-Session-ID", juggernaut.sessionID
+
+  juggernaut
+
+
 # -------------------------------------------------------------
 # TODO convert to Coffeescript
 `$.rails.allowAction = function(element) {
