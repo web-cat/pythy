@@ -28,6 +28,10 @@
                         = offering.course.name
                         = surround '(', ')' do
                           = offering.short_label
+          %li.nav-scratchpad
+            = link_to '/code/scratchpad' do
+              %i.icon-edit-sign.icon-large
+              %span.hidden-phone Scratchpad
         %li.nav-book
           %a{ href: 'http://interactivepython.org/courselib/static/thinkcspy/index.html', target: '_blank' }
             %i.icon-book.icon-large

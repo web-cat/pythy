@@ -218,6 +218,11 @@ class Ability
     can :manage, AssignmentReferenceRepository do |repository|
       can? :manage, repository.assignment
     end
+
+
+    can [:read, :update], ScratchpadRepository do |repository|
+      user == repository.user
+    end
   end
 
 

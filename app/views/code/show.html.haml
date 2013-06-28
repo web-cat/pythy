@@ -20,7 +20,10 @@
       = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
 
 #code-area
-  = text_area_tag :codearea, nil, data: { :channel => @subscribe_channel, :editor => can?(:update, @repository), :'user-media-key' => current_user.resource_key }
+  #code-loading-overlay
+    = icon_tag('spinner icon-spin')
+    Loading...
+  = text_area_tag :codearea, nil, data: @code_area_data
 
 - # Docked tab area
 #dock.tabbable.tabs-left

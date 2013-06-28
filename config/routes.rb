@@ -43,6 +43,8 @@ Pythy::Application.routes.draw do
     resources :assignment_checks
   end
 
+  resources :scratchpad_repositories
+
   shallow do
     resources :organizations do
       resources :courses do

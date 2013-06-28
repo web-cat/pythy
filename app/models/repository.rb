@@ -3,7 +3,7 @@ class Repository < ActiveRecord::Base
   belongs_to :user
   belongs_to :environment
 
-  attr_accessible :user_id
+  attr_accessible :user_id, :environment_id
 
   validates :user_id, presence: true
 

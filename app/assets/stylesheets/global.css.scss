@@ -177,6 +177,7 @@ form.form-basic {
     float: left;
 
     &.nav-courses  { @include nav-link($nav-color-green); }
+    &.nav-scratchpad { @include nav-link($nav-color-gold); }
     &.nav-book     { @include nav-link($nav-color-blue); }
     &.nav-grades   { @include nav-link($nav-color-red); }
     &.nav-settings { @include nav-link($nav-color-purple); }
@@ -442,6 +443,10 @@ a[data-toggle='collapse'].collapsed i.icon-chevron-right::before {
 
 .modal-body.has-typeahead {
    overflow: visible
+}
+
+.padded-top {
+  margin-top: 10px;
 }
 
 ul.gravatar-list {

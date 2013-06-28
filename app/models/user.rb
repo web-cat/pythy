@@ -20,6 +20,7 @@ class User < ActiveRecord::Base
   has_many    :course_offerings, through: :course_enrollments
   has_many    :assignment_offerings, through: :course_offerings
   has_many    :media_items
+  has_one     :scratchpad_repository
 
   # Include default devise modules. Others available are:
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
@@ -59,6 +60,13 @@ class User < ActiveRecord::Base
 
 
   #~ Instance methods .........................................................
+
+  # -------------------------------------------------------------
+  def storage_path
+    File.join(
+      SystemConfiguration.first.storage_path, 'users', email)
+  end
+
 
   # -------------------------------------------------------------
   def ability

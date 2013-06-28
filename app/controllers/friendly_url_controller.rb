@@ -38,6 +38,15 @@ class FriendlyUrlController < ApplicationController
           @rest = parts.empty? ? nil : File.join(parts)
         end
       end
+    else
+      # Put the rest of the path together again.
+      parts = []
+      parts << params[:organization] if params[:organization]
+      parts << params[:course] if params[:course]
+      parts << params[:term] if params[:term]
+      parts << params[:offering] if params[:offering]
+      parts << params[:rest] if params[:rest]
+      @rest = parts.empty? ? nil : File.join(parts)
     end
   end
 

@@ -12,6 +12,23 @@ body.code {
   right: 0;
   bottom: $initialconsoleheight;
 
+  #code-loading-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(128, 128, 128, 0.5);
+    line-height: 100%;
+    vertical-align: middle;
+    text-align: center;
+    color: white;
+    font-weight: 700;
+    font-size: 64px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    z-index: 1010;
+  }
+
   .CodeMirror {
     height: 100%;
 

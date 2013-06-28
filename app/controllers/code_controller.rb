@@ -7,7 +7,7 @@ class CodeController < FriendlyUrlController
   DEFAULT_FILE = 'main.py'
 
   ALLOWED_MESSAGES = %w(hash_change add_user remove_user unsync resync
-    ping check start_over check_results history)
+    ping check start_over check_results history prompt_for_environment)
 
   before_filter :authenticate_user!
   before_filter :find_repository
@@ -29,10 +29,22 @@ class CodeController < FriendlyUrlController
       @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
     elsif @repository.is_a? ExampleRepository
       @page_title = "#{@repository.course_offering.course.number} &ndash; Example: #{@repository.name}"
+    elsif @repository.is_a? ScratchpadRepository
+      @page_title = "#{@repository.user.display_name} &ndash; Scratchpad"
     end
 
     if @repository.warn_if_not_owner? && @repository.user != current_user
       flash[:alert] = "You are viewing a repository that belongs to #{@repository.user.display_name}."
+    end
+
+    @code_area_data = {
+      :channel => @subscribe_channel,
+      :editor => can?(:update, @repository),
+      :'user-media-key' => current_user.resource_key
+    }
+
+    if @repository.is_a? ScratchpadRepository
+      @code_area_data[:'needs-environment'] = !@repository.environment_present?
     end
   end
 
@@ -237,6 +249,20 @@ class CodeController < FriendlyUrlController
 
 
   # -------------------------------------------------------------
+  def prompt_for_environment
+    respond_to do |format|
+      format.js {
+        render template: 'code/prompt_for_environment',
+          locals: {
+            update_url: polymorphic_path(@repository),
+            model_name: @repository.class.name.underscore
+          }
+      }
+    end
+  end
+
+
+  # -------------------------------------------------------------
   def start_over
     begin
       @repository.start_over
@@ -346,6 +372,15 @@ class CodeController < FriendlyUrlController
 
 
   # -------------------------------------------------------------
+  def find_scratchpad_repository_from_path_parts(parts)
+    @repository = current_user.scratchpad_repository ||
+      current_user.create_scratchpad_repository
+
+    @filename = parts.length > 0 ? File.join(parts) : DEFAULT_FILE
+  end
+
+
+  # -------------------------------------------------------------
   def find_student_repository_from_path_parts(parts)
     # Course staff trying to access another student's repository for
     # an assignment.
@@ -376,9 +411,13 @@ class CodeController < FriendlyUrlController
       find_example_repository_from_path_parts(parts)
     when 'assignments'
       find_assignment_repository_from_path_parts(parts)
+    when 'scratchpad'
+      find_scratchpad_repository_from_path_parts(parts)
     else
       find_student_repository_from_path_parts(parts)
     end
+
+    puts parts
 
     # Prevent access to dot-files.
     # TODO maybe allow instructors to do this, though

@@ -5,7 +5,7 @@ class CodeController
     $codearea = $('#codearea')
 
     @channel = $codearea.data('channel')
-    @isEditor = ($codearea.data('editor') == true)
+    @isEditor = $codearea.data('editor')
     @mediaKey = $codearea.data('user-media-key')
 
     # Convert the text area to a CodeMirror widget.
@@ -47,6 +47,7 @@ class CodeController
     $('#check').click (e) => this._checkCode()
     $('#start-over').click (e) => this._startOver()
     $('#media').click (e) => this._openMediaLibrary()
+    $('#change-environment').click (e) => this._changeEnvironment()
     $(window).hashchange => this._hashChange()
 
     window.setInterval (=> this._updateHistoryTimestamps()), 1000
@@ -67,6 +68,14 @@ class CodeController
       this._trackChangesWithSaving()
     else
       this._trackChanges()
+
+    if $codearea.data('needs-environment')
+      this._changeEnvironment()
+
+
+  # ---------------------------------------------------------------
+  _changeEnvironment: ->
+    this._sendMessage data: message: 'prompt_for_environment'
 
 
   # ---------------------------------------------------------------
@@ -248,6 +257,10 @@ class CodeController
     if newHistoryRow
       this.updateHistory(newHistoryRow, amend)
 
+    clearTimeout(@overlayDelay)
+    @overlayDelay = null
+    $('#code-loading-overlay').fadeOut duration: 50
+
 
   # ---------------------------------------------------------------
   updateHistory: (newHistoryRow, amend) ->
@@ -294,6 +307,10 @@ class CodeController
     if @ignoreNextHashChange
       @ignoreNextHashChange = false
     else
+      @overlayDelay = setTimeout ->
+        $('#code-loading-overlay').fadeIn()
+      , 250
+
       data = { message: 'hash_change' }
       if window.location.hash && window.location.hash.length > 0
         data.sha = unescape(window.location.hash.substring(1))
@@ -638,6 +655,9 @@ window.InteractiveConsole = InteractiveConsole
 
 $ ->
   window.codeController = new CodeController()
+
+  overlay = $('#code-loading-overlay')
+  overlay.css('line-height', "#{overlay.height()}px")
 
   adjustCodeTop = ->
     codeTop = $('#flashbar').height() + 38
