@@ -51,9 +51,8 @@ class AssignmentReferenceRepository < Repository
       Git.init(path)
 
       commit(user, 'Initial repository setup.') do |git|
-        # An area where sample reference solutions can be stored.
-        create_dir 'solution'
-        FileUtils.touch 'solution/main.py'
+        # Touch the main solution file.
+        FileUtils.touch 'main.py'
 
         # An area to store additional Python modules that should be loaded
         # when the program runs. (TODO)
