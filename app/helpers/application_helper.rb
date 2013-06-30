@@ -122,7 +122,7 @@ HTML
       options[:href] = '#'
 
       content_tag :a, options do
-        raw(content + ' <span class="caret"></span>')
+        raw(content + ' <span class="caret"></span>'.html_safe)
       end
     end
   end

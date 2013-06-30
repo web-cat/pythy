@@ -6,12 +6,12 @@
       %th.span3 Role
       %th.span1= icon_tag('cog')
   %tbody#course_enrollments
-    - if @course_enrollments.empty?
+    - if enrollments.empty?
       %td{ colspan: 4 }
         .alert There are no users currently enrolled in this course offering.
     - else
-      = render @course_enrollments
+      = render enrollments
 
-- unless @course_enrollments.empty?
+- unless enrollments.empty?
   #course_enrollments_paginator
-    = paginate @course_enrollments, remote: true
+    = paginate enrollments, remote: true

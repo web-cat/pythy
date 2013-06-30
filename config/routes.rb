@@ -74,7 +74,8 @@ Pythy::Application.routes.draw do
   match code_pattern => 'code#update', via: :put, constraints: { rest: /.+/ }
   match code_pattern => 'code#message', via: :post, constraints: { rest: /.+/ }
 
-  match 'home(/:organization(/:course(/:term(/:offering))))' => 'home#index'
+  match 'home' => 'home#index'
+  match 'home/:organization/:course/:term(/:offering)' => 'home#course'
 
   # Route for accessing the media library.
   medias_pattern = 'media(/user/:user)(/assignment/:assignment)'

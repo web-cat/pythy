@@ -102,3 +102,19 @@ class ChangeableValidator < ActiveModel::EachValidator
     end
   end
 end
+
+
+# =============================================================================
+# A wrapper for the <=> operator that handles nil arguments correctly,
+# ordering them before non-nil objects.
+def nil_safe_compare(a, b)
+  if a.nil? && b.nil?
+    0
+  elsif a.nil?
+    -1
+  elsif b.nil?
+    1
+  else
+    a <=> b
+  end
+end

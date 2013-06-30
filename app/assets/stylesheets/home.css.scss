@@ -155,3 +155,9 @@ table.examples {
     text-align: right;
   }
 }
+
+#grades-table {
+  td {
+    min-width: 80px;
+  }
+}

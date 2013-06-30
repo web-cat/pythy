@@ -5,90 +5,99 @@ class HomeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def index
-    command = params[:command]
-
     @organization_list = Organization.all.map { |o| [o.display_name, o.id] }
 
-    if @offerings.any?
-      @not_started_assignments = []
-      @started_assignments = []
-      @assignments = []
-      @examples = []
+    offerings = current_user.course_offerings
+    @courses = offerings.group_by { |co| co.course }
 
-      # FIXME This isn't right, but I'm not sure yet how to ask Cancan whether
-      # the current ability can create new assignment offerings for a course
-      # offering.
-      staff = @offerings.first.role_for_user(
-        current_user).staff?
+    respond_to do |format|
+      format.html
+      format.js { render command }
+    end
+  end
 
-      @offerings.each do |offering|
-        @examples |= offering.example_repositories.where(
-          source_repository_id: nil)
 
-        if staff
-          assignments = offering.assignment_offerings
-          @assignments |= assignments.map { |ao| ao.assignment }
-        else
-          assignments = offering.assignment_offerings.visible
-          assignments.each do |assignment|
-            # TODO does a repository exist for the student and assignment? Put
-            # it in the right bucket.
+  # -------------------------------------------------------------
+  def course
+    @command = params[:command]
 
-            repo = AssignmentRepository.where(
-              assignment_offering_id: assignment.id,
-              user_id: current_user.id).first
-
-            if repo
-              @started_assignments |= [assignment]
-            else
-              @not_started_assignments |= [assignment]
-            end
-          end
-        end
-      end
-
-      @examples.sort! { |a, b| b.created_at <=> a.created_at }
-      @assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
-      @started_assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
-      @not_started_assignments.sort! { |a, b|
-        if a.effectively_due_at.nil? && b.effectively_due_at.nil?
-          0
-        elsif b.effectively_due_at.nil?
-          1
-        elsif a.effectively_due_at.nil?
-          -1
-        else
-          b.effectively_due_at <=> a.effectively_due_at
-        end
-      }
-
-      respond_to do |format|
-        format.html { render staff ? 'index_staff' : 'index' }
-        format.js { render command }
-      end
+    if @offerings.length == 1 &&
+      !@offerings.first.role_for_user(current_user).staff?
+      course_student
     else
-      offerings = current_user.course_offerings
-      @courses = offerings.group_by { |co| co.course }
+      course_staff
+    end
 
-      if offerings.count == 0
-        respond_to do |format|
-          format.html do
-            render 'index_no_courses'
-          end
-        end
-      elsif offerings.count == 1
-        respond_to do |format|
-          format.html do
-            render 'index_no_courses'
-          end
-        end
-      else        
-        respond_to do |format|
-          format.html do
-            render 'index_no_courses'
-          end
-        end
+  end
+
+
+  private
+
+  # -------------------------------------------------------------
+  def course_staff
+    # This is a staff user viewing one or more course offerings that
+    # they have permission to see.
+
+    @assignments = []
+    @examples = []
+
+    @offerings.each do |offering|
+      assignments = offering.assignment_offerings
+      @assignments |= assignments.map { |ao| ao.assignment }
+      @examples |= offering.example_repositories.where(source_repository_id: nil)
+    end
+
+    @assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
+    @examples.sort! { |a, b| b.created_at <=> a.created_at }
+
+    if @offerings.count == 1
+      @course_offering = @offerings.first
+      @course_enrollments = @course_offering.course_enrollments.page(params[:page])
+      @course_grades = CourseGrades.new(@course_offering)
+    end
+
+    respond_to do |format|
+      format.html { render 'course_staff' }
+      format.js   { render @command }
+    end
+  end
+
+
+  # -------------------------------------------------------------
+  def course_student
+    # This is a regular student viewing the one course offering that he or
+    # she is enrolled in for this course.
+
+    @not_started_assignments = []
+    @started_assignments = []
+    @examples = []
+
+    offering = @offerings.first
+
+    assignments = offering.assignment_offerings.visible
+    assignments.each do |assignment|
+      repo = AssignmentRepository.where(
+        assignment_offering_id: assignment.id,
+        user_id: current_user.id).first
+
+      if repo
+        @started_assignments |= [assignment]
+      else
+        @not_started_assignments |= [assignment]
       end
+    end
+
+    @started_assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
+    @not_started_assignments.sort! do |a, b|
+      nil_safe_compare(a.effectively_due_at, b.effectively_due_at)
+    end
+
+    @examples = offering.example_repositories
+    @examples.sort! { |a, b| b.created_at <=> a.created_at }
+
+    respond_to do |format|
+      format.html { render 'course_student' }
+      format.js   { render @command }
     end
   end
 

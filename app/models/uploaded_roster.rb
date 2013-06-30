@@ -14,12 +14,12 @@ class UploadedRoster
   NUMBER_OF_COLUMNS = 6
 
   COLUMNS = [
-    [ '(ignore)',   COLUMN_IGNORE ],
-    [ 'First Name', COLUMN_FIRST_NAME ],
-    [ 'Last Name',  COLUMN_LAST_NAME ],
-    [ 'Last Name, First',  COLUMN_FULL_NAME ],
-    [ 'E-mail',     COLUMN_EMAIL ],
-    [ 'Password',   COLUMN_PASSWORD ]
+    ['(ignore)',         COLUMN_IGNORE],
+    ['First Name',       COLUMN_FIRST_NAME],
+    ['Last Name',        COLUMN_LAST_NAME],
+    ['Last Name, First', COLUMN_FULL_NAME],
+    ['E-mail',           COLUMN_EMAIL],
+    ['Password',         COLUMN_PASSWORD]
   ]
 
 
@@ -35,7 +35,7 @@ class UploadedRoster
   #
   def initialize(params = {})
     @uploaded_file = params[:roster]
-    @column_hash = params[:columns]
+    @column_hash = params[:columns] || {}
     @has_headers = params[:has_headers]
     @course_role_id = params[:course_role_id]
     @course_offering = CourseOffering.find_by_id(params[:course_offering_id])
@@ -46,9 +46,7 @@ class UploadedRoster
     @preview_rows = []
     @column_array = []
 
-    if @uploaded_file
-      process_csv
-    end
+    process_csv if @uploaded_file
   end
 
 

@@ -3,38 +3,27 @@
     .row
       .span8
         %h1.slim
-          = @course.number
+          Courses
         %p.lead
-          = @course.name
 
 .container
   .row
-    .span7
-      %h3 Recent Work
+    .span6
+      - if @courses.empty?
+        %h2 Welcome to Pythy!
+        %p.lead
+          You are not currently enrolled in any courses on Pythy.
+          To get started, you can try to find your course listed by
+          selecting your school/organization and then the term in which
+          your course is being held to the right.
+        %p.lead
+          If you do not find your course listed, your instructor may have
+          not yet set it up, or he or she may be choosing to enroll students
+          manually.
+      - else
+        %h2 Your current courses
+        = render partial: 'self_enrollment/course_list', locals: { courses: @courses, link_to_offerings: true }
 
-      #started_assignments
-        = render(partial: 'home/started_assignment', collection: @started_assignments) || render(partial: 'home/no_started_assignments')
-
-    .span5
-      %h3 Not Yet Started
-
-      -# FIXME This isn't right, but I'm not sure yet how to ask Cancan whether
-      -# the current ability can create new assignment offerings for a course
-      -# offering.
-      - if @offerings.first.role_for_user(current_user).try(:can_manage_assignments?)
-        %p
-          = link_to 'Create a new assignment...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
-
-      #not_started_assignments
-        = render(partial: 'home/not_started_assignment', collection: @not_started_assignments) || render(partial: 'home/no_assignments')
-      
-      %h3 Instructor Examples
-      = hidden_field_tag :example_event_channel, @offerings.first.event_channel('examples')
-
-      - if can? :manage, @offerings.first
-        %p
-          = link_to 'Create a new example...', new_course_offering_example_repository_path(@offerings.first), class: 'btn btn-success btn-block', remote: true
-      %table.examples
-        %tbody#example_repositories
-          -# FIXME should be the union of all offerings' examples below
-          = render(@examples) || render(partial: 'example_repositories/empty')
+    .span6
+      %h2 Enroll in a new course
+      = render partial: 'self_enrollment/select_organization', locals: { organizations: @organization_list }

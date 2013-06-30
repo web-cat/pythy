@@ -37,4 +37,4 @@
         = link_to 'Upload a roster...', upload_roster_path(@course_offering), remote: true
 
 #staff-enrollments-table
-  = render partial: 'course_enrollments/table'
+  = render partial: 'course_enrollments/table', locals: { enrollments: @course_enrollments }

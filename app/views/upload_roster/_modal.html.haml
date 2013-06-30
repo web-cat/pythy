@@ -6,7 +6,7 @@
   = form_tag upload_roster_path(@course_offering, action: :upload),
     remote: true, multipart: true, class: 'form-horizontal modal-form' do
 
-    .modal-body
+    .modal-body.has-typeahead
       #flashbar-placeholder
 
       .control-group

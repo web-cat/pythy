@@ -33,25 +33,15 @@
               = link_to icon_tag('cog'), course_path(@offerings.first.course), class: 'btn btn-inverse', title: 'Manage this course', rel: 'tooltip'
 
 .container
-  .row
-    .span7
-      .btn-header-container.clearfix
-        %h3.pull-left.slim.btn-line-height Assignments
-        - if @offerings.any? { |o| o.role_for_user(current_user).can_manage_assignments? }
-          .pull-right
-            = link_to icon_tag('plus') + ' New...', new_course_offering_assignment_offering_path(@offerings.first), class: 'btn', remote: true
+  %ul.nav.nav-tabs
+    = tab_tag 'assignments-tab', icon_tag('laptop') + ' Assignments', active: true
+    = tab_tag 'users-tab', icon_tag('group') + ' Users'
+    = tab_tag 'grades-tab', icon_tag('tasks') + ' Grades'
 
-      #assignments
-        = render(partial: 'home/instructor_assignment', collection: @assignments) || render(partial: 'home/no_assignments')
-
-
-    .span5
-      .btn-header-container.clearfix
-        %h3.pull-left.slim.btn-line-height Instructor Examples
-        - if @offerings.any? { |o| o.role_for_user(current_user).can_manage_assignments? }
-          .pull-right
-            = link_to icon_tag('plus') + ' New...', new_course_offering_example_repository_path(@offerings.first), class: 'btn', remote: true
-
-      %table.examples
-        %tbody#example_repositories
-          = render(@examples) || render(partial: 'example_repositories/empty')
+.tab-content
+  #assignments-tab.tab-pane.active
+    = render partial: 'course_staff_assignments'
+  #users-tab.tab-pane
+    = render partial: 'course_staff_users'
+  #grades-tab.tab-pane
+    = render partial: 'course_staff_grades'
