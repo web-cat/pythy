@@ -28,6 +28,9 @@
 - # Docked tab area
 #dock.tabbable.tabs-left
   %ul.nav.nav-tabs
+    %li
+      %a{ href: 'javascript:void(0)', id: 'toggle-dock', rel: 'tooltip', title: 'Show/hide the dock', data: { placement: 'right' } }
+        .dock-chevron.down
     = tab_tag 'summary', active: true do
       = icon_tag('dashboard')
       %span.hidden-phone Summary

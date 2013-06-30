@@ -692,3 +692,54 @@ table td p.hint {
 .filter-list .active a:hover .icon-chevron-right {
   opacity: 1;
 }
+
+@mixin chevron($color, $angle) {
+  & {
+    position: relative;
+    text-align: center;
+    padding: 2px;
+    margin-bottom: 0px;
+    height: 0px;
+  }
+
+  &:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 51%;
+    background: $color;
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+    -webkit-transform: skew(0deg, $angle);
+    -moz-transform: skew(0deg, $angle);
+    -ms-transform: skew(0deg, $angle);
+    -o-transform: skew(0deg, $angle);
+    transform: skew(0deg, $angle);
+  }
+
+  &:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 50%;
+    background: $color;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+    -webkit-transform: skew(0deg, -$angle);
+    -moz-transform: skew(0deg, -$angle);
+    -ms-transform: skew(0deg, -$angle);
+    -o-transform: skew(0deg, -$angle);
+    transform: skew(0deg, -$angle);
+  }
+}
+
+.dock-chevron {
+  &.down { @include chevron(#eee, 10deg); }
+  &.up   { @include chevron(#eee, -10deg); }
+}

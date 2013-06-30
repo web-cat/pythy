@@ -35,13 +35,14 @@ class CodeController
     @ignoreChange = false
     @ignoreNextHashChange = false
 
-    @console = new InteractiveConsole()
+    @console = new InteractiveConsole(this)
 
     this._initializeSkulpt()
 
     $('#check').data('loading-text', '<i class="icon-spinner icon-spin"></i>')
 
     # Register event handlers for widgets.
+    $('#toggle-dock').click (e) => this._toggleDock()
     $('#run').click (e) => this._runCode()
     $('#sync').click (e) => this._resync()
     $('#check').click (e) => this._checkCode()
@@ -90,6 +91,27 @@ class CodeController
 
     # TODO optimize
     @preambleLines = @preamble.split('\n').length - 1
+
+
+  # ---------------------------------------------------------------
+  _toggleDock: (forceDirection) ->
+    $toggle = $('#toggle-dock')
+    $toggle.tooltip 'hide'
+
+    $chevron = $('#toggle-dock .dock-chevron')
+
+    if forceDirection == 'down' ||
+        !forceDirection && $chevron.hasClass('down')
+      # Hide the dock.
+      $chevron.removeClass('down').addClass('up')
+      $('#code-area').animate { bottom: '20px' }, 150
+      $('#dock').animate { height: '20px' }, 150
+    else if forceDirection == 'up' ||
+        !forceDirection && $chevron.hasClass('up')
+      # Show the dock.
+      $chevron.removeClass('up').addClass('down')
+      $('#code-area').animate { bottom: '180px' }, 150
+      $('#dock').animate { height: '180px' }, 150
 
 
   # ---------------------------------------------------------------
@@ -545,7 +567,7 @@ class CodeController
 class InteractiveConsole
 
   # -------------------------------------------------------------
-  constructor: (onInput) ->
+  constructor: (@codeController, onInput) ->
     @console_content = $("#console-content")
     @visible = false
     
@@ -560,6 +582,7 @@ class InteractiveConsole
   # -------------------------------------------------------------
   toggleConsole: (action) ->
     $('#dock a[href="#console"]').tab('show');
+    @codeController._toggleDock 'up'
 
 
   # -------------------------------------------------------------
