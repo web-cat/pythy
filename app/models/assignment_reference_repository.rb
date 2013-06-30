@@ -52,15 +52,14 @@ class AssignmentReferenceRepository < Repository
 
       commit(user, 'Initial repository setup.') do |git|
         # Touch the main solution file.
-        FileUtils.touch 'main.py'
+        FileUtils.touch File.join(path, 'main.py')
 
         # An area to store additional Python modules that should be loaded
         # when the program runs. (TODO)
         create_dir 'lib'
 
         # An area to store Python modules containing reference tests.
-        create_dir 'test'
-        FileUtils.touch 'test/test.py'
+        create_dir 'test', %w(test.py)
 
         # An area to store assets/resources that students should have
         # access to when their program is running (e.g., text files with
@@ -74,8 +73,7 @@ class AssignmentReferenceRepository < Repository
 
         # An area to store starter files that will be cloned into the
         # student's new repository when they start working on an assignment.
-        create_dir 'starter'
-        FileUtils.touch 'starter/main.py'
+        create_dir 'starter', %w(main.py)
 
         git.add '.'
       end
@@ -84,10 +82,14 @@ class AssignmentReferenceRepository < Repository
 
 
   # -------------------------------------------------------------
-  def create_dir(dirname)
+  def create_dir(dirname, files=[])
     dirpath = File.join(git_path, dirname)
     FileUtils.mkdir_p dirpath
     FileUtils.touch File.join(dirpath, '.gitkeep')
+
+    files.each do |file|
+      FileUtils.touch File.join(dirpath, file)
+    end
   end
 
 end
