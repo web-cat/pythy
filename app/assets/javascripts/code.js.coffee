@@ -48,6 +48,7 @@ class CodeController
     $('#start-over').click (e) => this._startOver()
     $('#media').click (e) => this._openMediaLibrary()
     $('#change-environment').click (e) => this._changeEnvironment()
+    $('#save-as-personal').click (e) => this._saveAsPersonal()
     $(window).hashchange => this._hashChange()
 
     window.setInterval (=> this._updateHistoryTimestamps()), 1000
@@ -76,6 +77,11 @@ class CodeController
   # ---------------------------------------------------------------
   _changeEnvironment: ->
     this._sendMessage data: message: 'prompt_for_environment'
+
+
+  # ---------------------------------------------------------------
+  _saveAsPersonal: ->
+    this._sendMessage data: message: 'save_as_personal'
 
 
   # ---------------------------------------------------------------

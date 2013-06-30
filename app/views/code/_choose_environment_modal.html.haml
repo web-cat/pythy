@@ -7,7 +7,7 @@
       Select the Python environment that you want to use for this
       scratchpad. You can change it at any time later on if you wish.
 
-    = select_tag :environment, options_from_collection_for_select(Environment.all, :id, :name), prompt: '(none)', data: { width: '100%' }
+    = select_tag :environment, options_from_collection_for_select(Environment.all, :id, :name, environment_id), prompt: '(none)', data: { width: '100%' }
 
   .modal-footer
     = button_tag 'Set Environment', id: 'set-environment', class: 'btn btn-primary', data: { dismiss: 'modal' }

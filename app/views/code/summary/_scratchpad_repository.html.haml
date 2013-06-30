@@ -4,12 +4,12 @@
       %h3.slim
         Scratchpad
       %p
-        You can use this coding area to do "scratch work" that isn't part
-        of any of your courses or assignments. The code that you write here
-        is automatically saved and you can use the
+        You can use this coding area to do &ldquo;scratch work&rdquo; that
+        isn't part of any of your courses or assignments. The code that you
+        write here is automatically saved and you can use the
         %strong History
         panel below to backtrack if you wish.
 
     .span4.padded-top
-      -#.btn-group.btn-group-vertical.btn-block
-      = link_to icon_tag('globe') + ' Change Environment...', 'javascript:void(0)', id: 'change-environment', class: 'btn btn-block'
+      = link_to icon_tag('globe') + ' Change environment...', 'javascript:void(0)', id: 'change-environment', class: 'btn btn-block'
+      = #link_to icon_tag('code-fork') + ' Save as personal repository...', 'javascript:void(0)', id: 'save-as-personal', class: 'btn btn-block'

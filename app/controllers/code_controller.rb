@@ -250,12 +250,15 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def prompt_for_environment
+    env = @repository.read_attribute(:environment_id)
+
     respond_to do |format|
       format.js {
         render template: 'code/prompt_for_environment',
           locals: {
             update_url: polymorphic_path(@repository),
-            model_name: @repository.class.name.underscore
+            model_name: @repository.class.name.underscore,
+            environment_id: env
           }
       }
     end
