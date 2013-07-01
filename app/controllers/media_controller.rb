@@ -77,7 +77,10 @@ class MediaController < ApplicationController
         # unique, we can mount the uploader without using the MediaItem id,
         # making it possible to provide shorthand versions of makePicture(),
         # etc. that only need the filename and not the full URL.
-        existing_item = MediaItem.where(file: file.original_filename).first
+        existing_item = MediaItem.where(
+          user_id: @user ? @user.id : nil
+          file: file.original_filename).first
+
         if existing_item
           media_item = existing_item
           media_item.file = file
