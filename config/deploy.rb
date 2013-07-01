@@ -148,10 +148,10 @@ namespace :uploads do
   EOD
   task :symlink, except: { no_release: true } do
     #run "rm -rf #{release_path}/public/uploads"
-    run "ln -nfs #{shared_path}/public/uploads #{latest_release}/public/uploads"
+    run "ln -nfs #{shared_path}/uploads #{latest_release}/public/uploads"
 
     #run "rm -rf #{release_path}/public/system"
-    run "ln -nfs #{shared_path}/public/m #{latest_release}/public/m"
+    run "ln -nfs #{shared_path}/m #{latest_release}/public/m"
   end
 
   desc <<-EOD
