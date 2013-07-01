@@ -138,12 +138,8 @@ namespace :uploads do
   EOD
   task :setup, except: { no_release: true } do
     dirs = uploads_dirs.map { |d| File.join(shared_path, d) }
-    sudo "mkdir -p #{dirs.join(' ')}"
-    sudo "chmod g+w #{dirs.join(' ')}"
-
-    dirs = protected_dirs.map { |d| File.join(shared_path, d) }
-    sudo "mkdir -p #{dirs.join(' ')}"
-    sudo "chmod g+w #{dirs.join(' ')}"
+    run "mkdir -p #{dirs.join(' ')}"
+    run "chmod g+w #{dirs.join(' ')}"
   end
 
   desc <<-EOD
@@ -152,10 +148,10 @@ namespace :uploads do
   EOD
   task :symlink, except: { no_release: true } do
     #run "rm -rf #{release_path}/public/uploads"
-    run "ln -nfs #{shared_path}/uploads #{latest_release}/public/uploads"
+    run "ln -nfs #{shared_path}/public/uploads #{latest_release}/public/uploads"
 
     #run "rm -rf #{release_path}/public/system"
-    run "ln -nfs #{shared_path}/m #{latest_release}/public/m"
+    run "ln -nfs #{shared_path}/public/m #{latest_release}/public/m"
   end
 
   desc <<-EOD
