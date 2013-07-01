@@ -34,6 +34,8 @@ class User < ActiveRecord::Base
   attr_accessible :full_name, :email, :password, :password_confirmation,
     :remember_me, :global_role_id, :course_offerings, :course_enrollments
 
+  validates :full_name, presence: true
+
   before_create :set_default_role
 
   paginates_per 15
