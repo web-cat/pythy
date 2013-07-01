@@ -78,7 +78,7 @@ class MediaController < ApplicationController
         # making it possible to provide shorthand versions of makePicture(),
         # etc. that only need the filename and not the full URL.
         existing_item = MediaItem.where(
-          user_id: @user ? @user.id : nil
+          user_id: @user ? @user.id : nil,
           file: file.original_filename).first
 
         if existing_item
