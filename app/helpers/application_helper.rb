@@ -264,7 +264,7 @@ HTML
 
   # -------------------------------------------------------------
   def link_to_destroy(resource, options={})
-    name = resource.class.name.humanize
+    name = resource.class.name.underscore.humanize.downcase
 
     options.merge! method: :delete, data: {
       confirm: "Are you sure you want to delete this #{name}?",

@@ -1,6 +1,7 @@
 require 'redis'
 
 class CodeController < FriendlyUrlController
+  include FriendlyUrlHelper
 
   layout 'code'
 
@@ -14,37 +15,41 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def show
-    @subscribe_channel = @repository.event_channel(nil)
+    if @needs_redirect
+      redirect_to staff_code_url(@repository)
+    else
+      @subscribe_channel = @repository.event_channel(nil)
 
-    @repository.read do
-      path = File.join(@repository.git_path, @filename)
-      FileUtils.touch path unless File.exists?(path)
-    end
+      @repository.read do
+        path = File.join(@repository.git_path, @filename)
+        FileUtils.touch path unless File.exists?(path)
+      end
 
-    if @repository.is_a? AssignmentRepository
-      a = @repository.assignment_offering.assignment
-      @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
-    elsif @repository.is_a? AssignmentReferenceRepository
-      a = @repository.assignment
-      @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
-    elsif @repository.is_a? ExampleRepository
-      @page_title = "#{@repository.course_offering.course.number} &ndash; Example: #{@repository.name}"
-    elsif @repository.is_a? ScratchpadRepository
-      @page_title = "#{@repository.user.display_name} &ndash; Scratchpad"
-    end
+      if @repository.is_a? AssignmentRepository
+        a = @repository.assignment_offering.assignment
+        @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
+      elsif @repository.is_a? AssignmentReferenceRepository
+        a = @repository.assignment
+        @page_title = "#{a.course.number} &ndash; #{a.short_name}: #{a.long_name}"
+      elsif @repository.is_a? ExampleRepository
+        @page_title = "#{@repository.course_offering.course.number} &ndash; Example: #{@repository.name}"
+      elsif @repository.is_a? ScratchpadRepository
+        @page_title = "#{@repository.user.display_name} &ndash; Scratchpad"
+      end
 
-    if @repository.warn_if_not_owner? && @repository.user != current_user
-      flash[:alert] = "You are viewing a repository that belongs to #{@repository.user.display_name}."
-    end
+      if @repository.warn_if_not_owner? && @repository.user != current_user
+        flash[:alert] = "You are viewing a repository that belongs to #{@repository.user.display_name}."
+      end
 
-    @code_area_data = {
-      :channel => @subscribe_channel,
-      :editor => can?(:update, @repository),
-      :'user-media-key' => current_user.resource_key
-    }
+      @code_area_data = {
+        :channel => @subscribe_channel,
+        :editor => can?(:update, @repository),
+        :'user-media-key' => current_user.resource_key
+      }
 
-    if @repository.is_a? ScratchpadRepository
-      @code_area_data[:'needs-environment'] = !@repository.environment_present?
+      if @repository.is_a? ScratchpadRepository
+        @code_area_data[:'needs-environment'] = !@repository.environment_present?
+      end
     end
   end
 
@@ -322,8 +327,8 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def find_example_repository_from_path_parts(parts)
-    id = parts.second
-    @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
+    parts.shift
+    id = parts.shift
 
     @repository = ExampleRepository.find_by_id(id)
   end
@@ -331,12 +336,13 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def find_assignment_repository_from_path_parts(parts)
+    parts.shift
+
     if @term
       # It's a student trying to access their personal repository
       # for an assignment.
 
-      url_part = parts.second
-      @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
+      url_part = parts.shift
 
       assignment = AssignmentOffering.joins(:assignment).where(
         assignments: { url_part: url_part },
@@ -353,8 +359,7 @@ class CodeController < FriendlyUrlController
       # It's an instructor trying to access the reference repository
       # for an assignment.
 
-      url_part = parts.second
-      @filename = parts.length > 2 ? File.join(parts[2..-1]) : DEFAULT_FILE
+      url_part = parts.shift
 
       assignment = Assignment.where(url_part: url_part).first
 
@@ -378,8 +383,6 @@ class CodeController < FriendlyUrlController
   def find_scratchpad_repository_from_path_parts(parts)
     @repository = current_user.scratchpad_repository ||
       current_user.create_scratchpad_repository
-
-    @filename = parts.length > 0 ? File.join(parts) : DEFAULT_FILE
   end
 
 
@@ -390,7 +393,6 @@ class CodeController < FriendlyUrlController
 
     user_id = parts.shift.to_i
     url_part = parts.shift
-    @filename = parts.length > 0 ? File.join(parts) : DEFAULT_FILE
 
     assignment = AssignmentOffering.joins(:assignment).where(
       assignments: { url_part: url_part },
@@ -410,6 +412,9 @@ class CodeController < FriendlyUrlController
     parts = @rest ? @rest.split('/') : []
 
     case parts.first
+    when /^\d+$/
+      @repository = Repository.find_by_id(parts.first)
+      @needs_redirect = true
     when 'example'
       find_example_repository_from_path_parts(parts)
     when 'assignments'
@@ -420,7 +425,7 @@ class CodeController < FriendlyUrlController
       find_student_repository_from_path_parts(parts)
     end
 
-    puts parts
+    @filename = parts.length > 0 ? File.join(parts) : DEFAULT_FILE
 
     # Prevent access to dot-files.
     # TODO maybe allow instructors to do this, though

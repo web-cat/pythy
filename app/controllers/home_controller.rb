@@ -53,7 +53,7 @@ class HomeController < FriendlyUrlController
     if @offerings.count == 1
       @course_offering = @offerings.first
       @course_enrollments = @course_offering.course_enrollments.page(params[:page])
-      @course_grades = CourseGrades.new(@course_offering)
+      @course_scores = CourseOfferingScores.new(@course_offering)
     end
 
     respond_to do |format|

@@ -24,3 +24,11 @@ $ ->
         dataType: 'script',
         data:
           command: 'refresh_examples'
+
+  # Defer loading the gradebook until the tab is shown.
+  $('a[href="#grades-tab"]').on 'shown', (e) ->
+    if $('#grades-tab').children().length == 0
+      window.pythy.appendLoaderTo $('#grades-tab')
+      $.ajax window.location.href,
+        dataType: 'script'
+        data: command: 'load_grades'

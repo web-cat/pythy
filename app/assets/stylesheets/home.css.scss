@@ -160,4 +160,7 @@ table.examples {
   td {
     min-width: 80px;
   }
+  td:first-child {
+    white-space: nowrap;
+  }
 }

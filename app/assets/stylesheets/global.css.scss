@@ -489,6 +489,26 @@ ul.gravatar-list {
   }
 }
 
+.loading-widget {
+  width: 100%;
+  text-align: center;
+  margin: 15px 0;
+  color: #666;
+
+  .icon-spinner {
+    display: block;
+    font-size: 96px;
+    margin-bottom: 8px;
+  }
+
+  &:after {
+    content: 'Loading...';
+    font-weight: 300;
+    font-size: 22px;
+  }
+}
+
+
 .CodeMirror {
   line-height: 16px;
 }

@@ -170,6 +170,15 @@ window.pythy =
     "#{Math.round(value * 100) / 100}%"
 
 
+  # -------------------------------------------------------------
+  appendLoaderTo: (selector) ->
+    selector.append(
+      $('<div>').addClass('loading-widget').append(
+        $('<i>').addClass('icon-spinner icon-spin')
+      )
+    )
+
+
 # =========================================================================
 # A utility class for calculating statistics from values in an array.
 class Statistics

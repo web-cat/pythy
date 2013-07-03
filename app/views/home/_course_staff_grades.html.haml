@@ -3,14 +3,18 @@
     %thead
       %tr
         %th Name
-        - @course_grades.assignment_offerings.each do |offering|
+        - @course_scores.assignment_offerings.each do |offering|
           %th= offering.assignment.short_name
     %tbody
-      - @course_grades.users.each do |user|
+      - @course_scores.users.each do |user|
         %tr
           %td.has_gravatar
             = gravatar_tag(user, 28)
             = user.display_name
-          - @course_grades.grades_for_user(user).each do |grade|
+          - @course_scores.assignment_offerings.each do |offering|
             %td
-              = grade && percentage(grade) || '&ndash;'.html_safe
+              - info = @course_scores.info_for_user_and_assignment_offering(user, offering)
+              - if info
+                = link_to percentage(info[:score]), "/code/#{info[:repository_id]}"
+              - else
+                &ndash;

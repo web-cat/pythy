@@ -142,8 +142,12 @@ class AssignmentRepository < Repository
 
   # -------------------------------------------------------------
   def copy_starter_files
+    path = git_path
+
     ref_repo = assignment_offering.assignment.assignment_reference_repository
-    ref_repo.copy_starter_files_to git_path
+    ref_repo.copy_starter_files_to path
+
+    FileUtils.touch File.join(path, '.gitkeep')
   end
 
 end
