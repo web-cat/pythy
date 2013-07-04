@@ -1,16 +1,16 @@
 source 'https://rubygems.org'
 
 gem 'rails', '4.0.0'
-gem 'thin'
+gem 'puma'
 
 group :development, :test do
   gem 'sqlite3', '~> 1.3.4'
   gem 'mysql2'
   gem 'quiet_assets'
-  gem 'pg'                  #postgres db support
+  gem 'pg'              # Postgres db support
 end
 
-group :production do
+group :production, :staging do
   gem 'mysql2'
 end
 
