@@ -10,7 +10,7 @@ class ActivityLog < ActiveRecord::Base
 
   serialize :info, Hash
 
-  default_scope includes(:user).order('activity_logs.created_at desc')
+  default_scope -> { includes(:user).order('activity_logs.created_at desc') }
 
 
   #~ Instance methods .........................................................

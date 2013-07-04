@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'rails', '3.2.11'
+gem 'rails', '4.0.0'
 gem 'thin'
 
 group :development, :test do
@@ -14,8 +14,8 @@ group :production do
   gem 'mysql2'
 end
 
-gem 'sass-rails',   '~> 3.2.3'
-gem 'coffee-rails', '~> 3.2.1'
+gem 'sass-rails',   '~> 4.0.0'
+gem 'coffee-rails', '~> 4.0.0'
 gem 'coffee-script-source', '1.5.0'
 gem 'uglifier', '>= 1.0.3'
 
@@ -34,14 +34,9 @@ gem 'daemon'
 gem 'rabl'            # JSON generation
 
 # Gems for authentication and authorization.
-gem 'devise'
-gem 'devise_ldap_authenticatable',
-  git: 'git://github.com/cschiewek/devise_ldap_authenticatable.git'
-gem 'net-ldap'
+gem 'devise', '3.0.0.rc'
 gem 'omniauth'
 gem 'omniauth-facebook'
-gem 'omniauth-ldap',
-  git: 'git://github.com/web-cat/omniauth-ldap.git'
 gem 'cancan', '1.6.9' # 1.6.10 broke shallow routes
 
 # Various gems for other features used in Pythy.
@@ -49,8 +44,8 @@ gem 'fastercsv'       # CSV reading/writing
 gem 'kaminari'        # Auto-paginated views
 gem 'remotipart'      # Adds support for remote mulitpart forms (file uploads)
 gem 'redcarpet'       # Markdown renderer
-gem 'rails_admin'     # Turnkey admin interface
-gem 'delocalize'      # Fixes formatting of date/time form fields
+gem 'delocalize',     # Fixes formatting of date/time form fields
+  git: 'git@github.com:elementar/delocalize.git' # Use this fork until Rails 4 support is added to official
 gem 'git',            # Git repository support
   git: 'git://github.com/allevato/ruby-git.git'
 gem 'carrierwave'     # File attachment support
@@ -73,6 +68,9 @@ gem 'sidekiq-failures'
 # Required for Sidekiq's web-based monitoring interface.
 gem 'sinatra', require: false
 gem 'slim'
+
+# Temporary gems for backwards-compatibility.
+gem 'protected_attributes'
 
 # Gems for deployment.
 gem 'capistrano'

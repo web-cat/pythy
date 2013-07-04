@@ -23,7 +23,7 @@ class Term < ActiveRecord::Base
   attr_accessible :ends_on, :season, :starts_on, :year
 
   # Orders terms in descending order (latest time first).
-  scope :latest_first, order('year desc, season desc')
+  scope :latest_first, -> { order('year desc, season desc') }
 
 
   #~ Class methods ............................................................

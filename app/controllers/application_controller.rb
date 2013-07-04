@@ -2,10 +2,6 @@ class ApplicationController < ActionController::Base
 
   layout :determine_layout
 
-  rescue_from DeviseLdapAuthenticatable::LdapException do |exception|
-    render :text => exception, :status => 500
-  end
-
   # -------------------------------------------------------------
   unless Rails.application.config.consider_all_requests_local
     rescue_from Exception,

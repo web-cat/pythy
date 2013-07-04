@@ -4,19 +4,15 @@ include ApplicationHelper   # Brings in needs_initial_setup?
 
 Pythy::Application.routes.draw do
 
-  resources :environments
-
-
-  mount RailsAdmin::Engine => 'rails_admin'
   mount Sidekiq::Web, at: '/sidekiq'
 
-  match '/auth/:provider/callback' => 'authentications#create'
+  post '/auth/:provider/callback' => 'authentications#create'
   resources :authentications
 
   # Provide the initial setup routes if the User table is empty.
-  scope constraints: ->(req) { needs_initial_setup? } do
-    match 'setup(/:action)', controller: 'setup', as: 'setup'
-    root to: 'setup#index'
+  scope constraints: -> (req) { needs_initial_setup? } do
+    get 'setup(/:action)', controller: 'setup', as: 'setup'
+    get '/', to: 'setup#index', as: nil
   end
 
   # Routes for Devise authentication.
@@ -33,11 +29,12 @@ Pythy::Application.routes.draw do
   resource :system_configuration, except: :destroy
 
   match 'activity(/:action)', controller: 'activity_logs',
-    as: 'activity_logs'
+    as: 'activity_logs', via: [:get, :post]
 
   resources :terms
   resources :global_roles
   resources :course_roles
+  resources :environments
 
   resources :assignment_repositories, shallow: true do
     resources :assignment_checks
@@ -58,36 +55,37 @@ Pythy::Application.routes.draw do
     end
   end
 
-  match 'typeaheads/user', to: 'typeaheads#user'
+  get 'typeaheads/user', to: 'typeaheads#user'
 
   match 'course_offering/:course_offering_id/upload_roster/:action',
-    controller: 'upload_roster', as: 'upload_roster'
+    controller: 'upload_roster', as: 'upload_roster', via: [:get, :post]
 
   match 'self_enroll/:action',
-    controller: 'self_enrollment', as: 'self_enrollment'
+    controller: 'self_enrollment', as: 'self_enrollment', via: [:get, :post]
 
   # Route for viewing code. The constraints allow project and file names to
   # include dots, which would normally be interpreted by Rails' router as a
   # format indicator.
   code_pattern = 'code(/:organization(/:course(/:term(/:offering(/:rest)))))'
-  match code_pattern => 'code#show', via: :get, constraints: { rest: /.+/ }
-  match code_pattern => 'code#update', via: :put, constraints: { rest: /.+/ }
-  match code_pattern => 'code#message', via: :post, constraints: { rest: /.+/ }
+  get code_pattern => 'code#show', constraints: { rest: /.+/ }
+  put code_pattern => 'code#update', constraints: { rest: /.+/ }
+  post code_pattern => 'code#message', constraints: { rest: /.+/ }
 
-  match 'home' => 'home#index'
-  match 'home/:organization/:course/:term(/:offering)' => 'home#course'
+  match 'home' => 'home#index', via: [:get, :post]
+  match 'home/:organization/:course/:term(/:offering)' => 'home#course',
+    via: [:get, :post]
 
   # Route for accessing the media library.
   medias_pattern = 'media(/user/:user)(/assignment/:assignment)'
   media_pattern = "#{medias_pattern}(/:filename)"
-  match medias_pattern => 'media#index', via: :get, constraints: { filename: /.+/ }
-  match media_pattern => 'media#show', via: :get, constraints: { filename: /.+/ }
-  match media_pattern => 'media#create', via: :post, constraints: { filename: /.+/ }
-  match 'media/:id' => 'media#destroy', via: :delete
+  get medias_pattern => 'media#index', constraints: { filename: /.+/ }
+  get media_pattern => 'media#show', constraints: { filename: /.+/ }
+  post media_pattern => 'media#create', constraints: { filename: /.+/ }
+  delete 'media/:id' => 'media#destroy'
 
   # External content proxy, to get around HTTPS issues when Python code makes
   # requests to external sites.
-  match 'proxy' => 'proxy#get', as: 'proxy'  
+  get 'proxy' => 'proxy#get', as: 'proxy'  
 
   # Default route when a user is logged in.
   authenticated :user do
@@ -95,10 +93,10 @@ Pythy::Application.routes.draw do
   end
 
   # Default route when a user is not logged in.
-  root to: 'landing#index'
+  get '/', to: 'landing#index', as: 'landing'
 
   unless Rails.application.config.consider_all_requests_local
-    match '*not_found', to: 'errors#error_404'
+    get '*not_found', to: 'errors#error_404'
   end
 
 end

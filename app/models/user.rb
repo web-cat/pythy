@@ -1,8 +1,5 @@
 #--------------------------------------------------------------------------
-# Describes a user in the system. Currently, users are authenticated using
-# the Virginia Tech LDAP server. We will need to generalize this eventually
-# so that the system can be adopted on a larger scale. (TODO look into ways
-# of supporting multiple authenticators in Devise.)
+# Describes a user in the system.
 class User < ActiveRecord::Base
 
   include ResourceKeyMethods
@@ -26,7 +23,7 @@ class User < ActiveRecord::Base
   # :token_authenticatable, :encryptable, :confirmable, :lockable,
   # :timeoutable and :omniauthable
 
-  # devise :ldap_authenticatable, :rememberable, :trackable, :validatable
+  # devise :rememberable, :trackable, :validatable
   devise :registerable, :database_authenticatable, :rememberable,
     :recoverable, :trackable, :validatable
 
@@ -40,7 +37,7 @@ class User < ActiveRecord::Base
 
   paginates_per 15
 
-  scope :search, lambda { |query|
+  scope :search, -> (query) {
     unless query.blank?
       arel = self.arel_table
       pattern = "%#{query}%"
@@ -49,7 +46,7 @@ class User < ActiveRecord::Base
     end
   }
 
-  scope :alphabetical, order('full_name asc, email asc')
+  scope :alphabetical, -> { order('full_name asc, email asc') }
 
 
   #~ Class methods ............................................................
