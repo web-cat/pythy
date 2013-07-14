@@ -13,7 +13,9 @@
 //= require jquery
 //= require jquery_ujs
 //= require jquery.remotipart
+//= require js-routes
 //= require twitter/bootstrap/bootstrap
+//= require turbolinks
 //= require jquery/jqueryui/jquery-ui-1.10.3.custom.min
 //= require cowboy/jquery-hashchange/jquery.ba-hashchange.min
 //= require morr/jquery-appear/jquery.appear
@@ -32,3 +34,6 @@
 //= require highcharts
 //= require highcharts/highcharts-more
 //= require highcharts-theme
+
+// Add the route helpers directly into the window object for easy access.
+$.extend(window, Routes)

@@ -49,7 +49,9 @@ module Pythy
 
     # Enable the asset pipeline
     config.assets.enabled = true
-    config.assets.initialize_on_precompile = false
+
+    # This is required to be true to precompile js-routes.
+    config.assets.initialize_on_precompile = true
 
     # Version of your assets, change this if you want to expire all your assets
     config.assets.version = '1.0'
