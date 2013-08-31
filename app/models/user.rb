@@ -37,7 +37,7 @@ class User < ActiveRecord::Base
 
   paginates_per 15
 
-  scope :search, -> (query) {
+  scope :search, lambda { |query|
     unless query.blank?
       arel = self.arel_table
       pattern = "%#{query}%"

@@ -44,7 +44,7 @@ class MediaItemUploader < CarrierWave::Uploader::Base
     def full_filename(for_file)
       dir_only = File.dirname(for_file)
       file_only = File.basename(for_file)
-      file_only.sub! /\.[^.]+\z/, '_thumb.png'
+      file_only.sub!(/\.[^.]+\z/, '_thumb.png')
       File.join(dir_only, '_thumbs', file_only)
     end 
   end

@@ -37,7 +37,7 @@ class SystemConfigurationsController < ApplicationController
   # POST /system_configuration.json
   def create
     respond_to do |format|
-      if @system_configuration.save
+      if @system_configuration.update_attributes(params[:system_configuration])
         format.html do
           redirect_to root_path,
             notice: 'System configuration was successfully created.'

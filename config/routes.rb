@@ -10,7 +10,7 @@ Pythy::Application.routes.draw do
   resources :authentications
 
   # Provide the initial setup routes if the User table is empty.
-  scope constraints: -> (req) { needs_initial_setup? } do
+  scope :constraints => lambda { |req| needs_initial_setup? } do
     get 'setup(/:action)', controller: 'setup', as: 'setup'
     get '/', to: 'setup#index', as: nil
   end
