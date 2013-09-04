@@ -75,6 +75,9 @@ class AssignmentReferenceRepository < Repository
         # student's new repository when they start working on an assignment.
         create_dir 'starter', %w(main.py)
 
+        # An area to store a reference solution written by the instructor.
+        create_dir 'solution', %w(main.py)
+
         git.add '.'
       end
     end
