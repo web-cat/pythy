@@ -1,7 +1,0 @@
-%tr
-  %td= link_to example_repository.name, code_path(example_repository)
-  %td
-    = l example_repository.created_at, format: :date_only
-    &nbsp;
-    - if can?(:destroy, example_repository)
-      = link_to_destroy example_repository
