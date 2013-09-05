@@ -206,6 +206,7 @@ form.form-basic {
         background: $nav-color-red;
       }
     }
+    &.nav-logout   { @include nav-link($nav-color-red); }
 
     & > a {
       background: #141414;

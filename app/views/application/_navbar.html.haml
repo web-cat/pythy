@@ -54,16 +54,16 @@
               = menu_link_to_if can?(:manage, Environment), icon_tag('globe') + ' Environments', environments_path                
               = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
         - if current_user
-          %li.dropdown.nav-user
-            = dropdown_tag do
-              = image_tag(current_user.gravatar_url(size: 30))
+          %li.nav-user
+            = link_to edit_registration_path(current_user) do
+              = image_tag(current_user.gravatar_url(size:30))
               %span.hidden-phone
                 = current_user.display_name
-              %i.icon-caret-down
-            %ul.dropdown-menu
-              %li= link_to icon_tag('user') + ' Account Settings', edit_registration_path(current_user)
-              %li.divider
-              - if session[:original_user]
-                %li= link_to icon_tag('signout') + ' Unimpersonate', unimpersonate_users_path
-              - else 
-                %li= link_to icon_tag('signout') + ' Sign Out', destroy_user_session_path, method: :delete
+          %li.nav-logout
+            - if session[:original_user]
+              = link_to unimpersonate_users_path, title: "Unimpersonate User" do
+                %i.icon-signout.icon-large
+              
+            - else 
+              = link_to destroy_user_session_path, title: "Logout", method: :delete do
+                %i.icon-signout.icon-large
