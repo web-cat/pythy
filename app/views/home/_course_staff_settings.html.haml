@@ -1,0 +1,19 @@
+.container
+  = pythy_form_for @offerings.first.course.organization, @offerings.first.course do |f|
+  
+    = f.collection_select :organization_id, 'Organization', Organization.all, :id, :display_name, prompt: '(none)'
+  
+    = f.text_field :number do
+      %span.help-block
+        The course number prefixed by its departmental abbreviation (for example, "CS 110"). There are no restrictions on the format of this string so different types of organizations can use it differently (for example, "Sandbox" or "Playground" might be appropriate).
+  
+    = f.text_field :name, class: 'span6' do
+      %span.help-block
+        The full course title (for example, "Introduction to Python").
+  
+    = f.collection_select :default_environment_id, 'Default environment', Environment.all, :id, :name, prompt: '(none)'
+  
+    = hidden_field_tag :source, 'settings_tab'
+  
+    = f.actions do
+      = f.submit

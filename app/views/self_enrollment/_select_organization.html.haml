@@ -1,6 +1,13 @@
 .well.well-small
   %p Which school or organization is hosting the course?
-  = select_tag :organization, options_for_select(organizations), { id: 'self-enroll-organization', prompt: '(select an organization)', data: { width: '100%' } }
+  - if organizations.any?
+    = select_tag :organization, options_for_select(organizations), { id: 'self-enroll-organization', prompt: '(select an organization)', data: { width: '100%' } }
+  - else
+    %div.alert
+      There are no registered organizations at the moment.
+      - if can? :create, Organization      
+        = link_to new_organization_path do
+          Click here to create one.
 
   #select-term
 

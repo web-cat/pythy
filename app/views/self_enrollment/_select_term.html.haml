@@ -1,2 +1,9 @@
 %p What term is the course offered?
-= select_tag :term, options_for_select(terms), { id: 'self-enroll-term', prompt: '(select a term)', data: { width: '100%' } }
+- if terms.any?
+  = select_tag :term, options_for_select(terms), { id: 'self-enroll-term', prompt: '(select a term)', data: { width: '100%' } }
+- else
+  %div.alert
+    You have not yet created any terms.    
+    - if can? :create, Term     
+      = link_to new_term_path do
+        Click here to create one.

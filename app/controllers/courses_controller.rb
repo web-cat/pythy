@@ -68,7 +68,13 @@ class CoursesController < ApplicationController
   def update
     respond_to do |format|
       if @course.update_attributes(params[:course])
-        format.html { redirect_to @course, notice: 'Course was successfully updated.' }
+        format.html { 
+          if params[:source] == 'settings_tab'
+            redirect_to :back, notice: 'Course offering was successfully updated.'
+          else
+            redirect_to @course, notice: 'Course was successfully updated.'
+          end
+        }
         format.json { head :no_content }
       else
         format.html { render action: 'edit' }

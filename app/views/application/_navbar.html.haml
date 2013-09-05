@@ -61,9 +61,9 @@
                 = current_user.display_name
           %li.nav-logout
             - if session[:original_user]
-              = link_to unimpersonate_users_path do
+              = link_to unimpersonate_users_path, title: "Unimpersonate User" do
                 %i.icon-signout.icon-large
               
             - else 
-              = link_to destroy_user_session_path, method: :delete do
+              = link_to destroy_user_session_path, title: "Logout", method: :delete do
                 %i.icon-signout.icon-large
