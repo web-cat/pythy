@@ -98,11 +98,11 @@ class Ability
     # offering and have a CourseRole where can_manage_course? is true.
 
     can :read, CourseOffering, user.course_offerings do |offering|
-      offering.users.exists?(user)
+      true
     end
 
     can :manage, CourseOffering, user.managing_course_offerings do |offering|
-      offering.managers.exists?(user)
+      true
     end
 
     # Likewise, a user can only manage enrollments in a CourseOffering
