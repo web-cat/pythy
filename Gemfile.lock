@@ -1,10 +1,4 @@
 GIT
-  remote: git://github.com/allevato/ruby-git.git
-  revision: cbef6322e7c3aa887253d82561dcc044ad80187a
-  specs:
-    git (1.2.6)
-
-GIT
   remote: git://github.com/stouset/twitter_bootstrap_form_for.git
   revision: 263774b4fca23987640d2586941584433b70c8d9
   branch: bootstrap-2.0
@@ -88,6 +82,7 @@ GEM
     fastercsv (1.5.5)
     font-awesome-rails (3.2.0.0)
       railties (>= 3.2, < 5.0)
+    git (1.2.6)
     gravtastic (3.2.6)
     haml (4.0.3)
       tilt
@@ -255,7 +250,7 @@ DEPENDENCIES
   devise (= 3.0.0.rc)
   fastercsv
   font-awesome-rails
-  git!
+  git (~> 1.2.6)
   gravtastic
   haml (>= 3.1.4)
   highcharts-rails (~> 3.0.0)

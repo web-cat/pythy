@@ -46,8 +46,7 @@ gem 'remotipart'      # Adds support for remote mulitpart forms (file uploads)
 gem 'redcarpet'       # Markdown renderer
 gem 'delocalize',     # Fixes formatting of date/time form fields
   git: 'git@github.com:elementar/delocalize.git' # Use this fork until Rails 4 support is added to official
-gem 'git',            # Git repository support
-  git: 'git://github.com/allevato/ruby-git.git'
+gem "git", "~> 1.2.6" # Git repository support
 gem 'carrierwave'     # File attachment support
 gem 'mime-types'      # MIME types for the above
 gem 'jquery-fileupload-rails'  # Better support for file uploads
