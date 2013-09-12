@@ -25,6 +25,8 @@
               - @offerings.each do |co|
                 %li
                   = link_to co.full_label, home_path(co)
+= render partial: 'flashbar'
+
 .container
   %ul.nav.nav-tabs
     = tab_tag 'assignments-tab', icon_tag('laptop') + ' Assignments', active: true
