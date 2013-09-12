@@ -10,6 +10,11 @@ group :development, :test do
   gem 'pg'              # Postgres db support
 end
 
+group :development do
+  gem 'annotate'
+  gem 'rails-erd'
+end
+
 group :production, :staging do
   gem 'mysql2'
 end
@@ -54,7 +59,7 @@ gem 'mini_magick'     # ImageMagick command-line interface
 gem 'uuidtools'       # For generating passkeys for models
 gem 'highcharts-rails', '~> 3.0.0'  # For beautiful client-side charts
 gem 'gravtastic'      # For Gravatar integration
-gem 'turbolinks'      # Rails 4 turbolinks
+#gem 'turbolinks'      # Rails 4 turbolinks
 gem 'js-routes'       # Route helpers in Javascript
 
 # Gems for server-side event support.

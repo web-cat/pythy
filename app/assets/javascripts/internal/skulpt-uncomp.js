@@ -3405,6 +3405,7 @@ Sk.reset = function()
     delete Sk._frameRestoreIndex;
     delete Sk._futureResult;
 };
+goog.exportSymbol("Sk.reset", Sk.reset);
 
 /**
  *
@@ -3436,8 +3437,8 @@ Sk.configure = function(options)
     Sk.read = options["read"] || Sk.read;
     goog.asserts.assert(typeof Sk.read === "function");
 
-    Sk.transformUrl = options["transformUrl"] || Sk.transformUrl;
-    goog.asserts.assert(typeof Sk.transformUrl === "function");
+    Sk.urlTransformer = options["transformUrl"] || Sk.urlTransformer;
+    goog.asserts.assert(typeof Sk.urlTransformer === "function");
 
     Sk.sysargv = options["sysargv"] || Sk.sysargv;
     goog.asserts.assert(goog.isArrayLike(Sk.sysargv));
@@ -3498,7 +3499,9 @@ Sk.read = function(x) { throw "Sk.read has not been implemented"; };
  * Note that this function should take and return a JS string (not a
  * wrapped Skulpt string).
  */
-Sk.transformUrl = function(x) { return x; };
+Sk.urlTransformer = function(x) { return x; };
+
+Sk.transformUrl = function(x) { return Sk.urlTransformer(x); }
 goog.exportSymbol("Sk.transformUrl", Sk.transformUrl);
 
 /*
@@ -4025,6 +4028,8 @@ Sk.builtin.Exception.prototype.toString = function()
     return this.tp$str().v;
 }
 
+goog.exportSymbol("Sk.builtin.Exception", Sk.builtin.Exception);
+
 /**
  * @constructor
  * @extends Sk.builtin.Exception
@@ -4125,6 +4130,7 @@ Sk.builtin.TypeError = function(args) { Sk.builtin.Exception.apply(this, argumen
 goog.inherits(Sk.builtin.TypeError, Sk.builtin.Exception);
 Sk.builtin.TypeError.prototype.tp$name = "TypeError";
 goog.exportSymbol("Sk.builtin.TypeError", Sk.builtin.TypeError);
+
 /**
  * @constructor
  * @extends Sk.builtin.Exception
@@ -4133,6 +4139,7 @@ goog.exportSymbol("Sk.builtin.TypeError", Sk.builtin.TypeError);
 Sk.builtin.ValueError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
 goog.inherits(Sk.builtin.ValueError, Sk.builtin.Exception);
 Sk.builtin.ValueError.prototype.tp$name = "ValueError";
+goog.exportSymbol('Sk.builtin.ValueError', Sk.builtin.ValueError);
 
 /**
  * @constructor
@@ -4214,6 +4221,7 @@ Sk.builtin.type = function(name, bases, dict)
               // when yielding inside a constructor.
               var self = Sk._createOrRetrieveObject(this, function() {
                 this['$d'] = new Sk.builtin.dict([]);
+                this.tp$name = klass.tp$name;
               });
 
               var init = Sk.builtin.type.typeLookup(self.ob$type, "__init__");
@@ -4235,6 +4243,7 @@ Sk.builtin.type = function(name, bases, dict)
             klass.prototype[v] = dict[v];
             klass[v] = dict[v];
         }
+        klass['$ex'] = {};
         klass['__class__'] = klass;
         klass.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
         klass.prototype.tp$setattr = Sk.builtin.object.prototype.GenericSetAttr;
@@ -4274,6 +4283,15 @@ Sk.builtin.type = function(name, bases, dict)
             var iternextf = this.tp$getattr("next");
             goog.asserts.assert(iternextf !== undefined, "iter() should have caught this");
             return Sk.misceval.callsim(iternextf);
+        };
+        klass.prototype.sq$length = function()
+        {
+            var lenf = this.tp$getattr("__len__");
+            if (lenf)
+            {
+                return Sk.misceval.callsim(lenf);
+            }
+            throw new Sk.builtin.TypeError("object of type '" + this.tp$name + "' has no len()");
         };
 
         klass.tp$name = name;
@@ -4343,6 +4361,12 @@ Sk.builtin.type['$r'] = function() { return new Sk.builtin.str("<type 'type'>");
 //Sk.builtin.type.prototype.tp$descr_get = function() { print("in type descr_get"); };
 
 //Sk.builtin.type.prototype.tp$name = "type";
+
+Sk.builtin.type.prototype.ob$exportattrs = function(names)
+{
+    for (var i = 0; i < names.length; i++)
+        this['$ex'][names[i]] = true;
+};
 
 // basically the same as GenericGetAttr except looks in the proto instead
 Sk.builtin.type.prototype.tp$getattr = function(name)
@@ -4515,10 +4539,14 @@ Sk.builtin.object = function()
 
 Sk.builtin.object.prototype.GenericGetAttr = function(name)
 {
-    goog.asserts.assert(typeof name === "string");
+    //goog.asserts.assert(typeof name === "string");
 
     var tp = this.ob$type;
-    goog.asserts.assert(tp !== undefined, "object has no ob$type!");
+    if (tp['$ex'] && tp['$ex'].hasOwnProperty(name))
+    {
+        return tp[name];
+    }
+    //goog.asserts.assert(tp !== undefined, "object has no ob$type!");
 
     //print("getattr", tp.tp$name, name);
 
@@ -4536,21 +4564,43 @@ Sk.builtin.object.prototype.GenericGetAttr = function(name)
     }
 
     // todo; assert? force?
-    if (this['$d'])
+    if (this['fc$' + name])
+    {
+        return this['fc$' + name];
+    }
+    else if (this['$d'])
     {
         var res;
         if (this['$d'].mp$subscript)
             res = this['$d'].mp$subscript(new Sk.builtin.str(name));
         else if (typeof this['$d'] === "object") // todo; definitely the wrong place for this. other custom tp$getattr won't work on object -- bnm -- implemented custom __getattr__ in abstract.js
             res = this['$d'][name];
+
         if (res !== undefined)
+        {
+            if (typeof(res) === 'function'
+                || res instanceof Sk.builtin.func
+                || res instanceof Sk.builtin.method)
+            {
+                this['fc$' + name] = res;
+            }
             return res;
+        }
     }
 
     if (f)
     {
         // non-data descriptor
-        return f.call(descr, this, this.ob$type);
+        var res = f.call(descr, this, this.ob$type);
+
+        if (typeof(res) === 'function'
+            || res instanceof Sk.builtin.func
+            || res instanceof Sk.builtin.method)
+        {
+            this['fc$' + name] = res;
+        }
+
+        return res;
     }
 
     if (descr)
@@ -4564,8 +4614,16 @@ goog.exportSymbol("Sk.builtin.object.prototype.GenericGetAttr", Sk.builtin.objec
 
 Sk.builtin.object.prototype.GenericSetAttr = function(name, value)
 {
+    var tp = this.ob$type;
+    if (tp['$ex'] && tp['$ex'].hasOwnProperty(name))
+    {
+        this[name] = value;
+        return;
+    }
+
     goog.asserts.assert(typeof name === "string");
     // todo; lots o' stuff
+    delete this['fc$' + name];
     if (this['$d'].mp$ass_subscript)
         this['$d'].mp$ass_subscript(new Sk.builtin.str(name), value);
     else if (typeof this['$d'] === "object")
@@ -4632,7 +4690,7 @@ goog.exportSymbol("Sk.builtin.func", Sk.builtin.func);
 Sk.builtin.func.prototype.tp$name = "function";
 Sk.builtin.func.prototype.tp$descr_get = function(obj, objtype)
 {
-    goog.asserts.assert(obj !== undefined && objtype !== undefined)
+    //goog.asserts.assert(obj !== undefined && objtype !== undefined)
     if (obj == null) return this;
     return new Sk.builtin.method(this, obj);
 };
@@ -4709,8 +4767,8 @@ goog.exportSymbol("Sk.builtin.method", Sk.builtin.method);
 
 Sk.builtin.method.prototype.tp$call = function(args, kw)
 {
-    goog.asserts.assert(this.im_self, "should just be a function, not a method since there's no self?");
-    goog.asserts.assert(this.im_func instanceof Sk.builtin.func);
+    //goog.asserts.assert(this.im_self, "should just be a function, not a method since there's no self?");
+    //goog.asserts.assert(this.im_func instanceof Sk.builtin.func);
 
     //print("calling method");
     // todo; modification OK?
@@ -4988,7 +5046,7 @@ goog.exportSymbol("Sk.misceval.richCompareBool", Sk.misceval.richCompareBool);
 
 Sk.misceval.objectRepr = function(v)
 {
-    goog.asserts.assert(v !== undefined, "trying to repr undefined");
+    //goog.asserts.assert(v !== undefined, "trying to repr undefined");
     if (v === null)
         return new Sk.builtin.str("None"); // todo; these should be consts
     else if (v === true)
@@ -5174,7 +5232,7 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
         // alternatively, put it to more use, and perhaps use
         // descriptors to create builtin.func's in other places.
 
-        goog.asserts.assert(kws === undefined);
+        //goog.asserts.assert(kws === undefined);
         return func.apply(null, args);
     }
     else
@@ -5189,10 +5247,10 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
                     args.push(i);
                 }
             }
-            if (kwdict)
-            {
-                goog.asserts.fail("todo;");
-            }
+            // if (kwdict)
+            // {
+            //     goog.asserts.fail("todo;");
+            // }
             return fcall.call(func, args, kws, kwdict);
         }
 
@@ -5408,6 +5466,10 @@ Sk.abstr.boNumPromote_ = {
     "Div": function(a, b) {
         if (b === 0)
             throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+        else if (a === +a && a === (a | 0)
+                 && b === +b && b === (b | 0)
+                 && a % b != 0)
+            return a / (1.0 * b);
         else
             return a / b;
     },
@@ -9257,7 +9319,7 @@ Sk.builtin.generator.prototype.tp$iternext = function(yielded)
     var ret = this.func_code.apply(this.func_globals, args); 
     //print("ret", JSON.stringify(ret));
     this.gi$running = false;
-    goog.asserts.assert(ret !== undefined);
+    //goog.asserts.assert(ret !== undefined);
     if (ret !== null)
     {
         // returns a pair: resume target and yielded value
@@ -9310,6 +9372,7 @@ Sk.builtin.makeGenerator = function(next, data)
 
   return gen;
 };
+goog.exportSymbol("Sk.builtin.makeGenerator", Sk.builtin.makeGenerator);
 /**
  * @constructor
  * @param {Sk.builtin.str} name
@@ -9621,6 +9684,141 @@ Sk.ffi.varTableToDict = function(vars)
   return new Sk.builtin.dict(kvs);
 };
 goog.exportSymbol("Sk.ffi.varTableToDict", Sk.ffi.varTableToDict);
+
+/**
+ * Checks the number of arguments to a function (usually called from a JS
+ * module) and throws a TypeError if there is a mismatch.
+ *
+ * @param name the name of the function
+ * @param args the argument list
+ * @param count the expected argument count
+ */
+Sk.ffi.checkArgs = function(name, args, count)
+{
+  if (typeof(count) === 'number')
+  {
+    if (args.length != count)
+    {
+      var verb = (args.length == 1) ? 'was' : 'were';
+      throw new Sk.builtin.TypeError(name + '() takes ' + count + ' positional '
+        + 'arguments but ' + args.length + ' ' + verb + ' given');
+    }
+  }
+  else
+  {
+    var low = count[0];
+    var high = count[1];
+
+    if (args.length < low || args.length > high)
+    {
+      var verb = (args.length == 1) ? 'was' : 'were';
+      throw new Sk.builtin.TypeError(name + '() takes between '
+        + low + ' and ' + high + ' positional arguments but '
+        + args.length + ' ' + verb + ' given');
+    }
+  }
+};
+goog.exportSymbol("Sk.ffi.checkArgs", Sk.ffi.checkArgs);
+/**
+ * @fileoverview
+ * @suppress {undefinedVars|missingProperties}
+ */
+Sk.canvas = {};
+
+// --------------------------------------------------------------
+Sk.canvas.show = function(canvas)
+{
+  if (!window.canvasModal)
+  {
+    // Create the modal dialog for the first time if needed.
+    var outer = $('<div>')
+        .addClass('modal hide')
+        .attr('id', 'Sk-canvasModal')
+        .css('width', 'auto');
+
+    var header = $('<div>')
+        .addClass('modal-header')
+        .append(
+            '<button type="button" class="close" data-dismiss="modal"'
+            + ' aria-hidden="true">&times;</button>'
+            + '<h3><i class="icon-reorder"></i>&nbsp;Picture</h3>')
+        .css('cursor', 'move');
+
+    var body = $('<div>').addClass('modal-body');
+    var footer = $('<div>').addClass('modal-footer');
+
+    outer.append(header);
+    outer.append(body);
+    outer.append(footer);
+    $('body').append(outer);
+
+    window.canvasModal = outer;
+    outer.modal({ backdrop: false, keyboard: true });
+    outer.draggable({ handle: '.modal-header' });
+  }
+
+  $('.modal-body', window.canvasModal)
+    .empty()
+    .append(canvas);
+
+  $('.modal-footer', window.canvasModal)
+    .empty()
+    .append(
+      '<form class="form-inline pull-left">' +
+      '<label for="canvas-x">X:</label>' +
+      '<input type="number" id="canvas-x" class="input-mini"/>' +
+      '<label for="canvas-y">Y:</label>' +
+      '<input type="number" id="canvas-y" class="input-mini"/>' +
+      '</form>')
+    .append(
+      '<table class="pull-right"><tbody><tr>' +
+      '<td class="canvas-color-label">R:</td><td id="canvas-red"></td>' +
+      '<td class="canvas-color-label">G:</td><td id="canvas-green"></td>' +
+      '<td class="canvas-color-label">B:</td><td id="canvas-blue"></td>' +
+      '<td id="canvas-color-swatch"></td>' +
+      '</tr></tbody></table>');
+
+  Sk.canvas._addMouseEvents(canvas, window.canvasModal);
+
+  window.canvasModal.css('marginLeft', '-' + (canvas.width + 30) / 2 + 'px');
+  window.canvasModal.modal('show');
+};
+
+
+// --------------------------------------------------------------
+Sk.canvas.hide = function()
+{
+  window.canvasModal.modal('hide');
+};
+
+
+// --------------------------------------------------------------
+Sk.canvas._addMouseEvents = function(canvas, modal)
+{
+  $(canvas).mousemove(function(e) {
+    var x = e.offsetX;
+    var y = e.offsetY;
+
+    $('#canvas-x', modal).val(x);
+    $('#canvas-y', modal).val(y);
+
+    var ctx = canvas.getContext('2d');
+    var colordata = ctx.getImageData(x, y, 1, 1).data;
+    var r = colordata[0];
+    var g = colordata[1];
+    var b = colordata[2];
+
+    var rgb = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+    $('#canvas-red', modal).text(r);
+    $('#canvas-green', modal).text(g);
+    $('#canvas-blue', modal).text(b);
+    $('#canvas-color-swatch', modal).css('background-color', rgb);
+  });
+};
+
+
+goog.exportSymbol("Sk.canvas.show", Sk.canvas.show);
+goog.exportSymbol("Sk.canvas.hide", Sk.canvas.hide);
 /*
  * This is a port of tokenize.py by Ka-Ping Yee.
  *
@@ -10433,7 +10631,7 @@ dfas:
        {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
  262: [[[[19, 1]], [[44, 2]], [[45, 3], [0, 2]], [[44, 4]], [[0, 4]]],
        {19: 1}],
- 263: [[[[17, 1], [8, 2], [9, 5], [28, 4], [11, 3], [13, 6], [20, 2]],
+ 263: [[[[17, 1], [8, 2], [11, 5], [28, 4], [9, 3], [13, 6], [20, 2]],
         [[17, 1], [0, 1]],
         [[0, 2]],
         [[49, 7], [50, 2]],
@@ -10510,10 +10708,10 @@ dfas:
  271: [[[[90, 1]], [[88, 2], [85, 2]], [[0, 2]]], {33: 1}],
  272: [[[[33, 1]],
         [[91, 2]],
-        [[28, 4], [2, 3]],
-        [[0, 3]],
+        [[2, 4], [28, 3]],
         [[51, 5], [92, 6]],
-        [[2, 3]],
+        [[0, 4]],
+        [[2, 4]],
         [[51, 5]]],
        {33: 1}],
  273: [[[[93, 1]], [[93, 1], [0, 1]]], {33: 1}],
@@ -10747,14 +10945,16 @@ dfas:
  314: [[[[134, 1]], [[135, 1], [43, 2], [0, 1]], [[104, 3]], [[0, 3]]],
        {8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 28: 1}],
  315: [[[[12, 1]],
-        [[44, 2], [136, 3], [0, 1]],
-        [[45, 4], [0, 2]],
-        [[44, 5]],
-        [[44, 2], [0, 4]],
-        [[45, 6], [0, 5]],
+        [[28, 2]],
+        [[51, 3], [44, 4], [136, 5]],
+        [[0, 3]],
+        [[51, 3], [45, 6]],
         [[44, 7]],
-        [[45, 8], [0, 7]],
-        [[44, 7], [0, 8]]],
+        [[44, 4], [51, 3]],
+        [[51, 3], [45, 8]],
+        [[44, 9]],
+        [[51, 3], [45, 10]],
+        [[51, 3], [44, 9]]],
        {12: 1}],
  316: [[[[5, 1]],
         [[44, 2], [0, 1]],
@@ -10865,11 +11065,11 @@ dfas:
         36: 1}],
  323: [[[[44, 1], [69, 2], [97, 3]],
         [[69, 2], [0, 1]],
-        [[44, 4], [150, 5], [0, 2]],
+        [[150, 4], [44, 5], [0, 2]],
         [[97, 6]],
-        [[150, 5], [0, 4]],
-        [[0, 5]],
-        [[97, 5]]],
+        [[0, 4]],
+        [[150, 4], [0, 5]],
+        [[97, 4]]],
        {6: 1,
         7: 1,
         8: 1,
@@ -11016,7 +11216,7 @@ dfas:
         [[158, 6]],
         [[0, 4]],
         [[51, 4]],
-        [[50, 4]]],
+        [[55, 4]]],
        {11: 1, 28: 1, 97: 1}],
  333: [[[[14, 1]],
         [[69, 2]],
@@ -11079,7 +11279,7 @@ states:
  [[[44, 1]], [[46, 2], [47, 3], [0, 1]], [[0, 2]], [[44, 2]]],
  [[[48, 1]], [[24, 0], [35, 0], [0, 1]]],
  [[[19, 1]], [[44, 2]], [[45, 3], [0, 2]], [[44, 4]], [[0, 4]]],
- [[[17, 1], [8, 2], [9, 5], [28, 4], [11, 3], [13, 6], [20, 2]],
+ [[[17, 1], [8, 2], [11, 5], [28, 4], [9, 3], [13, 6], [20, 2]],
   [[17, 1], [0, 1]],
   [[0, 2]],
   [[49, 7], [50, 2]],
@@ -11132,10 +11332,10 @@ states:
  [[[90, 1]], [[88, 2], [85, 2]], [[0, 2]]],
  [[[33, 1]],
   [[91, 2]],
-  [[28, 4], [2, 3]],
-  [[0, 3]],
+  [[2, 4], [28, 3]],
   [[51, 5], [92, 6]],
-  [[2, 3]],
+  [[0, 4]],
+  [[2, 4]],
   [[51, 5]]],
  [[[93, 1]], [[93, 1], [0, 1]]],
  [[[21, 1]], [[94, 2]], [[0, 2]]],
@@ -11222,14 +11422,16 @@ states:
  [[[22, 1]], [[0, 1]]],
  [[[134, 1]], [[135, 1], [43, 2], [0, 1]], [[104, 3]], [[0, 3]]],
  [[[12, 1]],
-  [[44, 2], [136, 3], [0, 1]],
-  [[45, 4], [0, 2]],
-  [[44, 5]],
-  [[44, 2], [0, 4]],
-  [[45, 6], [0, 5]],
+  [[28, 2]],
+  [[51, 3], [44, 4], [136, 5]],
+  [[0, 3]],
+  [[51, 3], [45, 6]],
   [[44, 7]],
-  [[45, 8], [0, 7]],
-  [[44, 7], [0, 8]]],
+  [[44, 4], [51, 3]],
+  [[51, 3], [45, 8]],
+  [[44, 9]],
+  [[51, 3], [45, 10]],
+  [[51, 3], [44, 9]]],
  [[[5, 1]],
   [[44, 2], [0, 1]],
   [[45, 3], [0, 2]],
@@ -11254,11 +11456,11 @@ states:
  [[[1, 1], [3, 1]], [[0, 1]]],
  [[[44, 1], [69, 2], [97, 3]],
   [[69, 2], [0, 1]],
-  [[44, 4], [150, 5], [0, 2]],
+  [[150, 4], [44, 5], [0, 2]],
   [[97, 6]],
-  [[150, 5], [0, 4]],
-  [[0, 5]],
-  [[97, 5]]],
+  [[0, 4]],
+  [[150, 4], [0, 5]],
+  [[97, 4]]],
  [[[151, 1]], [[45, 2], [0, 1]], [[151, 1], [0, 2]]],
  [[[1, 1], [2, 2]], [[0, 1]], [[152, 3]], [[105, 4]], [[153, 1], [105, 4]]],
  [[[104, 1]], [[154, 0], [41, 0], [155, 0], [156, 0], [0, 1]]],
@@ -11286,7 +11488,7 @@ states:
   [[158, 6]],
   [[0, 4]],
   [[51, 4]],
-  [[50, 4]]],
+  [[55, 4]]],
  [[[14, 1]],
   [[69, 2]],
   [[70, 3]],
@@ -11373,13 +11575,13 @@ labels:
  [293, null],
  [22, null],
  [326, null],
- [307, null],
- [10, null],
+ [275, null],
+ [27, null],
  [8, null],
  [330, null],
  [339, null],
- [275, null],
- [27, null],
+ [307, null],
+ [10, null],
  [329, null],
  [46, null],
  [39, null],
@@ -11466,11 +11668,11 @@ labels:
  [321, null],
  [13, null],
  [288, null],
- [262, null],
+ [274, null],
  [284, null],
  [313, null],
  [315, null],
- [274, null],
+ [262, null],
  [282, null],
  [296, null],
  [302, null],
@@ -11531,7 +11733,7 @@ tokens:
  7: 28,
  8: 51,
  9: 11,
- 10: 50,
+ 10: 55,
  11: 69,
  12: 45,
  13: 140,
@@ -11548,7 +11750,7 @@ tokens:
  24: 156,
  25: 13,
  26: 9,
- 27: 55,
+ 27: 50,
  28: 74,
  29: 72,
  30: 76,
@@ -14808,23 +15010,23 @@ function astForExpr(c, n)
 
 function astForPrintStmt(c, n)
 {
-    /* print_stmt: 'print' ( [ test (',' test)* [','] ]
-                             | '>>' test [ (',' test)+ [','] ] )
+    /* print_stmt: 'print' '(' ( [ test (',' test)* [','] ]
+                             | '>>' test [ (',' test)+ [','] ] ) ')'
      */
-    var start = 1;
+    var start = 2;
     var dest = null;
     REQ(n, SYM.print_stmt);
-    if (NCH(n) >= 2 && CHILD(n, 1).type === TOK.T_RIGHTSHIFT)
+    if (NCH(n) >= 3 && CHILD(n, 2).type === TOK.T_RIGHTSHIFT)
     {
-        dest = astForExpr(c, CHILD(n, 2));
-        start = 4;
+        dest = astForExpr(c, CHILD(n, 3));
+        start = 5;
     }
     var seq = [];
-    for (var i = start, j = 0; i < NCH(n); i += 2, ++j)
+    for (var i = start, j = 0; i < NCH(n) - 1; i += 2, ++j)
     {
         seq[j] = astForExpr(c, CHILD(n, i));
     }
-    var nl = (CHILD(n, NCH(n) - 1)).type === TOK.T_COMMA ? false : true;
+    var nl = (CHILD(n, NCH(n) - 2)).type === TOK.T_COMMA ? false : true;
     return new Print(dest, seq, nl, n.lineno, n.col_offset);
 }
 
@@ -16104,7 +16306,6 @@ Compiler.prototype._jumptrue = function(test, block)
 
 /**
  * @param {number} block
- * @param {boolean=} forceYield
  */
 Compiler.prototype._jump = function(block)
 {
@@ -16916,7 +17117,7 @@ Compiler.prototype.cfromimport = function(s)
         if (i === 0 && alias.name.v === "*")
         {
             goog.asserts.assert(n === 1);
-            out("Sk.importStar(", mod, ");");
+            out("Sk.importStar(", mod, ",$loc);");
             return;
         }
 
@@ -17805,7 +18006,7 @@ Sk.future = function(perform)
  */
 Sk.yield = function()
 {
-  var currentTime = new Date().getTime();
+  var currentTime = Date.now();
 
   if (!Sk._lastYieldTime
     || (currentTime - Sk._lastYieldTime > Sk.suspendInterval))
@@ -18179,6 +18380,22 @@ Sk.importMainWithBody = function(name, dumpJS, body)
     return Sk.importModuleInternal_(name, dumpJS, "__main__", body);
 };
 
+Sk.importStar = function(module, locals)
+{
+    // allevato: TODO We should respect privacy guards here, like
+    // names beginning with underscores; probably also incorporate the
+    // __all__ attribute somehow
+
+    var modattrs = module['$d'];
+    for (var name in modattrs)
+    {
+        if (modattrs.hasOwnProperty(name))
+        {
+            locals[name] = modattrs[name];
+        }
+    }
+};
+
 Sk.builtin.__import__ = function(name, globals, locals, fromlist)
 {
     var ret = Sk.importModuleInternal_(name);
@@ -18193,6 +18410,7 @@ Sk.builtin.__import__ = function(name, globals, locals, fromlist)
 
 goog.exportSymbol("Sk.importMain", Sk.importMain);
 goog.exportSymbol("Sk.importMainWithBody", Sk.importMainWithBody);
+goog.exportSymbol("Sk.importStar", Sk.importStar);
 goog.exportSymbol("Sk.builtin.__import__", Sk.builtin.__import__);// Note: the hacky names on int, long, float have to correspond with the
 // uniquization that the compiler does for words that are reserved in
 // Javascript. This is a bit hokey.

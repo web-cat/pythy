@@ -3,7 +3,7 @@
   = select_tag :term, options_for_select(terms), { id: 'self-enroll-term', prompt: '(select a term)', data: { width: '100%' } }
 - else
   %div.alert
-    You have not yet created any terms.    
+    There are no terms to choose from at the moment.    
     - if can? :create, Term     
       = link_to new_term_path do
-        Click here to create one.
+        Add a new term.
