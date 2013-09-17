@@ -3,10 +3,15 @@
 - bc.add_silencer { |line| line =~ /\/gems\// }
 - backtrace = bc.clean($!.backtrace)
 
-%h2 Internal Server Error
+%h2 We've Got a Problem ...
 %p
-  There was an internal server error when processing this request.
-  The system administrator has been notified of the problem.
+  Unfortunately, something went wrong.
+  There are a lot of possible reasons why this might have happened, 
+  but we've logged the problem so the developers can look at it.
+
+%p Sorry!
+
+= link_to 'Home', root_url, class: 'btn btn-primary'
 
 - if current_user && current_user.global_role.can_edit_system_configuration
   %hr

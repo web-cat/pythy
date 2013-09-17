@@ -3,7 +3,7 @@ class AssignmentRepository < Repository
   belongs_to :assignment_offering
   has_many :assignment_checks
 
-  after_create :create_git_repo
+#  after_create :create_git_repo
 
 
   # -------------------------------------------------------------
@@ -122,7 +122,6 @@ class AssignmentRepository < Repository
   end
 
 
-  private
 
   # -------------------------------------------------------------
   def create_git_repo
@@ -144,6 +143,7 @@ class AssignmentRepository < Repository
   end
 
 
+  private
   # -------------------------------------------------------------
   def copy_starter_files
     path = git_path
