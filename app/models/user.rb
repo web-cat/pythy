@@ -35,7 +35,7 @@ class User < ActiveRecord::Base
 
   before_create :set_default_role
 
-  paginates_per 15
+  paginates_per 100
 
   scope :search, lambda { |query|
     unless query.blank?

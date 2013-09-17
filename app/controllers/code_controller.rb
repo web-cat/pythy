@@ -354,7 +354,12 @@ class CodeController < FriendlyUrlController
 
       # Create the repository if it doesn't exist.
       # TODO improve permission checks
-      @repository = relation.first || relation.create
+      # @repository = relation.first || relation.create
+      @repository = relation.first
+      if !@repository
+        @repository = relation.create
+        @repository.create_git_repo
+      end
     else
       # It's an instructor trying to access the reference repository
       # for an assignment.

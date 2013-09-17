@@ -62,6 +62,7 @@ gem 'highcharts-rails', '~> 3.0.0'  # For beautiful client-side charts
 gem 'gravtastic'      # For Gravatar integration
 #gem 'turbolinks'      # Rails 4 turbolinks
 gem 'js-routes'       # Route helpers in Javascript
+gem 'awesome_print'   # For debugging/logging output
 
 # Gems for server-side event support.
 gem 'redis'

@@ -20,3 +20,6 @@ pickle-email-*.html
 *.rdb
 /public/m
 /public/uploads/tmp
+/storage/*
+/work/*
+erd.pdf

@@ -51,6 +51,7 @@ GEM
       rake
     arel (4.0.0)
     atomic (1.1.10)
+    awesome_print (1.1.0)
     bcrypt-ruby (3.0.1)
     builder (3.1.4)
     cancan (1.6.9)
@@ -252,6 +253,7 @@ PLATFORMS
 
 DEPENDENCIES
   annotate
+  awesome_print
   cancan (= 1.6.9)
   capistrano
   carrierwave
