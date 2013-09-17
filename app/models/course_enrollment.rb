@@ -7,6 +7,6 @@ class CourseEnrollment < ActiveRecord::Base
   attr_accessible :user, :course_offering, :course_role, :user_id,
     :course_offering_id, :course_role_id
 
-  paginates_per 10
+  paginates_per 100
 
 end

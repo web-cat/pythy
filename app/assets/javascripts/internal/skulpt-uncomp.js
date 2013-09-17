@@ -6836,9 +6836,35 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
 // Added by allevato
 Sk.builtin.str.prototype['format'] = new Sk.builtin.func(function() {
     var self = arguments[0];
+    
+    // Turn all {} in string into {0}, {1}, etc.
+    var count = 0;
+    var v = self.v.replace(/{}/g, function(){ return '{' + count++ + '}' })
     var args = Array.prototype.slice.call(arguments, 1);
-    return Sk.builtin.str.prototype.nb$remainder.call(
-        self, new Sk.builtin.tuple(args));
+
+    return new Sk.builtin.str(v.replace(/{([a-zA-Z0-9_]+)}/g, function(match, key) {
+        var val = args[key];
+        if (typeof val != 'undefined')
+        {
+            return (val.constructor === Sk.builtin.str)
+                ? val.v
+                : val;
+        }
+        else if (args[0].constructor == Sk.builtin.dict)
+        {
+        	var result = args[0].mp$subscript(new Sk.builtin.str(key));
+        	if (typeof result == 'undefined') return match;
+            return (result.constructor === Sk.builtin.str)
+                ? result.v
+                : result;
+        }
+        else
+        {
+            return match;
+        }
+    }));
+//    return Sk.builtin.str.prototype.nb$remainder.call(
+//        self, new Sk.builtin.tuple(args));
 });
 /**
  * @constructor

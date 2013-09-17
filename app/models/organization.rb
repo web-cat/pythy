@@ -11,7 +11,8 @@ class Organization < ActiveRecord::Base
   validates :abbreviation,
     format: {
       with: /[a-zA-Z0-9\-_.]+/,
-      message: 'must contain only [a-zA-Z0-9-_.] only'
+      message: 'must consist only of letters, digits, hyphens (-), ' \
+        'underscores (_), and periods (.).'
     },
     uniqueness: { case_sensitive: false }
 
