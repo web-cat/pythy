@@ -37,11 +37,7 @@ class ScratchpadRepository < Repository
 
     unless File.exists?(path)
       FileUtils.mkdir_p path
-      
-      old_path = Dir.pwd
-      Dir.chdir(path)
-      Git.init
-      Dir.chdir(old_path)
+      Git.init(path)
 
       commit(user, 'Initial repository setup.') do |git|
         FileUtils.touch File.join(path, 'main.py')

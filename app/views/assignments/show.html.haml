@@ -27,10 +27,24 @@
 
   - if @assignment.can_view_submissions_for_any_offering?(current_user)
     %ul.nav.nav-tabs
-      = tab_tag :description, 'Description', active: true
-      = tab_tag :grades, 'Grades'
+      = tab_tag :code, icon_tag('laptop') + ' Code'
+      = tab_tag :description, icon_tag('list-ol') + ' Description', active: true
+      = tab_tag :grades, icon_tag('tasks') + ' Grades'
 
-  .tab-content
+  .tab-content  
+    - if can? :edit, @assignment
+      #code.tab-pane    
+        .span3
+          %h4 Starter Files
+          = render partial: 'code/file_list', locals: { path: 'starter' }
+        .span3
+          %h4 Reference Tests
+          = render partial: 'code/file_list', locals: { path: 'test' }
+        .span3
+          %h4 Solution
+          = render partial: 'code/file_list', locals: { path: 'solution' }
+    
+      
     #description.tab-pane.active
       - if can? :edit, @assignment
         %table.table.table-bordered.table-striped

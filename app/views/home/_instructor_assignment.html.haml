@@ -3,7 +3,7 @@
     .assignment-short-name><= instructor_assignment.short_name
     .assignment-long-name><= instructor_assignment.long_name
   .assignment-tile.back
-    = link_to code_path(instructor_assignment.assignment_reference_repository) do
+    = link_to assignment_path(instructor_assignment, anchor: 'code') do
       = icon_tag('laptop')
       Code
     = link_to instructor_assignment do

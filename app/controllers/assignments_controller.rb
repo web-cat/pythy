@@ -26,6 +26,17 @@ class AssignmentsController < ApplicationController
   def show
     @summary = @assignment.brief_summary_html
     @description = @assignment.description_html
+    
+    relation = AssignmentReferenceRepository.where(
+      assignment_id: @assignment.id)
+
+    # Create the repository if it doesn't exist.
+    # TODO improve permission checks
+    @repository = relation.first
+
+    if @repository.nil? && can?(:edit, assignment)
+      @repository = relation.create(user_id: current_user.id)
+    end
 
     respond_to do |format|
       format.html # show.html.erb
