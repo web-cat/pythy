@@ -27,13 +27,25 @@ Pythy::Application.configure do
 
   # Specifies the header that your server uses for sending files
   # config.action_dispatch.x_sendfile_header = "X-Sendfile" # for apache
-  # config.action_dispatch.x_sendfile_header = 'X-Accel-Redirect' # for nginx
+  config.action_dispatch.x_sendfile_header = 'X-Accel-Redirect' # for nginx
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
   # config.force_ssl = true
 
   # See everything in the log (default is :info)
-  # config.log_level = :debug
+  # config.log_level = :warn
+
+  config.log_formatter = proc do |severity, datetime, progname, msg|
+    if severity == 'DEBUG' && msg.blank?
+      ''
+    else
+      "%s [%s] %s\n" % [
+        datetime.strftime('%Y-%m-%d %H:%M:%S'),
+        severity,
+        String === msg ? msg : msg.inspect
+        ]
+    end
+  end
 
   # Prepend all log lines with the following tags
   # config.log_tags = [ :subdomain, :uuid ]
@@ -54,7 +66,7 @@ Pythy::Application.configure do
   # config.action_mailer.raise_delivery_errors = false
 
   # Enable threaded mode
-  # config.threadsafe!
+  config.threadsafe!
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation can not be found)
