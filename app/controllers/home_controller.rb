@@ -40,6 +40,12 @@ class HomeController < FriendlyUrlController
 
     @assignments = []
     @examples = []
+    
+    @all_course_offerings = {} # a hash of term to offerings.
+    
+    @course.course_offerings.pluck(:term_id).uniq.each do |term_id|      
+      @all_course_offerings[term_id] = @course.course_offerings.where(:term_id => term_id).select { |o| can?(:show, o) }
+    end
 
     @offerings.each do |offering|
       assignments = offering.assignment_offerings

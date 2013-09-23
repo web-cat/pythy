@@ -16,15 +16,17 @@
               - else
                 = "All #{@offerings.first.term.display_name} offerings"
               %span.caret
-            %ul.dropdown-menu.pull-right
-              %li
-                = link_to "All #{@offerings.first.term.display_name} offerings", home_path(@course, term: @offerings.first.term)
-              %li.divider
-              %li.nav-header
-                = "#{@offerings.first.term.display_name} Offerings"
-              - @offerings.each do |co|
-                %li
-                  = link_to co.full_label, home_path(co)
+            %ul.dropdown-menu.pull-right              
+              - @all_course_offerings.each_with_index do |(term_id, offerings), index|
+                - term = Term.find(term_id)
+                - if index != 0
+                  %li.divider
+                %li.nav-header-link
+                  = link_to "#{term.display_name} offerings", home_path(@course, term: term)
+                - offerings.each do |co|
+                  %li
+                    = link_to co.full_label, home_path(co)
+                    
 = render partial: 'flashbar'
 
 .container

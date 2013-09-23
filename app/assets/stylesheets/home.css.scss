@@ -17,6 +17,16 @@ $assignment-title-height: 45px;
 $assignment-options-height: $assignment-tile-height - $assignment-title-height - 1;
 $assignment-score-width: 64px;
 
+li.nav-header-link a {
+  display: block;
+  padding: 3px 15px;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 20px;
+  color: rgb(153, 153, 153);
+  text-transform: uppercase;
+}
+
 .assignment-tile-wrapper {
   position: relative;
   margin-bottom: 8px;
