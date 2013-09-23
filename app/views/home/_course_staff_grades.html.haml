@@ -14,7 +14,7 @@
           - @course_scores.assignment_offerings.each do |offering|
             %td
               - info = @course_scores.info_for_user_and_assignment_offering(user, offering)
-              - if info
+              - if info && info[:score]
                 = link_to percentage(info[:score]), "/code/#{info[:repository_id]}"
               - else
                 &ndash;

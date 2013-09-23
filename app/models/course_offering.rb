@@ -97,11 +97,6 @@ class CourseOffering < ActiveRecord::Base
   # -------------------------------------------------------------
   def role_for_user(user)
     enrollment = course_enrollments.where(user_id: user.id).first
-    puts("DEBUG ------------ CO from course " + self.inspect)
-    course_enrollments.each do |ce|
-      puts(ce.inspect)
-    end
-    puts("DEBUG ------------ ")
     enrollment ? enrollment.course_role : nil
   end
 
