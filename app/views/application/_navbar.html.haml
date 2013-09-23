@@ -60,8 +60,13 @@
               %li.divider
               = menu_link_to_if can?(:manage, GlobalRole), icon_tag('key') + ' Global Roles', global_roles_path
               = menu_link_to_if can?(:manage, CourseRole), icon_tag('key') + ' Course Roles', course_roles_path
-              = menu_link_to_if can?(:manage, Environment), icon_tag('globe') + ' Environments', environments_path                
-              = menu_link_to_if can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path
+              = menu_link_to_if can?(:manage, Environment), icon_tag('globe') + ' Environments', environments_path
+              - scTitle = nil
+              - if SystemConfiguration.count == 0
+                - scTitle = "You must create a System Configuration in order for pythy to work properly."
+                %span{'style' => 'color: red; position: absolute; left: 10px; bottom: 8px; font-weight: bold; font-size: 18px;'}
+                  = "!"
+              = menu_link_to_if( can?(:manage, SystemConfiguration), icon_tag('cogs') + ' System Configuration', edit_system_configuration_path, :title => scTitle)
         - if current_user
           %li.nav-user
             = link_to edit_registration_path(current_user) do
