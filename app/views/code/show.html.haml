@@ -15,6 +15,10 @@
       /       %a{ href: '#', id: 'start-over' }
       /         = icon_tag('remove') + ' Start over...'
       = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
+    %br
+    %div{'id' => 'save-indicator', 'align' => 'center', 'style' => 'color: green; display: none;'}
+      = icon_tag('save') + " " + icon_tag('ok')
+        
   - if @repository.can_sync?(current_user)
     #sync-button-group.btn-group-parent.hide
       = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
