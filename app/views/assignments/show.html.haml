@@ -10,11 +10,6 @@
       = succeed ':' do
         = @assignment.short_name
       = @assignment.long_name
-    - if can? :edit, @assignment
-      %li.pull-right
-        = link_to edit_assignment_path(@assignment) do
-          %i.icon-pencil
-          Edit...
 
   %h2
     = @assignment.short_name
