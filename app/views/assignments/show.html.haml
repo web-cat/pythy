@@ -30,6 +30,7 @@
       = tab_tag :code, icon_tag('laptop') + ' Code'
       = tab_tag :description, icon_tag('list-ol') + ' Description', active: true
       = tab_tag :grades, icon_tag('tasks') + ' Grades'
+      = tab_tag :edit, icon_tag('pencil') + " Edit"
 
   .tab-content  
     - if can? :edit, @assignment
@@ -88,3 +89,7 @@
       #grades.tab-pane
         - @assignment_offerings.each do |ao|
           = render partial: 'assignment_offerings/grades', locals: { assignment_offering: ao, visible: true }
+          
+          
+    #edit.tab-pane
+      = render partial: 'assignments/form'
