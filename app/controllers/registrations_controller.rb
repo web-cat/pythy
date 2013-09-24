@@ -14,7 +14,7 @@ class RegistrationsController < Devise::RegistrationsController
         set_flash_message :notice, :signed_up if is_navigational_format?
         sign_up(resource_name, resource)
         if SystemConfiguration.count == 0 && @user.global_role_id == 1
-          flash[:notice] += " Please setup the system configuration paths now."
+          flash[:notice] += " Please set up your system configuration now."
           respond_with resource, :location => edit_system_configuration_path
         else
           respond_with resource, :location => after_sign_up_path_for(resource)
@@ -23,7 +23,7 @@ class RegistrationsController < Devise::RegistrationsController
         set_flash_message :notice, :"signed_up_but_#{resource.inactive_message}" if is_navigational_format?
         expire_session_data_after_sign_in!
         if SystemConfiguration.count == 0 && @user.global_role_id == 1
-          flash[:notice] += " Please setup the system configuration paths now."
+          flash[:notice] += " Please set up your system configuration now."
           respond_with resource, :location => edit_system_configuration_path
         else
           respond_with resource, :location => after_inactive_sign_up_path_for(resource)
