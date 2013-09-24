@@ -9,8 +9,9 @@ class CourseOffering < ActiveRecord::Base
   # TODO: This is deprecated, and needs to be updated to use a
   # scope block.  Causes warnings now.  May be related to
   # issue #25 in issue tracker.
-  has_many    :course_enrollments, include: [:course_role, :user],
-              order: 'course_roles.id asc, users.full_name asc'
+  #has_many    :course_enrollments, include: [:course_role, :user],
+  #            order: 'course_roles.id asc, users.full_name asc'
+  has_many    :course_enrollments
 
   has_many    :users, through: :course_enrollments
 
