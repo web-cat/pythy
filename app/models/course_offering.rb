@@ -6,27 +6,28 @@ class CourseOffering < ActiveRecord::Base
   has_many    :example_repositories
   has_many    :assignment_offerings
 
-  # TODO: This is deprecated, and needs to be updated to use a
-  # scope block.  Causes warnings now.  May be related to
-  # issue #25 in issue tracker.
-  has_many    :course_enrollments, include: [:course_role, :user],
-              order: 'course_roles.id asc, users.full_name asc'
-
-  has_many    :users, through: :course_enrollments
-
-  attr_accessible :course_id, :short_label, :long_label, :term_id,
-    :url, :self_enrollment_allowed
+  has_many    :course_enrollments,
+    -> { CourseEnrollment.includes(:course_role, :user)
+      .order('course_roles.id ASC', 'users.full_name ASC') }
 
   validates :term_id, presence: true
   validates :short_label, presence: true
 
 
   # -------------------------------------------------------------
+  # Public: Gets a relation representing all Users who are associated
+  # with this CourseOffering.
+  #
+  def users
+    User.includes(course_enrollments: :course_role).where(
+      course_enrollments: { course_offering_id: id })
+      .order('course_roles.id ASC', 'users.full_name ASC')
+  end
+
+
+  # -------------------------------------------------------------
   # Public: Gets a relation representing all Users who are allowed to
   # manage this CourseOffering.
-  #
-  # Returns a relation representing all Users who are allowed to manage
-  # this CourseOffering.
   #
   def managers
     User.joins(course_enrollments: :course_role).where(
@@ -38,9 +39,6 @@ class CourseOffering < ActiveRecord::Base
   # -------------------------------------------------------------
   # Public: Gets a relation representing all Users who are students in
   # this CourseOffering.
-  #
-  # Returns a relation representing all users who are students in this
-  # CourseOffering.
   #
   def students
     User.joins(course_enrollments: :course_role).where(
