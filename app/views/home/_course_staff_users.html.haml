@@ -12,6 +12,7 @@
 
     #course-enrollments-table
       = render partial: 'course_enrollments/table', locals: { enrollments: @course_enrollments }
+  
   - else
     %p
       Course enrollments can only be viewed or modified when you are viewing

@@ -16,6 +16,7 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   def show
     if @needs_redirect
+      puts("\n\nDEBUG ------------v\n" + @repository.inspect + "\n\n")
       redirect_to staff_code_url(@repository)
     else
       @subscribe_channel = @repository.event_channel(nil)
