@@ -75,7 +75,7 @@ class CourseEnrollmentsController < ApplicationController
   # PUT /course_enrollments/1.json
   def update
     respond_to do |format|
-      if @course_enrollment.update_attributes(params[:course_enrollment])
+      if @course_enrollment.update_attributes(course_enrollment_params)
         format.js
         format.html { redirect_to @course_enrollment, notice: 'Course enrollment was successfully updated.' }
         format.json { head :no_content }

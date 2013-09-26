@@ -89,7 +89,7 @@ module FriendlyUrlHelper
         path_parts.unshift 'example'
         model = model.course_offering
       elsif model.is_a?(AssignmentRepository)
-        path_parts.unshift model.assignment_offering.assignment.url_part
+        path_parts.unshift model.assignment_offering.id.to_s
         path_parts.unshift model.user.id.to_s
         model = model.assignment_offering.course_offering
       end

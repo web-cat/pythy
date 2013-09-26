@@ -419,8 +419,8 @@ class CodeController < FriendlyUrlController
 
     case parts.first
     when /^\d+$/
-      @repository = Repository.find_by_id(parts.first)
-      @needs_redirect = true
+      @repository = Repository.where(:assignment_offering_id => parts[1].to_i, :user_id => parts.first).first
+      parts = []
     when 'example'
       find_example_repository_from_path_parts(parts)
     when 'assignments'

@@ -44,6 +44,7 @@ gem 'omniauth'
 gem 'omniauth-facebook'
 gem 'cancan', '1.6.9' # 1.6.10 broke shallow routes
 
+
 # Various gems for other features used in Pythy.
 gem 'fastercsv'       # CSV reading/writing
 gem 'kaminari'        # Auto-paginated views
