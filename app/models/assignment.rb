@@ -2,6 +2,7 @@ class Assignment < ActiveRecord::Base
 
   belongs_to  :creator, class_name: "User"
   belongs_to  :course
+  belongs_to :term
 
   has_many    :assignment_offerings
   has_one     :assignment_reference_repository
@@ -22,7 +23,20 @@ class Assignment < ActiveRecord::Base
 
   # -------------------------------------------------------------
   def set_url_part
-    self.url_part = url_part_safe(short_name)
+    new_url_part = url_part_safe(short_name)
+    if self.url_part != new_url_part    
+      existing_urls = self.term.assignments
+      existing_urls.where!("id != ?", self.id) if self.id
+      existing_urls = existing_urls.pluck(:url_part)
+      
+      i = 0    
+      self.url_part = new_url_part
+      while existing_urls.include?(self.url_part)
+        self.url_part = new_url_part
+        self.url_part += "-" + i.to_s
+        i += 1
+      end
+    end
   end
 
 
@@ -71,7 +85,8 @@ class Assignment < ActiveRecord::Base
   def create_reference_repository
     AssignmentReferenceRepository.create(
       assignment_id: id,
-      user_id: creator.id)
+      user_id: creator.id,
+      term_id: term_id)
   end
 
 end

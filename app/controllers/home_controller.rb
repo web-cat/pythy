@@ -47,20 +47,26 @@ class HomeController < FriendlyUrlController
       @all_course_offerings[term_id] = @course.course_offerings.where(:term_id => term_id).select{ |o| can?(:show, o) }
     end
     
+    @course_scores = []
     @offerings.each do |offering|
       assignments = offering.assignment_offerings
       @assignments |= assignments.map { |ao| ao.assignment }
       @examples |= offering.example_repositories.where(source_repository_id: nil)
+      @course_scores |= [CourseOfferingScores.new(offering)]
     end
+      
+    @course_scores = Kaminari.paginate_array(@course_scores).page(params[:page])
+    
+    @past_assignments = @course.assignments.select{ |o| can?(:show, o) }
 
     @assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
     @examples.sort! { |a, b| b.created_at <=> a.created_at }
 
-    if @offerings.count == 1
-      @course_offering = @offerings.first
-      @course_enrollments = @course_offering.course_enrollments.page(params[:page])
-      @course_scores = CourseOfferingScores.new(@course_offering)
-    end
+    #if @offerings.count == 1
+    #  @course_offering = @offerings.first
+    #  @course_enrollments = @course_offering.course_enrollments.page(params[:page])
+    #  @course_scores = CourseOfferingScores.new(@course_offering)
+    #end
 
     respond_to do |format|
       format.html { render 'course_staff' }

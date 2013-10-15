@@ -9,6 +9,8 @@
       #flashbar-placeholder
 
       = f.fields_for :assignment do |assignment|
+        = select_tag :model_after, options_from_collection_for_select(@past_assignments, :id) if @past_assignments
+      
         = assignment.text_field :short_name, class: 'input-large' do
           .help-block A brief name for the assignment, such as "Project 1".
         = assignment.text_field :long_name, class: 'input-xxlarge' do

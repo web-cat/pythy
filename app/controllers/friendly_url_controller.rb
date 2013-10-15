@@ -22,13 +22,8 @@ class FriendlyUrlController < ApplicationController
         @term = Term.from_path_component(params[:term]).first
 
         if @term
-          if params[:offering]
-            offering = @course.offering_with_short_label(params[:offering], @term)
-            @offerings << offering if can?(:show, offering)
-          else
-            offerings = @course.offerings_for_user(current_user, @term)
-            @offerings = offerings.select { |o| can?(:show, o) }
-          end
+          offerings = @course.offerings_for_user(current_user, @term)
+          @offerings = offerings.select { |o| can?(:show, o) }          
         else
           # Put the rest of the path together again.
           parts = []

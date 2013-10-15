@@ -1,22 +1,23 @@
-.container
-  %table#grades-table.table.table-condensed.table-striped
-    %thead
-      %tr
-        %th Name
-        - if @course_scores
-          - @course_scores.assignment_offerings.each do |offering|
-            %th= offering.assignment.short_name
-    %tbody
-      - if @course_scores
-        - @course_scores.users.each do |user|
-          %tr
-            %td.has_gravatar
-              = gravatar_tag(user, 28)
-              = user.display_name
+-#
+  .container
+    %table#grades-table.table.table-condensed.table-striped
+      %thead
+        %tr
+          %th Name
+          - if @course_scores
             - @course_scores.assignment_offerings.each do |offering|
-              %td
-                - info = @course_scores.info_for_user_and_assignment_offering(user, offering)
-                - if info && info[:score]
-                  = link_to percentage(info[:score]), "/code/#{info[:repository_id]}"
-                - else
-                  &ndash;
+              %th= offering.assignment.short_name
+      %tbody
+        - if @course_scores
+          - @course_scores.users.each do |user|
+            %tr
+              %td.has_gravatar
+                = gravatar_tag(user, 28)
+                = user.display_name
+              - @course_scores.assignment_offerings.each do |offering|
+                %td
+                  - info = @course_scores.info_for_user_and_assignment_offering(user, offering)
+                  - if info && info[:score]
+                    = link_to percentage(info[:score]), "/code/#{info[:repository_id]}"
+                  - else
+                    &ndash;

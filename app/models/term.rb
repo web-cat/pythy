@@ -24,6 +24,8 @@ class Term < ActiveRecord::Base
 
   # Orders terms in descending order (latest time first).
   scope :latest_first, -> { order('year desc, season desc') }
+  
+  has_many :assignments
 
 
   #~ Class methods ............................................................

@@ -23,6 +23,7 @@ class AssignmentReferenceRepository < Repository
   def git_path
     File.join(
       assignment.course.storage_path,
+      assignment.term.url_part,
       'assignments',
       assignment.url_part)
   end

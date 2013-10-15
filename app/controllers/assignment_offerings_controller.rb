@@ -58,6 +58,7 @@ class AssignmentOfferingsController < ApplicationController
 
     @assignment.course = @assignment_offering.course_offering.course
     @assignment.creator = current_user
+    @assignment.term_id = @assignment_offering.course_offering.term.id
     @assignment.save!
 
     # Create in all offerings if checked.

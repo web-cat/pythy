@@ -14,4 +14,4 @@
 
 - unless enrollments.empty?
   #course_enrollments_paginator
-    = paginate enrollments, remote: true
+    = paginate enrollments, :param_name => "enrollments_" + enrollments.first.course_offering_id.to_s + "_page"

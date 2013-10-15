@@ -1,21 +1,18 @@
 .container
-  - if @course_enrollments
+  %h3 Course Staff and Enrolled Students
+  
+  - @offerings.each do |offering|
     .btn-header-container.clearfix
-      %h3.slim.btn-line-height.pull-left Course Staff and Enrolled Students
+      %h4.slim.btn-line-height.pull-left 
+        = offering.full_label
+      
       .pull-right.dropdown
         = dropdown_button_tag icon_tag('plus') + ' Add users', class: 'btn'
         %ul.dropdown-menu
           %li
-            = link_to 'Manually...', new_course_offering_course_enrollment_path(@course_offering), remote: true
+            = link_to 'Manually...', new_course_offering_course_enrollment_path(offering), remote: true
           %li
-            = link_to 'Upload a roster...', upload_roster_path(@course_offering), remote: true
-
-    #course-enrollments-table
-      = render partial: 'course_enrollments/table', locals: { enrollments: @course_enrollments }
+            = link_to 'Upload a roster...', upload_roster_path(offering), remote: true
   
-  - else
-    %p
-      Course enrollments can only be viewed or modified when you are viewing
-      a single offering of a course, not all offerings during a term. To
-      see the enrollments for one offering of your course, please select that
-      offering from the drop-down menu at the top of the page.
+    #course-enrollments-table
+      = render partial: 'course_enrollments/table', locals: { enrollments: Kaminari.paginate_array(offering.course_enrollments).page(params["enrollments_" + offering.id.to_s + "_page"]) }
