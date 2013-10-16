@@ -13,7 +13,6 @@ class Assignment < ActiveRecord::Base
   accepts_nested_attributes_for :assignment_offerings
 
   after_create :create_reference_repository
-  before_validation :set_url_part
 
   validates :url_part, uniqueness: { scope: :course_id,
     message: 'cannot collide with the URL for another assignment in the same course' }
@@ -29,11 +28,11 @@ class Assignment < ActiveRecord::Base
       existing_urls.where!("id != ?", self.id) if self.id
       existing_urls = existing_urls.pluck(:url_part)
       
-      i = 0    
+      i = 2    
       self.url_part = new_url_part
       while existing_urls.include?(self.url_part)
         self.url_part = new_url_part
-        self.url_part += "-" + i.to_s
+        self.url_part += "_" + i.to_s
         i += 1
       end
     end
@@ -83,6 +82,8 @@ class Assignment < ActiveRecord::Base
 
   # -------------------------------------------------------------
   def create_reference_repository
+    set_url_part
+    
     AssignmentReferenceRepository.create(
       assignment_id: id,
       user_id: creator.id,
