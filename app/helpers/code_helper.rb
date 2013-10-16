@@ -29,19 +29,19 @@ module CodeHelper
   # -------------------------------------------------------------
   def score_bar(score)
     score ||= 0
+    
+    success_bar = "#{score.round}%"
+    danger_bar = ""
 
-    if score < 70
-      bar_color = 'progress-danger'
-    elsif score < 90
-      bar_color = 'progress-warning'
-    else
-      bar_color = 'progress-success'
+    if score < 15
+      success_bar = ""
+      danger_bar = "#{score.round}%"
     end
 
-    content_tag :div, class: "progress progress-striped #{bar_color}" do
-      content_tag :div, class: 'bar', style: "width: #{score}%" do
-        "#{score.round}%"
-      end
+    content_tag :div, class: "progress" do
+      content_tag(:div, success_bar, class: 'bar bar-success', style: "width: #{score}%") +
+      content_tag(:div, danger_bar, class: 'bar bar-danger', style: "width: #{100 - score}%")
+      
     end
   end
 
