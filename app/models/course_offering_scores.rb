@@ -11,6 +11,10 @@ class CourseOfferingScores
     @gathered = false
   end
 
+  # -------------------------------------------------------------
+  def course_offering
+    @course_offering
+  end
 
   # -------------------------------------------------------------
   def assignment_offerings

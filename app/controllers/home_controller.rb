@@ -21,6 +21,7 @@ class HomeController < FriendlyUrlController
   def course
     @command = params[:command]
 
+    # TODO: This if statement doesn't look right...
     if @offerings.length == 1 &&
       !@offerings.first.role_for_user(current_user).staff?
       course_student

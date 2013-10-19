@@ -1,23 +1,26 @@
--#
-  .container
-    %table#grades-table.table.table-condensed.table-striped
+
+.container
+  - @course_scores.each do |scores|
+    %h4
+      = scores.course_offering.full_label
+
+    %table#grades-table.table.table-condensed.table-striped{'style' => 'border-collapse: inherit;'}
       %thead
         %tr
           %th Name
-          - if @course_scores
-            - @course_scores.assignment_offerings.each do |offering|
-              %th= offering.assignment.short_name
+          - scores.assignment_offerings.each do |offering|
+            %th= offering.assignment.short_name
+            
       %tbody
-        - if @course_scores
-          - @course_scores.users.each do |user|
-            %tr
-              %td.has_gravatar
-                = gravatar_tag(user, 28)
-                = user.display_name
-              - @course_scores.assignment_offerings.each do |offering|
-                %td
-                  - info = @course_scores.info_for_user_and_assignment_offering(user, offering)
-                  - if info && info[:score]
-                    = link_to percentage(info[:score]), "/code/#{info[:repository_id]}"
-                  - else
-                    &ndash;
+        - scores.users.each do |user|
+          %tr
+            %td.has_gravatar
+              = gravatar_tag(user, 28)
+              = user.display_name
+            - scores.assignment_offerings.each do |offering|
+              %td
+                - info = scores.info_for_user_and_assignment_offering(user, offering)
+                - if info && info[:score]
+                  = link_to percentage(info[:score]), "/code/#{info[:repository_id]}"
+                - else
+                  &ndash;
