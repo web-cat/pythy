@@ -6,26 +6,6 @@
           = @course.number
         %p.lead
           = @course.name
-      .span4
-        .pull-right
-          %span.btn-aligned Viewing:
-          .btn-group
-            %a.btn.btn-inverse.dropdown-toggle{ href: '#', data: { toggle: 'dropdown' }}
-              - if params[:offering]
-                = @offerings.first.full_label
-              - else
-                = "All #{@offerings.first.term.display_name} offerings"
-              %span.caret
-            %ul.dropdown-menu.pull-right              
-              - @all_course_offerings.each_with_index do |(term_id, offerings), index|
-                - term = Term.find(term_id)
-                - if index != 0
-                  %li.divider
-                %li.nav-header-link
-                  = link_to "#{term.display_name} offerings", home_path(@course, term: term)
-                - offerings.each do |co|
-                  %li
-                    = link_to co.full_label, home_path(co)
                     
 = render partial: 'flashbar'
 

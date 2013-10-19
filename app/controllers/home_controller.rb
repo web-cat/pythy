@@ -6,9 +6,21 @@ class HomeController < FriendlyUrlController
   # -------------------------------------------------------------
   def index
     @organization_list = Organization.all.map { |o| [o.display_name, o.id] }
+    
+    # I want Term => Courses
+    
 
-    offerings = current_user.course_offerings
-    @courses = offerings.group_by { |co| co.course }
+    @user_offerings = current_user.course_offerings
+    
+    @current_user_courses = {}
+    @user_offerings.each do |offering|
+      term_id = offering.term.id.to_s
+      if @current_user_courses[term_id]
+        @current_user_courses[term_id] |= [offering.course]
+      else
+        @current_user_courses[term_id] = [offering.course]
+      end
+    end
 
     respond_to do |format|
       format.html
@@ -41,12 +53,6 @@ class HomeController < FriendlyUrlController
 
     @assignments = []
     @examples = []
-    
-    @all_course_offerings = {} # a hash of term to offerings.
-    
-    @course.course_offerings.pluck(:term_id).uniq.each do |term_id|      
-      @all_course_offerings[term_id] = @course.course_offerings.where(:term_id => term_id).select{ |o| can?(:show, o) }
-    end
     
     @course_scores = []
     @offerings.each do |offering|

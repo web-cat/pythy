@@ -10,7 +10,7 @@
 .container
   .row
     .span6
-      - if @courses.empty?
+      - if @current_user_courses.empty?
         %h2 Welcome to Pythy!
         %p.lead
           You are not currently enrolled in any courses on Pythy.
@@ -22,8 +22,19 @@
           not yet set it up, or he or she may be choosing to enroll students
           manually.
       - else
-        %h2 Your current courses
-        = render partial: 'self_enrollment/course_list', locals: { courses: @courses, link_to_offerings: true }
+        #enrolled-courses-list
+          %h2 Enrolled Courses
+          - @current_user_courses.each do |term_id, courses|
+            - term = Term.find(term_id.to_i)
+            %h3.slim
+              = term.display_name
+            - courses.each do |course|
+              = link_to home_path(course, term: term) do
+                %h4.slim                
+                  &nbsp;
+                  = course.number 
+                  %span.lead
+                    = ' - ' + course.name
 
     .span6
       %h2 Enroll in a new course

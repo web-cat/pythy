@@ -174,3 +174,22 @@ table.examples {
     white-space: nowrap;
   }
 }
+
+#enrolled-courses-list {
+  a {
+    position: relative;
+    left: 0px;
+    text-decoration: none;
+    color: black;
+    
+    -webkit-transition: all 0.25s ease-in-out;
+       -moz-transition: all 0.25s ease-in-out;
+        -ms-transition: all 0.25s ease-in-out;
+         -o-transition: all 0.25s ease-in-out;
+            transition: all 0.25s ease-in-out;
+  }
+  a:hover {
+    left: 10px;
+  }
+}
+
