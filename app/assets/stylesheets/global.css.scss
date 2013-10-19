@@ -347,28 +347,10 @@ img.gravatar {
 
 table td.has_gravatar {
   position: relative;
-  padding-left: 44px;
-
-  img.gravatar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 36px;
-    height: 36px;
-  }
 }
 
 table.table-condensed td.has_gravatar {
   position: relative;
-  padding-left: 36px;
-
-  img.gravatar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 28px;
-    height: 28px;
-  }
 }
 
 .header-buttons {
