@@ -24,11 +24,13 @@
       - else
         #enrolled-courses-list
           %h2 Enrolled Courses
-          - @current_user_courses.each do |term_id, courses|
+          - keys = @current_user_courses.keys
+          - keys.sort!{|a,b| b <=> a}
+          - keys.each do |term_id|
             - term = Term.find(term_id.to_i)
             %h3.slim
               = term.display_name
-            - courses.each do |course|
+            - @current_user_courses[term_id].each do |course|
               = link_to home_path(course, term: term) do
                 %h4.slim
                   = course.number 
