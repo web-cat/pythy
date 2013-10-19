@@ -375,6 +375,8 @@ class CodeController
   _sendChangeRequest: ->
     value = @codeArea.getValue()
     $.ajax type: 'PUT', url: window.location.href, data: { code: value }
+    $('#save-state-icon').html('<i class="icon-spinner icon-spin"></i>')
+    $('#save-state-message').html('saving')
 
 
   # -------------------------------------------------------------
@@ -689,9 +691,11 @@ $ ->
   overlay.css('line-height', "#{overlay.height()}px")
 
   adjustCodeTop = ->
-    codeTop = $('#flashbar').height() + 38
+    codeTop = $('#flashbar').height() + 35
+    actionTop = codeTop + 45
     $('#code-area').css 'top', "#{codeTop}px"
-    $('#action-bar').css 'top', "#{codeTop}px"
+    $('#save-bar').css 'top', "#{codeTop}px"
+    $('#action-bar').css 'top', "#{actionTop}px"
 
   $('#flashbar .flash').on 'hidden', adjustCodeTop
   adjustCodeTop()

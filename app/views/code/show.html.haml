@@ -1,5 +1,15 @@
 - title raw @page_title
 
+#save-bar
+  %table
+    %tr
+      %td
+        #save-state-icon{'style' => 'color: green;'}
+          = icon_tag('ok')
+      %td    
+        #save-state-message{'align' => 'center', 'style' => 'color: green; line-height: 25px;'}
+          saved
+
 #action-bar
   .btn-group-parent
     .btn-group.btn-group-vertical
@@ -15,9 +25,6 @@
       /       %a{ href: '#', id: 'start-over' }
       /         = icon_tag('remove') + ' Start over...'
       = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
-    %br
-    %div{'id' => 'save-indicator', 'align' => 'center', 'style' => 'color: green; display: none;'}
-      = icon_tag('save') + " " + icon_tag('ok')
         
   - if @repository.can_sync?(current_user)
     #sync-button-group.btn-group-parent.hide

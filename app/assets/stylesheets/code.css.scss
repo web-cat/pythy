@@ -71,9 +71,9 @@ body.code {
   background-color: none;
 }
 
-#action-bar {
+#save-bar {
   position: absolute;
-  top: 39px;
+  top: 35px;
   right: 0;
   padding: 6px;
   background-color: rgba(255, 255, 255, 0.8);
@@ -84,6 +84,34 @@ body.code {
   -webkit-box-shadow: -1px 1px 4px rgba(0,0,0,.2);
      -moz-box-shadow: -1px 1px 4px rgba(0,0,0,.2);
           box-shadow: -1px 1px 4px rgba(0,0,0,.2);
+          
+  cursor: default;
+
+  table tr td {
+    text-align: left;
+    width: 40px;
+  }
+  
+  table tr td:first-child {
+    text-align: center;
+    width: 16px;
+  }
+}
+
+#action-bar {
+  position: absolute;
+  top: 80px;
+  right: 0;
+  padding: 6px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-left: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+  border-bottom-left-radius: 8px;
+  border-top-left-radius: 8px;    
+  z-index: 1009;
+  -webkit-box-shadow: 0px 0px 4px 2px rgba(0,0,0,.2);
+     -moz-box-shadow: 0px 0px 4px 2px rgba(0,0,0,.2);
+          box-shadow: 0px 0px 4px 2px rgba(0,0,0,.2);
 
   .btn-group-parent {
     margin-top: 6px;
