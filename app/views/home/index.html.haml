@@ -30,11 +30,11 @@
               = term.display_name
             - courses.each do |course|
               = link_to home_path(course, term: term) do
-                %h4.slim                
-                  &nbsp;
+                %h4.slim
                   = course.number 
                   %span.lead
                     = ' - ' + course.name
+            %br
 
     .span6
       %h2 Enroll in a new course
