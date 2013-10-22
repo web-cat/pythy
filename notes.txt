@@ -1,0 +1,8 @@
+
+To change the file structure of the reference repositories to the current version:
+
+- Create an "assignments" folder inside each term.
+
+- For each Assignment:
+    - Assign a term_id to the assignment.
+    - Move the reference repo folder (has the url_part as its name) to inside the corresponding "assignments" folder in the term folder.
