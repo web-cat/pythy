@@ -38,7 +38,8 @@ module FriendlyUrlHelper
 
     if model.is_a?(AssignmentReferenceRepository)
         path_parts.unshift model.assignment.url_part
-        path_parts.unshift 'assignments'
+        path_parts.unshift 'assignment_reference'
+        path_parts.unshift model.assignment.term.url_part        
         path_parts.unshift model.assignment.course.url_part
         model = model.assignment.course.organization
     else
@@ -54,7 +55,7 @@ module FriendlyUrlHelper
       end
 
       if model.is_a?(CourseOffering)
-        path_parts.unshift model.short_label
+        path_parts.unshift "offering_" + model.short_label
         path_parts.unshift model.term.url_part
         path_parts.unshift model.course.url_part
         model = model.course.organization

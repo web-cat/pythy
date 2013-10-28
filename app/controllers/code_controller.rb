@@ -16,7 +16,6 @@ class CodeController < FriendlyUrlController
   # -------------------------------------------------------------
   def show
     if @needs_redirect
-      puts("\n\nDEBUG ------------v\n" + @repository.inspect + "\n\n")
       redirect_to staff_code_url(@repository)
     else
       @subscribe_channel = @repository.event_channel(nil)
@@ -337,49 +336,50 @@ class CodeController < FriendlyUrlController
 
   # -------------------------------------------------------------
   def find_assignment_repository_from_path_parts(parts)
+    parts.shift # == 'assignments'
+
+    # It's a student trying to access their personal repository
+    # for an assignment.
+
+    url_part = parts.shift
+
+    assignment = AssignmentOffering.joins(:assignment).where(
+      assignments: { url_part: url_part },
+      course_offering_id: @offerings.first.id).first
+
+    relation = AssignmentRepository.where(
+      user_id: current_user.id,
+      assignment_offering_id: assignment.id)
+
+    # Create the repository if it doesn't exist.
+    # TODO improve permission checks
+    # @repository = relation.first || relation.create
+    @repository = relation.first
+    if !@repository
+      @repository = relation.create
+      @repository.create_git_repo
+    end
+  end
+  
+  # -------------------------------------------------------------
+  def find_reference_repository_from_path_parts(parts)
+    # It's an instructor trying to access the reference repository
+    # for an assignment.
     parts.shift
+    url_part = parts.shift
 
-    if @term
-      # It's a student trying to access their personal repository
-      # for an assignment.
+    assignment = Assignment.where(url_part: url_part).first
 
-      url_part = parts.shift
-
-      assignment = AssignmentOffering.joins(:assignment).where(
-        assignments: { url_part: url_part },
-        course_offering_id: @offerings.first.id).first
-
-      relation = AssignmentRepository.where(
-        user_id: current_user.id,
-        assignment_offering_id: assignment.id)
+    if assignment
+      relation = AssignmentReferenceRepository.where(
+        assignment_id: assignment.id)
 
       # Create the repository if it doesn't exist.
       # TODO improve permission checks
-      # @repository = relation.first || relation.create
       @repository = relation.first
-      if !@repository
-        @repository = relation.create
-        @repository.create_git_repo
-      end
-    else
-      # It's an instructor trying to access the reference repository
-      # for an assignment.
 
-      url_part = parts.shift
-
-      assignment = Assignment.where(url_part: url_part).first
-
-      if assignment
-        relation = AssignmentReferenceRepository.where(
-          assignment_id: assignment.id)
-
-        # Create the repository if it doesn't exist.
-        # TODO improve permission checks
-        @repository = relation.first
-
-        if @repository.nil? && can?(:edit, assignment)
-          @repository = relation.create(user_id: current_user.id)
-        end
+      if @repository.nil? && can?(:edit, assignment)
+        @repository = relation.create(user_id: current_user.id)
       end
     end
   end
@@ -418,17 +418,19 @@ class CodeController < FriendlyUrlController
     parts = @rest ? @rest.split('/') : []
 
     case parts.first
-    when /^\d+$/
-      @repository = Repository.where(:assignment_offering_id => parts[1].to_i, :user_id => parts.first).first
-      parts = []
-    when 'example'
-      find_example_repository_from_path_parts(parts)
-    when 'assignments'
-      find_assignment_repository_from_path_parts(parts)
-    when 'scratchpad'
-      find_scratchpad_repository_from_path_parts(parts)
-    else
-      find_student_repository_from_path_parts(parts)
+      when /^\d+$/
+        @repository = Repository.where(:assignment_offering_id => parts[1].to_i, :user_id => parts.first).first
+        parts = []
+      when 'example'
+        find_example_repository_from_path_parts(parts)
+      when 'assignments'
+        find_assignment_repository_from_path_parts(parts)
+      when 'assignment_reference'
+        find_reference_repository_from_path_parts(parts)
+      when 'scratchpad'
+        find_scratchpad_repository_from_path_parts(parts)
+      else
+        find_student_repository_from_path_parts(parts)
     end
 
     @filename = parts.length > 0 ? File.join(parts) : DEFAULT_FILE

@@ -8,6 +8,8 @@ class AssignmentsController < ApplicationController
   before_filter :get_assignment_offerings,
     only: [ :show, :edit, :create, :update ]
 
+  before_filter :get_course_and_term,
+    only: [ :show, :edit, :create, :update ]
 
   # -------------------------------------------------------------
   # GET /assignments
@@ -118,6 +120,11 @@ class AssignmentsController < ApplicationController
     @assignment_offerings =
       @assignment.assignment_offerings.joins(:course_offering).
         order('course_offerings.short_label asc').select { |ao| can? :read, ao }
+  end
+  
+  def get_course_and_term    
+    @term = @assignment.term
+    @course = @assignment.course
   end
 
 end

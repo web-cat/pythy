@@ -5,34 +5,41 @@
         %span.hidden-phone Pythy
       %ul.nav
         - if current_user
-          %li.dropdown.nav-courses
-            
-            = dropdown_tag do
-              = icon_tag('home icon-large')
-              %span.hidden-phone
-                - if @course
-                  = @course.number
-                - else
-                  Courses
-              %i.icon-caret-down
-            %ul.dropdown-menu
-              - Term.latest_first.each do |term|
-                - offerings = current_user.course_offerings.where(term_id: term.id)
-                - course_ids = offerings.pluck(:course_id).uniq
-                - if course_ids.any?
-                  %li.nav-header
-                    Courses You Are In During
-                    = term.display_name
-                  - course_ids.each do |course_id|
-                    - course = Course.find(course_id.to_i)
-                    %li
-                      = link_to home_path(course, term: term) do
-                        %strong= course.number
-                        \-
-                        = course.name
+        
+          - if @current_user_courses          
+            %li.dropdown.nav-courses              
+              = dropdown_tag do
+                = icon_tag('home icon-large')
+                %span.hidden-phone
+                  Courses                    
+                %i.icon-caret-down
+                
+              %ul.dropdown-menu
+                - if current_user.course_offerings.any?
+                  - keys = @current_user_courses.keys
+                  - keys.sort!{|a,b| b <=> a}
+                  - keys.each do |term_id|
+                    - term = Term.find(term_id.to_i)
+                    %li.nav-header
+                      Courses You Are In During
+                      = term.display_name
+                    - @current_user_courses[term_id].each do |course|
+                      %li
+                        = link_to home_path(course, term: term) do
+                          %strong= course.number
+                          \-
+                          = course.name
                 - else
                   %li.nav-header
                     You aren't enrolled in any courses
+                    
+          - elsif @course && @term            
+            %li.nav-courses
+              = link_to home_path(@course, term: @term) do
+                %i.icon-home.icon-large
+                %span.hidden-phone
+                  = @course.number
+                      
                       
           %li.nav-scratchpad
             = link_to '/code/scratchpad' do
