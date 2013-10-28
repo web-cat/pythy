@@ -13,10 +13,6 @@ class FriendlyUrlController < ApplicationController
     @term = nil
     @offerings = []
     @rest = params[:rest]
-    
-    puts("\nTERM -----------> " + params[:term]) if params[:term]
-    puts("\nOFFERING -----------> " + params[:offering]) if params[:offering]
-    puts("\nREST -----------> " + params[:rest]) if params[:rest]
 
     @organization = Organization.from_path_component(params[:organization]).first
 
