@@ -7,10 +7,11 @@ class HomeController < FriendlyUrlController
   def index
     @organization_list = Organization.all.map { |o| [o.display_name, o.id] }
     
-    # I want Term => Courses
+    # use this method to make sure list is accurate (and not an outdated cache).
+    CourseOffering.uncached do
+      @user_offerings = current_user.course_offerings
+    end
     
-
-    @user_offerings = current_user.course_offerings
     
     @current_user_courses = {}
     @user_offerings.each do |offering|
