@@ -1,5 +1,5 @@
 .container
-  = pythy_form_for @offerings.first.course, @offerings.first do |f|
+  = pythy_form_for offering.course, offering do |f|
   
     = f.collection_select :term_id, 'Term', Term.all, :id, :display_name
   

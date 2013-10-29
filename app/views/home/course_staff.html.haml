@@ -14,8 +14,10 @@
     = tab_tag 'assignments-tab', icon_tag('laptop') + ' Assignments', active: true
     = tab_tag 'users-tab', icon_tag('group') + ' Users'
     = tab_tag 'grades-tab', icon_tag('tasks') + ' Grades'
-    - if can? :edit, @offerings.first
-      = tab_tag 'settings-tab', icon_tag('cog') + ' Settings'
+    - @offerings.each do |offering|      
+      - if can? :edit, offering
+        = tab_tag 'settings-tab', icon_tag('cog') + ' Settings'
+        - break
 
 .tab-content
   #assignments-tab.tab-pane.active
@@ -25,8 +27,8 @@
   #grades-tab.tab-pane
     = render partial: 'course_staff_grades'
   #settings-tab.tab-pane
-    - if params[:offering]
-      = render partial: 'course_staff_offering_settings'
-    - else
-      = render partial: 'course_staff_settings'
-  
+    = render partial: 'course_staff_settings'
+    - @offerings.each do |offering|
+      - if can? :edit, offering
+        = render partial: 'course_staff_offering_settings', locals: { offering: offering }
+    
