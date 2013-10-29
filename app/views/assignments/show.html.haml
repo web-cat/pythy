@@ -43,12 +43,13 @@
           %h4 Student View            
           %ul.unstyled
             - @assignment.assignment_offerings.each do |ao|
-              %li 
-                = ao.course_offering.short_label + ": " + ao.course_offering.long_label
-              %li
-                = icon_tag('file')
-                = link_to "main.py", code_path(ao)
-              %br
+              - if can? :show, ao
+                %li 
+                  = ao.course_offering.short_label + ": " + ao.course_offering.long_label
+                %li
+                  = icon_tag('file')
+                  = link_to "main.py", code_path(ao)
+                %br
     
       
     #description.tab-pane.active

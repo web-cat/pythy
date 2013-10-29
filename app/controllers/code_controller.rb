@@ -345,7 +345,7 @@ class CodeController < FriendlyUrlController
 
     assignment = AssignmentOffering.joins(:assignment).where(
       assignments: { url_part: url_part },
-      course_offering_id: @offerings.first.id).first
+      course_offering_id: @offering.id).first
 
     relation = AssignmentRepository.where(
       user_id: current_user.id,
@@ -402,7 +402,7 @@ class CodeController < FriendlyUrlController
 
     assignment = AssignmentOffering.joins(:assignment).where(
       assignments: { url_part: url_part },
-      course_offering_id: @offerings.first.id).first
+      course_offering_id: @offering.id).first
 
     relation = AssignmentRepository.where(
       user_id: user_id,

@@ -11,6 +11,7 @@ class FriendlyUrlController < ApplicationController
     @organization = nil
     @course = nil
     @term = nil
+    @offering = nil
     @offerings = []
     @rest = params[:rest]
 
@@ -23,6 +24,8 @@ class FriendlyUrlController < ApplicationController
         @term = Term.from_path_component(params[:term]).first
 
         if @term
+          @offering = CourseOffering.find(params[:offering].to_i) if params[:offering]
+          
           offerings = @course.offerings_for_user(current_user, @term)
           @offerings = offerings.select { |o| can?(:show, o) }          
         else

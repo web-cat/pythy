@@ -4,4 +4,6 @@ window.codeController.updateHistory(new_history_row, <%= @committed[:amend] %>)
 $('#save-state-icon').html('<i class="icon-ok"></i>')
 $('#save-state-message').html('saved')  
 <% end %>
+<% if !@repository.assignment_offering.closed? %>
 $('#check').removeAttr('disabled')
+<% end %>
