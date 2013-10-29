@@ -220,6 +220,8 @@ class CodeController
     @codeArea.on 'change', (_editor, change) =>
       if !@ignoreChange
         $('#check').attr 'disabled', 'disabled'
+        $('#save-state-icon').html('<i class="icon-ban-circle"></i>')
+        $('#save-state-message').html('wait')
         if (@timerHandle)
           clearTimeout(@timerHandle)
         @timerHandle = setTimeout =>
