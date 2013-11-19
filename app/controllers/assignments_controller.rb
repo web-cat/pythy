@@ -123,7 +123,7 @@ class AssignmentsController < ApplicationController
     @assignment_offering = @assignment.assignment_offerings.where(:course_offering_id => params[:offering_id].to_i).first
     
     # TODO: Is this the correct authorization?
-    #authorize! :manage, @assignment_offering
+    authorize! :manage, @assignment_offering
     
     @assignment_offering.assignment_repositories.each do |repo|
       assignment_check = repo.assignment_checks.create(number: repo.next_assignment_check_number)
@@ -147,7 +147,7 @@ class AssignmentsController < ApplicationController
     @repository = @assignment_offering.assignment_repositories.where(:id => params[:repository_id].to_i).first
     
     # TODO: Is this the correct authorization?
-    #authorize! :edit, @repository
+    authorize! :manage, @assignment_offering
 
     assignment_check = @repository.assignment_checks.create(number: @repository.next_assignment_check_number)
 
