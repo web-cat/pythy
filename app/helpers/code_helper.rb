@@ -33,7 +33,7 @@ module CodeHelper
     success_bar = "#{score.round}%"
     danger_bar = ""
 
-    if score < 15
+    if score < 20
       success_bar = ""
       danger_bar = "#{score.round}%"
     end
