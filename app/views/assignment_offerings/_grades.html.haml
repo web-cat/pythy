@@ -15,8 +15,8 @@
         %td
           = link_to assignment_path(@assignment, format: :csv), class: 'btn btn-primary btn-block' do
             = icon_tag('bar-chart')
-            Download these grades as a CSV
-      
+            Download CSV of grades
+
 .row.collapse{ id: "grades_#{course_offering.id}", class: visible && 'in' }
   .span8
     %table.table.table-bordered.table-striped.table-condensed
