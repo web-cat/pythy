@@ -356,6 +356,7 @@ class CodeController < FriendlyUrlController
     # @repository = relation.first || relation.create
     @repository = relation.first
     if !@repository
+      # TODO: Authorize! :create
       @repository = relation.create
       @repository.create_git_repo
     end

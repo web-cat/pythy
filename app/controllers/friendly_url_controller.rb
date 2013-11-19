@@ -24,20 +24,22 @@ class FriendlyUrlController < ApplicationController
         @term = Term.from_path_component(params[:term]).first
 
         if @term
-          @offering = CourseOffering.find(params[:offering].to_i) if params[:offering]
+          # TODO: I shouldn't be using the short label here.
+          @offering = @course.course_offerings.where(:short_label => params[:offering]).first if params[:offering]
+          #if cannot?(:show, @offering)
+          #  forbidden
+          #  return
+          #end
           
           offerings = @course.offerings_for_user(current_user, @term)
-          @offerings = offerings.select { |o| can?(:show, o) }          
+          @offerings = offerings.select { |o| can?(:show, o) }
         else
-          # Put the rest of the path together again.
-          parts = []
-          parts << params[:term] if params[:term]
-          parts << params[:offering] if params[:offering]
-          parts << params[:rest] if params[:rest]
-          @rest = parts.empty? ? nil : File.join(parts)
+          not_found
+          return
         end
       end
     else
+      # TODO: this is scratchpad.
       # Put the rest of the path together again.
       parts = []
       parts << params[:organization] if params[:organization]

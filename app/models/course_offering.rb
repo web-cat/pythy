@@ -16,6 +16,7 @@ class CourseOffering < ActiveRecord::Base
   attr_accessible :course_id, :short_label, :long_label, :term_id,
                   :url, :self_enrollment_allowed
 
+  
   # -------------------------------------------------------------
   # Public: Gets a relation representing all Users who are associated
   # with this CourseOffering.
