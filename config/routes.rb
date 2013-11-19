@@ -62,6 +62,8 @@ Pythy::Application.routes.draw do
 
   match 'self_enroll/:action',
     controller: 'self_enrollment', as: 'self_enrollment', via: [:get, :post]
+    
+  get 'assignments/:id/offering_:offering_id/regrade_all' => 'assignments#regrade_all', as: 'assignment_regrade_all'
 
   # Route for viewing code. The constraints allow project and file names to
   # include dots, which would normally be interpreted by Rails' router as a

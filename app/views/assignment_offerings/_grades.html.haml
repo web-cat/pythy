@@ -6,9 +6,17 @@
         = icon_tag('chevron-right')
         = course_offering.full_label
   .span4
-    = link_to assignment_path(@assignment, format: :csv), class: 'btn btn-primary btn-block' do
-      = icon_tag('bar-chart')
-      Download these grades as a CSV
+    %table{style: 'width: 100%;'}
+      %tr
+        %td
+          = link_to assignment_regrade_all_path(@assignment, course_offering), class: 'btn btn-info btn-block' do
+            = icon_tag('ok')
+            Regrade All
+        %td
+          = link_to assignment_path(@assignment, format: :csv), class: 'btn btn-primary btn-block' do
+            = icon_tag('bar-chart')
+            Download these grades as a CSV
+      
 .row.collapse{ id: "grades_#{course_offering.id}", class: visible && 'in' }
   .span8
     %table.table.table-bordered.table-striped.table-condensed

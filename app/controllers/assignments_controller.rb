@@ -111,6 +111,28 @@ class AssignmentsController < ApplicationController
       format.json { head :no_content }
     end
   end
+  
+  
+  # Regrade every student's submission for this assignment
+  def regrade_all
+    if !params[:offering_id]
+      not_found
+      return
+    end
+    
+    @assignment_offering = @assignment.assignment_offerings.where(:course_offering_id => params[:offering_id].to_i).first
+    
+    # TODO: Is this the correct authorization?
+    #authorize! :manage, @assignment_offering
+    
+    @assignment_offering.assignment_repositories.each do |repo|
+      assignment_check = repo.assignment_checks.create(number: repo.next_assignment_check_number)
+
+      CheckCodeWorker.perform_async(assignment_check.id, request.headers['X-Session-ID'])
+    end
+    
+    redirect_to assignment_path(@assignment, anchor: 'grades')
+  end
 
 
   private
