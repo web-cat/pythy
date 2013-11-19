@@ -133,6 +133,28 @@ class AssignmentsController < ApplicationController
     
     redirect_to assignment_path(@assignment, anchor: 'grades')
   end
+  
+  
+  # Regrade this assignment repository
+  def regrade
+    if !params[:offering_id] || !params[:repository_id]
+      not_found
+      return
+    end
+    
+    @assignment_offering = @assignment.assignment_offerings.where(:course_offering_id => params[:offering_id].to_i).first
+    
+    @repository = @assignment_offering.assignment_repositories.where(:id => params[:repository_id].to_i).first
+    
+    # TODO: Is this the correct authorization?
+    #authorize! :edit, @repository
+
+    assignment_check = @repository.assignment_checks.create(number: @repository.next_assignment_check_number)
+
+    CheckCodeWorker.perform_async(assignment_check.id, request.headers['X-Session-ID'])
+    
+    redirect_to assignment_path(@assignment, anchor: 'grades')
+  end
 
 
   private

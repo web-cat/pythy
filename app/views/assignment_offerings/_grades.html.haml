@@ -23,20 +23,19 @@
       %thead
         %tr
           %th Student
-          %th{ width: '20%' } Check #
+          %th{ width: '20%' } Check Number
           %th{ width: '20%' } Score
           %th{ width: '1px', style: 'border-left: none' }
+          %th{ width: '1px', style: 'border-left: none' }
+          %th{ width: '1px', style: 'border-left: none' } 
       %tbody
         - course_offering.users_sorted_by_role.each do |user|
           - repository = assignment_offering.repository_for_user(user)
           %tr
             %td.has_gravatar
               = gravatar_tag(user, 28)
-              - if repository
-                = link_to user.display_name, staff_code_url(repository)
-              - else
-                = user.display_name
-              
+              = link_to user.display_name, user
+
               - role = course_offering.role_for_user(user)
               - if role != CourseRole.student
                 %span.muted
@@ -54,10 +53,16 @@
                   = score_bar(most_recent.overall_score)
                 %td{ style: 'border-left: none' }
                   = link_to icon_tag('bar-chart'), assignment_repository_assignment_checks_path(repository), remote: true
+                %td{ style: 'border-left: none' }
+                  = link_to assignment_regrade_path(@assignment, course_offering, repository) do
+                    = icon_tag('ok')
+                %td{ style: 'border-left: none' }
+                  = link_to staff_code_url(repository) do
+                    = icon_tag('laptop')
               - else
-                %td{ colspan: 3 } Started but never checked
+                %td{ colspan: 5 } Started but never checked
             - else
-              %td{ colspan: 3 } Not started
+              %td{ colspan: 5 } Not started
   .span4
     = chart_placeholder_tag 'grade-histogram', :'assignment-offering' => assignment_offering.id
     %table.grade-summary.table.table-condensed
