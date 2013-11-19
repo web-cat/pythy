@@ -12,7 +12,7 @@ window.pythy.typeaheadUser = ->
         typeahead_user_mapped = {}
 
         $.each data, (i, item) ->
-          label = item.full_name + ' (' + item.email + ')'
+          label = item.first_name + ' ' + item.last_name + ' (' + item.email + ')'
           typeahead_user_mapped[label] = item.id
           typeahead_user_labels.push label
 

@@ -8,7 +8,7 @@ class CourseOffering < ActiveRecord::Base
 
   has_many    :course_enrollments,
     -> { CourseEnrollment.includes(:course_role, :user)
-      .order('course_roles.id ASC', 'users.full_name ASC') }
+      .order('course_roles.id ASC', 'users.last_name ASC', 'users.first_name ASC') }
 
   validates :term_id, presence: true
   validates :short_label, presence: true
@@ -24,7 +24,7 @@ class CourseOffering < ActiveRecord::Base
   def users
     User.includes(course_enrollments: :course_role).where(
       course_enrollments: { course_offering_id: id })
-      .order('course_roles.id ASC', 'users.full_name ASC')
+      .order('course_roles.id ASC', 'users.last_name ASC', 'users.first_name ASC')
   end
 
 
@@ -71,7 +71,7 @@ class CourseOffering < ActiveRecord::Base
       if aon != bon
         aon <=> bon
       else
-        a.user.full_name <=> b.user.full_name
+        a.user.last_name <=> b.user.last_name
       end
     end
 

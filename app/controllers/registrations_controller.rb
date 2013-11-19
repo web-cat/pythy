@@ -45,9 +45,9 @@ class RegistrationsController < Devise::RegistrationsController
   end
   
   # --------------------------------------------------------------
-  # Let devise know to permit the full_name field at sign-up.
+  # Let devise know to permit the first_name and last_name fields at sign-up.
   def sign_up_params
-     params.require(:user).permit(:email, :password, :password_confirmation, :full_name)
+     params.require(:user).permit(:email, :password, :password_confirmation, :first_name, :last_name)
   end
 
 end

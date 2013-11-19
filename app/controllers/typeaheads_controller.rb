@@ -6,7 +6,7 @@ class TypeaheadsController < ApplicationController
     @users = User.search(@search)
 
     respond_to do |format|
-      format.json { render json: @users.as_json(only: [:full_name, :email, :id]) }
+      format.json { render json: @users.as_json(only: [:first_name, :last_name, :email, :id]) }
     end
   end
 
