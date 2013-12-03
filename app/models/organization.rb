@@ -5,6 +5,8 @@ class Organization < ActiveRecord::Base
   attr_accessible :display_name, :domain, :abbreviation
 
   before_validation :set_url_part
+  
+  after_update :update_file_path
 
   #~ Validation ...............................................................
 
@@ -52,6 +54,21 @@ class Organization < ActiveRecord::Base
   # -------------------------------------------------------------
   def set_url_part
     self.url_part = url_part_safe(abbreviation)
+  end
+  
+  # -------------------------------------------------------------
+  # Updates the file structure to reflect the changes made to
+  # this organization model.
+  def update_file_path
+    if self.url_part_changed?
+      old_path = File.join(SystemConfiguration.first.storage_path, self.url_part_was)
+      
+      if File.directory?(old_path)
+        new_path = self.storage_path
+        
+        FileUtils.mv old_path, new_path
+      end
+    end
   end
 
 end

@@ -27,6 +27,7 @@ class Term < ActiveRecord::Base
   
   has_many :assignments
 
+  after_update :update_file_path
 
   #~ Class methods ............................................................
 
@@ -81,4 +82,26 @@ class Term < ActiveRecord::Base
     "#{SEASON_PATH_NAMES.rassoc(season).first}-#{year}"
   end
 
+
+  private
+  # -------------------------------------------------------------
+  # Updates the file structure to reflect the changes made to
+  # this term model.
+  def update_file_path
+    if self.season_changed? || self.year_changed?
+      old_url_part = "#{SEASON_PATH_NAMES.rassoc(self.season_was).first}-#{self.year_was}"
+      course_ids = self.assignments.pluck(:course_id).uniq
+      
+      course_ids.each do |course_id|
+        course = Course.find(course_id)
+        old_path = File.join(course.storage_path, old_url_part)
+        
+        if File.directory?(old_path)
+          new_path = File.join(course.storage_path, self.url_part)
+          
+          FileUtils.mv old_path, new_path
+        end
+      end
+    end
+  end
 end

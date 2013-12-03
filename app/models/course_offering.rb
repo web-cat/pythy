@@ -15,6 +15,8 @@ class CourseOffering < ActiveRecord::Base
   
   attr_accessible :course_id, :short_label, :long_label, :term_id,
                   :url, :self_enrollment_allowed
+                  
+  after_update :update_file_path
 
   
   # -------------------------------------------------------------
@@ -113,6 +115,30 @@ class CourseOffering < ActiveRecord::Base
       course.url_part,
       term.url_part,
       short_label)
+  end
+  
+  
+  private
+  # -------------------------------------------------------------
+  # Update the file structure to reflect the changes made to
+  # this course offering model.
+  def update_file_path
+    if self.short_label_changed?
+      old_path = File.join(
+                  course.organization.storage_path,
+                  course.url_part,
+                  term.url_part,
+                  short_label_was)
+                  
+      # If the directory exists, move/rename it.
+      if File.directory?(old_path)        
+        FileUtils.mv old_path, File.join(
+                                course.organization.storage_path,
+                                course.url_part,
+                                term.url_part,
+                                short_label)
+      end
+    end
   end
 
 end

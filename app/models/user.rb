@@ -35,6 +35,8 @@ class User < ActiveRecord::Base
   validates :last_name, presence: true
 
   before_create :set_default_role
+  
+  after_update :update_file_paths
 
   paginates_per 100
 
@@ -122,6 +124,39 @@ class User < ActiveRecord::Base
       self.global_role = GlobalRole.administrator
     else
       self.global_role = GlobalRole.regular_user
+    end
+  end
+  
+  
+  # -------------------------------------------------------------
+  # Updates the file structure to reflect the changes made to
+  # this user model.
+  def update_file_paths
+    if self.email_changed?
+      old_storage_path = File.join(SystemConfiguration.first.storage_path, 'users', self.email_was)
+      
+      # If the directory exists, move/rename it.
+      if File.directory?(old_storage_path)        
+        FileUtils.mv old_storage_path, File.join(SystemConfiguration.first.storage_path, 'users', self.email)
+      end
+      
+      self.assignment_offerings.each do |assignment_offering|
+        old_assignment_path = File.join(
+                                assignment_offering.course_offering.storage_path,
+                                'assignments',
+                                assignment_offering.assignment.url_part,
+                                self.email_was)
+                                
+        # If the directory exists, move/rename it.
+        if File.directory?(old_assignment_path)        
+          FileUtils.mv old_assignment_path, File.join(
+                                              assignment_offering.course_offering.storage_path,
+                                              'assignments',
+                                              assignment_offering.assignment.url_part,
+                                              self.email)
+        end
+      end
+      
     end
   end
 

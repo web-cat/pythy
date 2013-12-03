@@ -13,6 +13,8 @@ class Assignment < ActiveRecord::Base
   accepts_nested_attributes_for :assignment_offerings
 
   after_create :create_reference_repository
+  
+  after_update :update_file_paths
 
   validates :url_part, uniqueness: { scope: :course_id,
     message: 'cannot collide with the URL for another assignment in the same course' }
@@ -36,7 +38,6 @@ class Assignment < ActiveRecord::Base
         i += 1
       end
     end
-    self.save
   end
 
 
@@ -83,12 +84,57 @@ class Assignment < ActiveRecord::Base
 
   # -------------------------------------------------------------
   def create_reference_repository
-    set_url_part
+    set_url_part    
+    self.save
     
     AssignmentReferenceRepository.create(
       assignment_id: id,
       user_id: creator.id,
       term_id: term_id)
+  end
+  
+  # -------------------------------------------------------------
+  # Updates the file structure to reflect the changes made to
+  # this assignment model.
+  def update_file_paths
+    if self.short_name_changed?
+      old_url_part = self.url_part
+      old_ref_path = self.assignment_reference_repository.git_path
+      set_url_part
+      
+      if old_url_part == self.url_part
+        # Nothing changes
+        return
+      end
+      
+      self.save
+      
+      # Move reference repository folder if necessary
+      if File.directory?(old_ref_path)        
+        new_ref_path = String.new(old_ref_path)
+        new_ref_path[new_ref_path.index(File.basename(new_ref_path))..-1] = self.url_part
+        
+        FileUtils.mv old_ref_path, new_ref_path
+      end
+      
+      # Move assignment repositories if necessary
+      self.assignment_offerings.each do |assignment_offering|
+        old_assignment_repo_path = File.join(
+                                    assignment_offering.course_offering.storage_path,
+                                    'assignments',
+                                    old_url_part)
+                                    
+        if File.directory?(old_assignment_repo_path)
+          new_assignment_repo_path = File.join(
+                                      assignment_offering.course_offering.storage_path,
+                                      'assignments',
+                                      self.url_part)                                
+          
+          FileUtils.mv old_assignment_repo_path, new_assignment_repo_path
+        end                   
+        
+      end
+    end
   end
 
 end

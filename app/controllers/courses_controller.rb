@@ -68,12 +68,13 @@ class CoursesController < ApplicationController
   def update
     respond_to do |format|
       if @course.update_attributes(params[:course])
-        format.html { 
-          if params[:source] == 'settings_tab'
-            redirect_to :back, notice: 'Course offering was successfully updated.'
+        format.html {
+          if params[:term]
+            term = Term.find(params[:term])
+            redirect_to view_context.home_path(@course, term: term), notice: 'Course was successfully updated.'   
           else
-            redirect_to @course, notice: 'Course was successfully updated.'
-          end
+            redirect_to @course
+          end       
         }
         format.json { head :no_content }
       else

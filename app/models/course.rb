@@ -21,6 +21,7 @@ class Course < ActiveRecord::Base
     presence: true,
     uniqueness: { case_sensitive: false }
 
+  after_update :update_file_path
 
   #~ Class methods ............................................................
 
@@ -64,6 +65,30 @@ class Course < ActiveRecord::Base
   # -------------------------------------------------------------
   def set_url_part
     self.url_part = url_part_safe(number)
+  end
+  
+  
+  # -------------------------------------------------------------
+  # Updates the file structure to reflect the changes made to
+  # this course model.
+  def update_file_path
+    if self.number_changed? || self.organization_id_changed?
+      old_organization = Organization.find(self.organization_id_was)
+      old_url_part = url_part_safe(self.number_was)
+      
+      old_path = File.join(old_organization.storage_path, old_url_part)
+      
+      if File.directory?(old_path)
+        new_path = self.storage_path
+        
+        # If the organization folder does not exist, create it.
+        if !File.directory?(self.organization.storage_path)
+          FileUtils.mkdir_p self.organization.storage_path
+        end
+        
+        FileUtils.mv old_path, new_path
+      end
+    end
   end
 
 end
