@@ -97,12 +97,13 @@ class Ability
     # A user can manage a CourseOffering if they are enrolled in that
     # offering and have a CourseRole where can_manage_course? is true.
 
-    can :read, CourseOffering, user.course_offerings do |offering|
-      true
+    can :read, CourseOffering do |offering|
+      user.course_offerings.include?(offering)
     end
 
-    can :manage, CourseOffering, user.managing_course_offerings do |offering|
-      true
+    puts("DEBUG --------------> Manageing course offerings = " + user.managing_course_offerings.count.to_s)
+    can :manage, CourseOffering do |offering|
+      user.managing_course_offerings.include?(offering)
     end
 
     # Likewise, a user can only manage enrollments in a CourseOffering

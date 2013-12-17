@@ -85,13 +85,15 @@ class User < ActiveRecord::Base
   # user can manage
   #
   def managing_course_offerings
+    self.course_offerings.select{ |o| o.role_for_user(self).can_manage_course? }
+    
     # It seems like I should have been able to do this through the
     # course_offerings association directly somehow, but writing
     # course_offerings.joins(...) resulted in a double-join. This seems
     # to work correctly instead.
-    CourseOffering.joins(:course_enrollments => :course_role).where(
-      course_enrollments: { user_id: id },
-      course_roles: { can_manage_course: true })
+    #CourseOffering.joins(:course_enrollments => :course_role).where(
+    #  course_enrollments: { user_id: id },
+    #  course_roles: { can_manage_course: true })
   end
 
 

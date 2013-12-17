@@ -13,7 +13,7 @@
     .span5
       .btn-header-container.clearfix
         %h3.pull-left.slim.btn-line-height Instructor Examples
-        - if @offerings.any? { |o| o.role_for_user(current_user).can_manage_assignments? }
+        - if @offerings.any? { |o| o.role_for_user(current_user).can_manage_course? }
           .pull-right
             = link_to icon_tag('plus') + ' New...', new_course_offering_example_repository_path(@offerings.first), class: 'btn', remote: true
 
