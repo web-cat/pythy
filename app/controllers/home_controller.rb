@@ -7,21 +7,7 @@ class HomeController < FriendlyUrlController
   def index
     @organization_list = Organization.all.map { |o| [o.display_name, o.id] }
     
-    # use this method to make sure list is accurate (and not an outdated cache).
-    CourseOffering.uncached do
-      @user_offerings = current_user.course_offerings
-    end
-    
-    
-    @current_user_courses = {}
-    @user_offerings.each do |offering|
-      term_id = offering.term.id.to_s
-      if @current_user_courses[term_id]
-        @current_user_courses[term_id] |= [offering.course]
-      else
-        @current_user_courses[term_id] = [offering.course]
-      end
-    end
+    @current_user_courses = current_user.courses
 
     respond_to do |format|
       format.html

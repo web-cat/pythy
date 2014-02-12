@@ -40,8 +40,8 @@
 #dock.tabbable.tabs-left
   %ul.nav.nav-tabs
     %li
-      %a{ href: 'javascript:void(0)', id: 'toggle-dock', rel: 'tooltip', title: 'Show/hide the dock', data: { placement: 'right' } }
-        .dock-chevron.down
+      %a{ href: 'javascript:void(0)', id: 'toggle-dock', rel: 'tooltip', title: 'Show/hide the dock', data: { placement: 'left' } }
+        .dock-chevron.up
     = tab_tag 'summary', active: true do
       = icon_tag('dashboard')
       %span.hidden-phone Summary

@@ -100,8 +100,8 @@ class Assignment < ActiveRecord::Base
   # -------------------------------------------------------------
   # Updates the file structure to reflect the changes made to
   # this assignment model.
-  def update_file_paths
-    if self.short_name_changed?
+  def update_file_paths    
+    if self.url_part_was && self.url_part && self.short_name_changed?
       old_url_part = self.url_part
       old_ref_path = self.assignment_reference_repository.git_path
       set_url_part

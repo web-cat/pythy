@@ -24,6 +24,7 @@ class FriendlyUrlController < ApplicationController
         @term = Term.from_path_component(params[:term]).first
 
         if @term
+          current_user.update_attributes(:current_course_id => @course.id, :current_term_id => @term.id)
           # TODO: I shouldn't be using the short label here.
           @offering = @course.course_offerings.where(:short_label => params[:offering]).first if params[:offering]
           #if cannot?(:show, @offering)

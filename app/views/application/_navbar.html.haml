@@ -6,7 +6,25 @@
       %ul.nav
         - if current_user
         
-          - if @current_user_courses          
+          - if @course && @term            
+            %li.nav-courses
+              = link_to home_path(@course, term: @term) do
+                %i.icon-home.icon-large
+                %span.hidden-phone
+                  = @course.number
+        
+          - elsif current_user.current_term_id && current_user.current_course_id
+            %li.nav-courses
+              - current_course = Course.find_by_id(current_user.current_course_id)
+              - current_term = Term.find_by_id(current_user.current_term_id)
+              = link_to home_path(current_course, term: current_term) do
+                %i.icon-home.icon-large
+                %span.hidden-phone
+                  = current_course.number
+        
+          - else
+            - if !@current_user_courses
+              - @current_user_courses = current_user.courses
             %li.dropdown.nav-courses              
               = dropdown_tag do
                 = icon_tag('home icon-large')
@@ -32,13 +50,6 @@
                 - else
                   %li.nav-header
                     You aren't enrolled in any courses
-                    
-          - elsif @course && @term            
-            %li.nav-courses
-              = link_to home_path(@course, term: @term) do
-                %i.icon-home.icon-large
-                %span.hidden-phone
-                  = @course.number
                       
                       
           %li.nav-scratchpad

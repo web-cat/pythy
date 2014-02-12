@@ -101,7 +101,6 @@ class Ability
       user.course_offerings.include?(offering)
     end
 
-    puts("DEBUG --------------> Manageing course offerings = " + user.managing_course_offerings.count.to_s)
     can :manage, CourseOffering do |offering|
       user.managing_course_offerings.include?(offering)
     end
@@ -187,7 +186,7 @@ class Ability
     end
 
     can :manage, ExampleRepository do |repository|
-      can? :manage, repository.course_offering
+      can? :manage, repository.course_offering.role_for_user(user).can_manage_assignments?
     end
 
 

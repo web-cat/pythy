@@ -29,7 +29,7 @@ class User < ActiveRecord::Base
 
   # Setup accessible (or protected) attributes for your model
   attr_accessible :first_name, :last_name, :email, :password, :password_confirmation,
-    :remember_me, :global_role_id, :course_offerings, :course_enrollments
+    :remember_me, :global_role_id, :course_offerings, :course_enrollments, :current_course_id, :current_term_id
 
   validates :first_name, presence: true
   validates :last_name, presence: true
@@ -76,6 +76,24 @@ class User < ActiveRecord::Base
     @ability ||= Ability.new(self)
   end
 
+  def courses
+    # use this method to make sure list is accurate (and not an outdated cache).
+    CourseOffering.uncached do
+      @user_offerings = self.course_offerings
+    end
+    
+    courses = {}
+    @user_offerings.each do |offering|
+      term_id = offering.term.id.to_s
+      if courses[term_id]
+        courses[term_id] |= [offering.course]
+      else
+        courses[term_id] = [offering.course]
+      end
+    end
+    
+    return courses
+  end
 
   # -------------------------------------------------------------
   # Public: Gets a relation representing all of the CourseOfferings that
@@ -86,14 +104,6 @@ class User < ActiveRecord::Base
   #
   def managing_course_offerings
     self.course_offerings.select{ |o| o.role_for_user(self).can_manage_course? }
-    
-    # It seems like I should have been able to do this through the
-    # course_offerings association directly somehow, but writing
-    # course_offerings.joins(...) resulted in a double-join. This seems
-    # to work correctly instead.
-    #CourseOffering.joins(:course_enrollments => :course_role).where(
-    #  course_enrollments: { user_id: id },
-    #  course_roles: { can_manage_course: true })
   end
 
 

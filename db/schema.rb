@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20131119081535) do
+ActiveRecord::Schema.define(version: 20140116001823) do
 
   create_table "activity_logs", force: true do |t|
     t.integer  "user_id"
@@ -220,6 +220,8 @@ ActiveRecord::Schema.define(version: 20131119081535) do
     t.string   "resource_key"
     t.string   "first_name"
     t.string   "last_name"
+    t.integer  "current_course_id"
+    t.integer  "current_term_id"
   end
 
   add_index "users", ["email"], name: "index_users_on_email", unique: true, using: :btree
