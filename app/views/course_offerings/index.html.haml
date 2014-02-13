@@ -1,13 +1,4 @@
-%ul.breadcrumb
-  %li
-    = link_to @course.organization.display_name, @course.organization
-    %span.divider /
-  %li
-    = link_to @course.number, course_path(@course)
-    %span.divider /
-  %li.active
-    (all offerings)
-  %li.pull-right
-    = link_to 'New...', new_course_course_offering_path(@course)
+.pull-right
+  = link_to icon_tag('plus') + ' New...', new_course_course_offering_path(@course), class: 'btn'
 
 = render partial: 'course_offerings/index', locals: { course_offerings: @grouped_offerings }

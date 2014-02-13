@@ -1,13 +1,5 @@
-%ul.breadcrumb
-  %li
-    = link_to 'Environments', environments_path
-    %span.divider /
-  %li.active
-    = @environment.name
-  %li.pull-right
-    = link_to edit_environment_path(@environment) do
-      %i.icon-pencil
-      Edit...
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_environment_path(@environment), class: 'btn'
 
 %h2
   = @environment.name

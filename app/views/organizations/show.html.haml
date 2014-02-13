@@ -1,13 +1,5 @@
-%ul.breadcrumb
-  %li
-    = link_to 'Organizations', organizations_path
-    %span.divider /
-  %li.active
-    = @organization.display_name
-  %li.pull-right
-    = link_to edit_organization_path(@organization) do
-      %i.icon-pencil
-      Edit...
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_organization_path(@organization), class: 'btn'
 
 %h2
   = @organization.display_name

@@ -1,18 +1,5 @@
-%ul.breadcrumb
-  %li
-    = link_to @course_offering.course.organization.display_name, @course_offering.course.organization
-    %span.divider /
-  %li
-    = link_to @course_offering.course.number, course_path(@course_offering.course)
-    %span.divider /
-  %li.active
-    = @course_offering.short_label
-    = surround '(', ')' do
-      = @course_offering.term.display_name
-  %li.pull-right
-    = link_to edit_course_offering_path(@course_offering) do
-      %i.icon-pencil
-      Edit...
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_course_offering_path(@course_offering), class: 'btn'
 
 %h2.page-header
   = @course_offering.course.number

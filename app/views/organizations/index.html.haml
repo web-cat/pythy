@@ -1,8 +1,5 @@
-%ul.breadcrumb
-  %li.active
-    Organizations
-  %li.pull-right
-    = link_to 'New...', new_organization_path
+.pull-right
+  = link_to icon_tag('plus') + ' New...', new_organization_path, class: 'btn'
 
 %table.table.table-striped.table-bordered
   %thead

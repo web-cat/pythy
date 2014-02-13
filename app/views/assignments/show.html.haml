@@ -1,15 +1,4 @@
 .row
-  %ul.breadcrumb
-    %li
-      = link_to_if can?(:edit, @assignment), @assignment.course.organization.display_name, @assignment.course.organization
-      %span.divider /
-    %li
-      = link_to_if can?(:edit, @assignment), @assignment.course.number, @assignment.course
-      %span.divider /
-    %li.active
-      = succeed ':' do
-        = @assignment.short_name
-      = @assignment.long_name
 
   %h2
     = @assignment.short_name

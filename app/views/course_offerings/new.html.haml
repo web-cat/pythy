@@ -1,11 +1,2 @@
-%ul.breadcrumb
-  %li
-    = link_to @course.organization.display_name, @course.organization
-    %span.divider /
-  %li
-    = link_to @course.number, course_path(@course)
-    %span.divider /
-  %li.active
-    (new offering)
 
 = render 'form'

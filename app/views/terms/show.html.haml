@@ -1,13 +1,5 @@
-%ul.breadcrumb
-  %li
-    = link_to 'Terms', terms_path
-    %span.divider /
-  %li.active
-    = @term.display_name
-  %li.pull-right
-    = link_to edit_term_path(@term) do
-      %i.icon-pencil
-      Edit...
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_term_path(@term), class: 'btn'
 
 %h2
   = @term.display_name

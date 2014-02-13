@@ -1,12 +1,2 @@
-%ul.breadcrumb
-  %li
-    = link_to @assignment.course.organization.display_name, @assignment.course.organization
-    %span.divider /
-  %li
-    = link_to @assignment.course.number, @assignment.course
-    %span.divider /
-  %li.active
-    = @assignment.short_name
-    (editing)
 
 = render 'form'

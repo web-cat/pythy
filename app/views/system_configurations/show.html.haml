@@ -1,11 +1,5 @@
-%ul.breadcrumb
-  %li.active
-    System Configuration
-  - if can? :edit, @system_configuration
-    %li.pull-right
-      = link_to edit_system_configuration_path(@system_configuration) do
-        %i.icon-pencil
-        Edit...
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_system_configuration_path(@system_configuration), class: 'btn'
 
 %table.table.table-bordered.table-striped
   %tr

@@ -1,13 +1,5 @@
-%ul.breadcrumb
-  %li
-    = link_to 'Users', users_path
-    %span.divider /
-  %li.active
-    = @user.display_name
-  %li.pull-right
-    = link_to edit_user_path(@user) do
-      %i.icon-pencil
-      Edit
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_user_path(@user), class: 'btn'
 
 .row
   .span3

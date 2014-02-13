@@ -1,13 +1,5 @@
-%ul.breadcrumb
-  %li
-    = link_to @course.organization.display_name, @course.organization
-    %span.divider /
-  %li.active
-    = @course.number
-  %li.pull-right
-    = link_to edit_course_path(@course) do
-      %i.icon-pencil
-      Edit...
+.pull-right
+  = link_to icon_tag('pencil') + ' Edit', edit_course_path(@course), class: 'btn'
 
 %h2.page-header
   = @course.number
