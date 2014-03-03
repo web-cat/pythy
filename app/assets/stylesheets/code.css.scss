@@ -1,4 +1,6 @@
-$initialconsoleheight: 180px;
+$initialconsoleheight: 120px;
+$consoleresizebarheight: 10px;
+$sidedockwidth: 260px;
 
 body.code {
   overflow: hidden;
@@ -9,8 +11,8 @@ body.code {
   position: absolute;
   left: 0;
   top: 39px;
-  right: 0;
-  bottom: $initialconsoleheight;
+  right: $sidedockwidth;
+  bottom: $initialconsoleheight + $consoleresizebarheight;
 
   #code-loading-overlay {
     position: absolute;
@@ -126,12 +128,23 @@ body.code {
   }
 }
 
-#dock {
+#console-resize-bar {
   position: absolute;
   left: 0;
+  right: $sidedockwidth;
+  background-color: #f7f7f7;
+  height: $consoleresizebarheight;
+  bottom: $initialconsoleheight;
+  cursor: row-resize;
+  border-top: 1px solid #ddd;
+}
+
+#dock {
+  position: absolute;
+  top: 36px;
   right: 0;
-  height: $initialconsoleheight;
   bottom: 0;
+  width: $sidedockwidth;
   background-color: white;
   border-top: 1px solid #ccc;
 
@@ -187,18 +200,23 @@ body.code {
     .tab-pane {
       height: 100%;
       overflow: auto;
-      padding: 0 15px;
+      padding: 0 0px;
     }
   }
 }
 
 #console {
+  position: absolute;
+  left: 0;
+  right: $sidedockwidth;
+  height: $initialconsoleheight;
+  bottom: 0;
   background-color: #222;
   color: #eee;
 }
 
 #console-content {
-  margin: 10px 0;
+  margin: 10px 10px;
 
   .line {
     font-family: "Source Code Pro", Menlo, Monaco, Consolas,

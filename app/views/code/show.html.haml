@@ -1,6 +1,6 @@
 - title raw @page_title
 
-#save-bar
+#save-bar.hide
   %table
     %tr
       %td
@@ -10,7 +10,7 @@
         #save-state-message{'align' => 'center', 'style' => 'color: green; line-height: 25px;'}
           saved
 
-#action-bar
+#action-bar.hide
   .btn-group-parent
     .btn-group.btn-group-vertical
       = action_button_tag id: 'run', icon: 'play', class: 'btn-success', tooltip: 'Run your code and see its output'
@@ -30,54 +30,26 @@
     #sync-button-group.btn-group-parent.hide
       = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
 
-#code-area
-  #code-loading-overlay
-    = icon_tag('spinner icon-spin')
-    Loading...
-  = text_area_tag :codearea, nil, data: @code_area_data
-
-- # Docked tab area
-#dock.tabbable.tabs-left
-  %ul.nav.nav-tabs
-    %li
-      %a{ href: 'javascript:void(0)', id: 'toggle-dock', rel: 'tooltip', title: 'Show/hide the dock', data: { placement: 'left' } }
-        .dock-chevron.up
-    = tab_tag 'summary', active: true do
-      = icon_tag('dashboard')
-      %span.hidden-phone Summary
-    = tab_tag 'console' do
-      = icon_tag('desktop')
-      %span.hidden-phone Console
-    = tab_tag 'history' do
-      = icon_tag('time')
-      %span.hidden-phone History
-    - if class_partial_exists?(@repository, 'related_files')
-      = tab_tag 'files' do
-        = icon_tag('copy')
-        %span.hidden-phone Related
-  .tab-content
-    #summary.tab-pane.active
-      = render_class_partial @repository, 'summary'
+#worspace
+  #code-area
+    #code-loading-overlay
+      = icon_tag('spinner icon-spin')
+      Loading...
+    = text_area_tag :codearea, nil, data: @code_area_data
     
-    #console.tab-pane
-      #console-content
-        %span.muted
-          You haven't run your code yet. When you do, this console is where
-          its output will be displayed and where you will be asked to enter
-          any input that your program requests.
-      %i#console-spinner.icon-spinner.icon-large.icon-spin
-
-    #history.tab-pane
-      %table#history-table.table.table-condensed.table-striped
-        %tbody
-        %tfoot
-          %tr
-            %td.next-page{ colspan: 2, data: { :'appear-top-offset' => '40' } }
-              %i.icon-refresh
-              Earlier history
-
-    - if class_partial_exists?(@repository, 'related_files')
-      #files.tab-pane
-        .container-fluid
-          .row-fluid
-            = render_class_partial @repository, 'related_files'
+  #dock
+    Hi
+    
+  
+  #console-resize-bar
+    %div{'align' => 'center', 'style' => 'margin-top: -3px; line-height: 0px; color: #bbb; text-weight: bold; font-size: 28px;'}
+      \. . .
+  
+  #console
+    #console-content
+      %span.muted
+        You haven't run your code yet. When you do, this console is where
+        its output will be displayed and where you will be asked to enter
+        any input that your program requests.
+    %i#console-spinner.icon-spinner.icon-large.icon-spin
+    

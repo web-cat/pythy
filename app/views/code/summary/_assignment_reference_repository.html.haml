@@ -8,9 +8,9 @@
         %span.label.label-important Reference repository
     - if can? :edit, @repository.assignment
       .pull-right.header-buttons
-        = link_to edit_assignment_path(@repository.assignment), class: 'btn', title: 'Edit this assignment', rel: 'tooltip' do
+        = link_to edit_assignment_path(@repository.assignment), class: 'btn', title: 'Edit description and date', rel: 'tooltip' do
           = icon_tag('pencil')
-          Edit description and dates...
+          Edit assignment
 
   This example was created by
   = @repository.user.display_name

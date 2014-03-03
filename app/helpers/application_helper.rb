@@ -130,8 +130,9 @@ module ApplicationHelper
       content = args[1]
       options = args[2] || {}
       active = options.delete(:active)
+      options.merge!({:class => ('active' if active)})
 
-      content_tag :li, :class => ('active' if active) do
+      content_tag :li, options do
         link_to content, "\##{pane_id}", data: { toggle: 'tab' }
       end
     end

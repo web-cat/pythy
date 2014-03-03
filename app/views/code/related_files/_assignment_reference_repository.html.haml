@@ -1,12 +1,19 @@
+
 .span3
   %h4 Starter Files
   = render partial: 'file_list', locals: { path: 'starter' }
+  %br
+
 .span3
   %h4 Reference Tests
   = render partial: 'file_list', locals: { path: 'test' }
+  %br
+    
 .span3
   %h4 Solution
   = render partial: 'file_list', locals: { path: 'solution' }
+  %br
+
 .span3
   %h4 Student View
   %ul.unstyled

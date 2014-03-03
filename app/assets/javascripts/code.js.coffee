@@ -35,6 +35,8 @@ class CodeController
     @ignoreChange = false
     @ignoreNextHashChange = false
 
+    @worspace = $('#worspace')
+
     @console = new InteractiveConsole(this)
 
     this._initializeSkulpt()
@@ -42,7 +44,7 @@ class CodeController
     $('#check').data('loading-text', '<i class="icon-spinner icon-spin"></i>')
 
     # Register event handlers for widgets.
-    $('#toggle-dock').click (e) => this._toggleDock()
+    #$('#toggle-dock').click (e) => this._toggleDock()
     $('#run').click (e) => this._runCode()
     $('#sync').click (e) => this._resync()
     $('#check').click (e) => this._checkCode()
@@ -54,7 +56,7 @@ class CodeController
 
     window.setInterval (=> this._updateHistoryTimestamps()), 1000
 
-    #$('#dock .nav-tabs a').on 'shown', (e) => this._dockTabShown(e)
+    $('#dock .nav-tabs a').on 'shown', (e) => this._dockTabShown(e)
     $('#history .next-page').appear()
     $(document.body).on 'appear', '#history .next-page', => this._loadNextHistoryPage()
     this._loadNextHistoryPage()
@@ -403,7 +405,7 @@ class CodeController
       this._setRunButtonStop(true)
       this._clearErrors()
       @console.clear()
-      @console.toggleConsole()
+      #@console.toggleConsole()
       code = @preamble + @codeArea.getValue()
       starter =     => Sk.importMainWithBody("<stdin>", false, code)
       error   = (e) => this._handleException(e)
@@ -575,18 +577,49 @@ class InteractiveConsole
     @console_content = $("#console-content")
     @visible = false
     
+    @resizeBar = $("#console-resize-bar")
+    @consoleWrapper = $('#console')
+    
+    @resizeBar.mousedown (e) => this.initDrag(e)
+    @codeController.worspace.mouseup (e) => this.stopDrag(e)
+    
     @inputField = $('<input type="text" class="input-xlarge"
       placeholder=" Type something..."/>')
 
     this._createNewLine()
 
     $('#console-spinner').hide()
+    
+    $(window).resize ->
+      $("#code-area").css({bottom: $('#console').height() + $("#console-resize-bar").height()})
+    
+  # -------------------------------------------------------------
+  drag: (e) ->
+    @consoleWrapper.height(@consoleInitDragHeight + @initDragY - e.pageY)
+    @resizeBar.css({bottom: @consoleWrapper.height()})
+    $("#code-area").css({bottom: @consoleWrapper.height() + @resizeBar.height()})
+    return
+    
+  # -------------------------------------------------------------
+  initDrag: (e) ->
+    @codeController.worspace.disableSelection()
+    @consoleInitDragHeight = @consoleWrapper.height()
+    @codeareaInitDragHeight = $("#code-area").height()
+    @initDragY = e.pageY
+    @codeController.worspace.bind "mousemove", (e) => this.drag(e)
+    return
+      
+  # -------------------------------------------------------------
+  stopDrag: (e) ->
+    @codeController.worspace.unbind "mousemove"
+    @codeController.worspace.enableSelection()
+    return
 
 
   # -------------------------------------------------------------
-  toggleConsole: (action) ->
-    $('#dock a[href="#console"]').tab('show');
-    @codeController._toggleDock 'up'
+  #toggleConsole: (action) ->
+  #  $('#dock a[href="#console"]').tab('show');
+  #  @codeController._toggleDock 'up'
 
 
   # -------------------------------------------------------------
@@ -606,7 +639,7 @@ class InteractiveConsole
       this._createNewLine()
       this._addToCurrentLine line
 
-    this.toggleConsole('open')
+    #this.toggleConsole('open')
     
 
   # -------------------------------------------------------------
@@ -649,7 +682,7 @@ class InteractiveConsole
 
   # -------------------------------------------------------------
   promptForInput: (prompt, callback) ->
-    this.toggleConsole('open')
+    #this.toggleConsole('open')
     this._addToCurrentLine prompt
     @inputField.val('')
     @currentLine.append @inputField
