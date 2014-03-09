@@ -23,3 +23,7 @@ pickle-email-*.html
 /storage/*
 /work/*
 erd.pdf
+
+# Ignore all vim backup and swap files
+*~
+*.swp
