@@ -29,7 +29,7 @@ gem 'json'
 gem 'haml', '>= 3.1.4'
 gem 'jquery-rails'
 gem 'therubyracer'
-gem 'less-rails'
+gem 'less-rails', '2.3.3'
 gem 'twitter_bootstrap_form_for',
   git: 'git://github.com/stouset/twitter_bootstrap_form_for.git',
   branch: 'bootstrap-2.0'

@@ -270,7 +270,7 @@ DEPENDENCIES
   json
   juggernaut
   kaminari
-  less-rails
+  less-rails (= 2.3.3)
   mime-types
   mini_magick
   mysql2
