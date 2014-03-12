@@ -44,8 +44,11 @@ class SelfEnrollmentController < ApplicationController
           course_offering_id: course_offering.id,
           user_id: current_user.id,
           course_role_id: CourseRole.student.id)
+          
+        course = course_offering.course
+        term = course_offering.term
 
-        format.html { redirect_to view_context.home_path(course_offering) }
+        format.html { redirect_to view_context.home_path(course, term: term) }
       else
         format.html { forbidden }
       end
