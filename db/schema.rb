@@ -120,15 +120,6 @@ ActiveRecord::Schema.define(version: 20140116001823) do
     t.integer  "default_environment_id"
   end
 
-  create_table "departments", force: true do |t|
-    t.integer  "institution_id"
-    t.string   "name"
-    t.string   "abbreviation"
-    t.string   "url_part"
-    t.datetime "created_at"
-    t.datetime "updated_at"
-  end
-
   create_table "environments", force: true do |t|
     t.string   "name"
     t.text     "preamble"
@@ -143,19 +134,6 @@ ActiveRecord::Schema.define(version: 20140116001823) do
     t.boolean "can_edit_system_configuration", default: false, null: false
     t.boolean "builtin",                       default: false, null: false
   end
-
-  create_table "institutions", force: true do |t|
-    t.string   "domain"
-    t.string   "display_name"
-    t.string   "abbreviation"
-    t.string   "url_part"
-    t.datetime "created_at"
-    t.datetime "updated_at"
-  end
-
-  add_index "institutions", ["abbreviation"], name: "index_institutions_on_abbreviation", unique: true, using: :btree
-  add_index "institutions", ["domain"], name: "index_institutions_on_domain", unique: true, using: :btree
-  add_index "institutions", ["url_part"], name: "index_institutions_on_url_part", unique: true, using: :btree
 
   create_table "media_items", force: true do |t|
     t.integer  "user_id"
