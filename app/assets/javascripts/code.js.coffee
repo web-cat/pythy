@@ -228,7 +228,7 @@ class CodeController
           clearTimeout(@timerHandle)
         @timerHandle = setTimeout =>
           this._sendChangeRequest(this)
-        , 500
+        , 5000
 
     window.onbeforeunload = (e) =>
       this._sendMessage async: false, data: message: 'remove_user'
