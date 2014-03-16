@@ -4,8 +4,6 @@ class SplitFullNameIntoFirstAndLastName < ActiveRecord::Migration
     add_column :users, :first_name, :string
     add_column :users, :last_name, :string    
 
-    # Note: substring_index is a function specific to mysql and will not work
-    # in other database systems like postgresql.
     execute 'update users set last_name = substring_index(full_name, \' \', -1)'
     execute 'update users set first_name = left(full_name, length(full_name) - locate(\' \', reverse(full_name)))'
 
