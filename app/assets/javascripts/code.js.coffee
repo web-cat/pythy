@@ -597,14 +597,15 @@ class InteractiveConsole
   drag: (e) ->
     @consoleWrapper.height(@consoleInitDragHeight + @initDragY - e.pageY)
     @resizeBar.css({bottom: @consoleWrapper.height()})
-    $("#code-area").css({bottom: @consoleWrapper.height() + @resizeBar.height()})
+    @codearea.css({bottom: @consoleWrapper.height() + @resizeBar.height()})
     return
     
   # -------------------------------------------------------------
   initDrag: (e) ->
     @codeController.worspace.disableSelection()
     @consoleInitDragHeight = @consoleWrapper.height()
-    @codeareaInitDragHeight = $("#code-area").height()
+    @codearea = $("#code-area")
+    @codeareaInitDragHeight = @codearea.height()
     @initDragY = e.pageY
     @codeController.worspace.bind "mousemove", (e) => this.drag(e)
     return

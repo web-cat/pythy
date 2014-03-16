@@ -1,17 +1,10 @@
-.container-fluid
-  .clearfix
-    %h3.slim.pull-left
-      = @repository.assignment.long_name
-      %small
-        = surround '(', ')' do
-          = @repository.assignment.course.number
-        %span.label.label-important Reference repository
-    - if can? :edit, @repository.assignment
-      .pull-right.header-buttons
-        = link_to edit_assignment_path(@repository.assignment), class: 'btn', title: 'Edit description and date', rel: 'tooltip' do
-          = icon_tag('pencil')
-          Edit assignment
+.section-header.big
+  = succeed ": " do
+    = @repository.assignment.short_name
+  = @repository.assignment.long_name
+  %span.label.label-important Reference repository
 
+.container-fluid
   This example was created by
   = @repository.user.display_name
   at

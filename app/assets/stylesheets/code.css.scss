@@ -1,6 +1,6 @@
 $initialconsoleheight: 120px;
 $consoleresizebarheight: 10px;
-$sidedockwidth: 260px;
+$sidedockwidth: 280px;
 
 body.code {
   overflow: hidden;
@@ -137,70 +137,54 @@ body.code {
   bottom: $initialconsoleheight;
   cursor: row-resize;
   border-top: 1px solid #ddd;
+  
+  div {
+    margin-top: -3px; 
+    line-height: 0px; 
+    color: #bbb; 
+    text-weight: bold; 
+    font-size: 28px;
+  }
 }
 
 #dock {
   position: absolute;
   top: 36px;
   right: 0;
-  bottom: 0;
+  bottom: 0px;
   width: $sidedockwidth;
-  background-color: white;
-  border-top: 1px solid #ccc;
-
-  .nav-tabs {
-    height: 100%;
-    margin-right: 0;
-    background-color: #666;
-    border-right: 0;
-
-    li {
-      padding: 0;
-      margin: 0;
-
-      a {
-        border-left: none;
-        border-right: none;
-        min-width: 0;
-        margin: 0;
-        border-radius: 0;
-        border-bottom: 1px solid rgba(0,0,0,.15);
-        border-top: 1px solid rgba(255,255,225,.14);
-        text-transform: uppercase;
-        font-size: 12px;
-        font-weight: 600;
-        color: white;
-        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
-
-        &:hover {
-          margin: 0;
-          background-color: #444;
-          border-top-color: rgba(0,0,0,.15);
-          border-left: none;
-          border-right: none;
-        }
-
-        i {
-          font-size: 15px;
-        }
-      }
-
-      &.active > a {
-        background-color: #444;
-        border-top-color: rgba(0,0,0,.15);
-        border-left: none;
-        border-right: none;
-      }
-    }
+  background-color: #f7f7f7;
+  border-left: 1px solid #ddd;
+  overflow: auto;
+  overflow-x: hidden;
+  
+  .span {
+    margin-left: 20px;
+    margin-right: 20px;
+    margin-top: 15px;    
   }
-
-  .tab-content {
-    height: 100%;
-
-    .tab-pane {
-      height: 100%;
-      overflow: auto;
-      padding: 0 0px;
+  
+  .btn {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+  
+  #top-tools {
+    margin-right: 20px;
+    margin-left: 20px;
+    margin-bottom: 0px;
+  }
+  
+  .section-header {
+    width: 100%;
+    border-bottom: 1px solid #ddd;
+    padding-top: 15px;
+    padding-left: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    
+    &.big {
+      font-size: 18px;
     }
   }
 }
@@ -249,37 +233,42 @@ body.code {
   }
 }
 
-#history.tab-pane {
-  padding: 0 !important;
-
-  .next-page {
-    text-align: center;
-  }
-}
-
 #history-table {
   margin-bottom: 0;
+  
+  th {
+    font-size: 14px;
+  }
 
   .relative-date {
     color: #666;
-    font-size: 12px;
+    font-size: 10px;
   }
 
   tr {
+    font-size: 12px;
+    
     td:first-child {
       padding-left: 15px;
-      width: 50%;
+      width: 40%;
     }
 
     td:last-child {
       padding-right: 15px;
       width: 50%;
     }
+    
+    td.next-page {      
+      text-align: center;
+    }
+  }
+  
+  tr:first-child {
+    td {
+      border-top: 0px;
+    }    
   }
 
-  tr:first-child td {
-    border-style: none;
-  }
 }
 
 .outcomes-header {

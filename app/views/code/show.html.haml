@@ -1,34 +1,34 @@
 - title raw @page_title
 
-#save-bar.hide
-  %table
-    %tr
-      %td
-        #save-state-icon{'style' => 'color: green;'}
-          = icon_tag('ok')
-      %td    
-        #save-state-message{'align' => 'center', 'style' => 'color: green; line-height: 25px;'}
-          saved
+/#save-bar.hide
+/  %table
+/    %tr
+/      %td
+/        #save-state-icon{'style' => 'color: green;'}
+/          = icon_tag('ok')
+/      %td    
+/        #save-state-message{'align' => 'center', 'style' => 'color: green; line-height: 25px;'}
+/          saved
 
-#action-bar.hide
-  .btn-group-parent
-    .btn-group.btn-group-vertical
-      = action_button_tag id: 'run', icon: 'play', class: 'btn-success', tooltip: 'Run your code and see its output'
-      - if @repository.can_check?(current_user)
-        = action_button_tag id: 'check', icon: 'magic', class: 'btn', disabled: @repository.assignment_offering.closed?, tooltip: 'Check your work to see how well you are doing'
-      / - if @repository.resettable?
-      /   = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
-      /     = icon_tag('cog')
-      /     %span.caret
-      /   %ul.dropdown-menu.pull-right
-      /     %li
-      /       %a{ href: '#', id: 'start-over' }
-      /         = icon_tag('remove') + ' Start over...'
-      = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
-        
-  - if @repository.can_sync?(current_user)
-    #sync-button-group.btn-group-parent.hide
-      = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
+/#action-bar.hide
+/  .btn-group-parent
+/    .btn-group.btn-group-vertical
+/      = action_button_tag id: 'run', icon: 'play', class: 'btn-success', tooltip: 'Run your code and see its output'
+/      - if @repository.can_check?(current_user)
+/        = action_button_tag id: 'check', icon: 'magic', class: 'btn', disabled: @repository.assignment_offering.closed?, tooltip: 'Check your work to see how well you are doing'
+/      / - if @repository.resettable?
+/      /   = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
+/      /     = icon_tag('cog')
+/      /     %span.caret
+/      /   %ul.dropdown-menu.pull-right
+/      /     %li
+/      /       %a{ href: '#', id: 'start-over' }
+/      /         = icon_tag('remove') + ' Start over...'
+/      = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
+/        
+/  - if @repository.can_sync?(current_user)
+/    #sync-button-group.btn-group-parent.hide
+/      = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
 
 #worspace
   #code-area
@@ -38,11 +38,56 @@
     = text_area_tag :codearea, nil, data: @code_area_data
     
   #dock
-    Hi
+  
+    %table#top-tools
+      %tr
+        %td
+          #save-state-icon{'style' => 'color: grey;'}
+            = icon_tag('ok')
+        %td    
+          #save-state-message{'align' => 'center', 'style' => 'color: grey; line-height: 25px;'}
+            saved
+        %td{width: "100%"}
+          
+        %td.btn-group-parent
+          .btn-group.btn-group-horizontal
+            = action_button_tag id: 'run', icon: 'play', class: 'btn btn-success', tooltip: 'Run your code and see its output'
+            
+            - if @repository.can_check?(current_user)
+              = action_button_tag id: 'check', icon: 'magic', class: 'btn', disabled: @repository.assignment_offering.closed?, tooltip: 'Check your work to see how well you are doing'
+  
+            = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
+            
+            - if @repository.can_sync?(current_user)
+              = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
+  
+            - if @repository.environment_id
+              = link_to icon_tag('globe'), 'javascript:void(0)', id: 'change-environment', class: 'btn', rel: 'tooltip', title: 'Change environment', data: {placement: 'bottom'}
+    
+            - if @repository.is_a?(AssignmentReferenceRepository) && can?(:edit, @repository.assignment)
+              = link_to edit_assignment_path(@repository.assignment), class: 'btn', title: 'Edit description and date', rel: 'tooltip' do
+                = icon_tag('pencil')
+  
+    = render_class_partial @repository, 'summary'
+    
+    - if class_partial_exists?(@repository, 'related_files')
+      #files.tab-pane
+        .container-fluid{'style' => "padding-left: 0;"}
+          = render_class_partial @repository, 'related_files'
+    
+    .section-header
+      History
+    %table#history-table.table.table-condensed
+      %tbody
+      %tfoot
+        %tr
+          %td.next-page{ colspan: 2, data: { :'appear-top-offset' => '40' }, height: 0}
+            %i.icon-refresh
+            Earlier history
     
   
   #console-resize-bar
-    %div{'align' => 'center', 'style' => 'margin-top: -3px; line-height: 0px; color: #bbb; text-weight: bold; font-size: 28px;'}
+    %div{'align' => 'center'}
       \. . .
   
   #console

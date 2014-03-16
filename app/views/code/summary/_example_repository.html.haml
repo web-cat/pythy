@@ -1,22 +1,21 @@
+.section-header.big
+  Example:
+  = @repository.name
+  %small
+    = surround '(', ')' do
+      = @repository.course_offering.course.number
+
 .container-fluid
-  .row-fluid
-    .span8
-      %h3.slim
-        Example:
-        = @repository.name
-        %small
-          = surround '(', ')' do
-            = @repository.course_offering.course.number
+  .row-fluid    
+    This example was created by
+    = @repository.user.display_name
+    at
+    = succeed '.' do
+      %strong= l @repository.created_at
 
-      This example was created by
-      = @repository.user.display_name
-      at
-      = succeed '.' do
-        %strong= l @repository.created_at
-
-    .span4
-      - if can? :manage, @repository
-        %h4
-          Users currently accessing
-          %small#accessing-user-count
-        %ul#accessing-users.gravatar-list
+- if can? :manage, @repository
+  .section-header
+    Users watching:
+    
+  .container-fluid  
+    %ul#accessing-users.gravatar-list

@@ -140,7 +140,7 @@ module CodeHelper
       rel: 'tooltip',
       title: options[:tooltip],
       disabled: options[:disabled],
-      data: { placement: 'left' }) do
+      data: { placement: 'bottom' }) do
         icon_tag(options[:icon]) + (block_given? && yield || '')
     end
   end

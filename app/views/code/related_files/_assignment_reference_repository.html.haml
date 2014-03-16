@@ -1,21 +1,22 @@
 
-.span3
-  %h4 Starter Files
+.section-header
+  Starter Files
+.container-fluid
   = render partial: 'file_list', locals: { path: 'starter' }
-  %br
 
-.span3
-  %h4 Reference Tests
+.section-header
+  Reference Tests
+.container-fluid  
   = render partial: 'file_list', locals: { path: 'test' }
-  %br
     
-.span3
-  %h4 Solution
+.section-header
+  Solution
+.container-fluid
   = render partial: 'file_list', locals: { path: 'solution' }
-  %br
 
-.span3
-  %h4 Student View
+.section-header
+  Student View
+.container-fluid
   %ul.unstyled
     - @repository.assignment.assignment_offerings.each do |ao|
       %li 
