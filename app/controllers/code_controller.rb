@@ -40,11 +40,20 @@ class CodeController < FriendlyUrlController
       if @repository.warn_if_not_owner? && @repository.user != current_user
         flash[:alert] = "You are viewing a repository that belongs to #{@repository.user.display_name}."
       end
+      
+      codeDataPath = ""
+      codeDataPath += "/" + @organization.url_part if @organization
+      codeDataPath += "/" + @course.url_part if @course
+      codeDataPath += "/" + @term.url_part if @term
+      codeDataPath += "/" + @offering.short_label if @offering
+      codeDataPath += "/" + @rest 
 
       @code_area_data = {
         :channel => @subscribe_channel,
         :editor => can?(:update, @repository),
-        :'user-media-key' => current_user.resource_key
+        :'user-media-key' => current_user.resource_key,
+        :'user-email' => current_user.email,
+        :'path' => codeDataPath
       }
 
       if @repository.is_a? ScratchpadRepository
