@@ -2,13 +2,56 @@ Pythy -- The Cloud-Based IDE for Novice Python Programmers
 ==========================================================
 
 Pythy is a web-based programming environment for Python that
-*eliminates software-related barriers to entry* for
+**eliminates software-related barriers to entry** for
 novice programmers, such as installing the language runtime and IDE
 and properly configuring other dependencies. Within seconds, students can
-begin *writing code, watch it execute, debug it, and access support materials and tutorials,*
-all from within the familiar context of their *web browser.*
+begin **writing code, watch it execute, debug it, and access support materials and tutorials**,
+all from within the familiar context of their **web browser**.  
+For more information please see the [slides](http://sofia.cs.vt.edu/cta-mediacomp/presentation.pdf) and the [paper](http://dl.acm.org/citation.cfm?id=2538977)
+
+Setup Instructions
+------------------
+### Dependencies
+
+1. Ruby
+2. The Ruby on Rails framework. 
+3. Mysql client and server. (For linux install the dev packages also.)
+4. A JavaScript runtime (Ex: Node.js)
+
+(For an ubuntu installation see [Install Ruby on Rails - Ubuntu Linux](http://railsapps.github.io/installrubyonrails-ubuntu.html))
+
+### Linux
+1.  Clone the git repository. `git clone https://github.com/web-cat/pythy.git`
+2.  Go into the newly created pythy directory. `cd pythy`
+3.  Install the dependencies. `bundle install`
+4.  Create a database configuration file at `config/database.yml`. 
+    The adapter must be mysql2 as some of the sql statements will not work
+    otherwise. [Sample configuration file](#sample-database-configuration-file).
+5.  Create the database. `bundle exec rake db:create`
+6.  Load the schema into the database. `bundle exec rake db:schema:load`
+7.  Seed the database with the initial values. `bundle exec rake db:seed`
+8.  Run the server. `rails server`
+9.  If the server is running locally, visit [http://localhost:3000](http://localhost:3000), else, visit the corresponding url.
+
+### Sample Database Configuration File
 
 
+```
+	development:
+    		adapter: mysql2
+    		encoding: utf8
+    		database: dev_pythy
+    		pool: 5
+    		username: <your mysql username>
+    		password: <your mysql password>
+	test:
+    		adapter: mysql2
+    		encoding: utf8
+    		database: test_pythy
+    		pool: 5
+    		username: <your mysql username>
+    		password: <your mysql password>
+```
 Objectives and Plans
 --------------------
 
