@@ -33,6 +33,24 @@ Setup Instructions
 8.  Run the server. `rails server`
 9.  If the server is running locally, visit [http://localhost:3000](http://localhost:3000), else, visit the corresponding url.
 
+#### Running the tests
+The tests are located in the `spec` directory. To run them, first prepare the
+test database by running the commands
+```
+bundle exec rake db:test:prepare
+bundle exec rake db:seed RAILS_ENV=test
+```
+
+Preparing the test database is a one-time operation.  
+
+Now, the tests can be run using the command  
+`bundle exec rspec`
+
+Running the tests generates a coverage report 
+(using [simplecov](https://github.com/colszowka/simplecov))
+that is stored in the `coverage` directory.
+Open the `index.html` file in a web browser to view the test coverage.
+ 
 ### Sample Database Configuration File
 
 
