@@ -10,20 +10,26 @@ capybara-*.html
 /db/*.sqlite3
 /public/assets/*
 /public/system/*
-/coverage/
 /spec/tmp/*
 **.orig
 rerun.txt
 pickle-email-*.html
-/config/database.yml
 
 *.rdb
 /public/m
 /public/uploads/tmp
 /storage/*
 /work/*
+
+# Ignore the entity relationship diagram
 erd.pdf
+
+# Ignore the database configuration
+/config/database.yml
 
 # Ignore all vim backup and swap files
 *~
 *.swp
+
+# Ignore test coverage reports
+/coverage/
