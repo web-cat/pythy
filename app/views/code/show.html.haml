@@ -1,36 +1,6 @@
 - title raw @page_title
 
-/#save-bar.hide
-/  %table
-/    %tr
-/      %td
-/        #save-state-icon{'style' => 'color: green;'}
-/          = icon_tag('ok')
-/      %td    
-/        #save-state-message{'align' => 'center', 'style' => 'color: green; line-height: 25px;'}
-/          saved
-
-/#action-bar.hide
-/  .btn-group-parent
-/    .btn-group.btn-group-vertical
-/      = action_button_tag id: 'run', icon: 'play', class: 'btn-success', tooltip: 'Run your code and see its output'
-/      - if @repository.can_check?(current_user)
-/        = action_button_tag id: 'check', icon: 'magic', class: 'btn', disabled: @repository.assignment_offering.closed?, tooltip: 'Check your work to see how well you are doing'
-/      / - if @repository.resettable?
-/      /   = button_tag id: 'more-options', class: 'btn dropdown-toggle', disabled: @repository.assignment_offering.closed?, data: { toggle: 'dropdown' } do
-/      /     = icon_tag('cog')
-/      /     %span.caret
-/      /   %ul.dropdown-menu.pull-right
-/      /     %li
-/      /       %a{ href: '#', id: 'start-over' }
-/      /         = icon_tag('remove') + ' Start over...'
-/      = action_button_tag id: 'media', icon: 'cloud', class: 'btn-info', tooltip: 'Upload and manage your media files'
-/        
-/  - if @repository.can_sync?(current_user)
-/    #sync-button-group.btn-group-parent.hide
-/      = action_button_tag id: 'sync', icon: 'refresh', class: 'btn-warning', tooltip: 'Automatic updates stop when you start typing, so that the instructor\'s typing doesn\'t clobber yours. Click this button to pull the instructor\'s latest version and resume automatic updates.'
-
-#worspace
+#workspace
   #code-area
     #code-loading-overlay
       = icon_tag('spinner icon-spin')

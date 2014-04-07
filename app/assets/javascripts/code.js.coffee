@@ -7,6 +7,8 @@ class CodeController
     @channel = $codearea.data('channel')
     @isEditor = $codearea.data('editor')
     @mediaKey = $codearea.data('user-media-key')
+    
+    @localStoragePath = $codearea.data('user-email') + $codearea.data('path')
 
     # Convert the text area to a CodeMirror widget.
     @codeArea = CodeMirror.fromTextArea $codearea[0],
@@ -34,8 +36,8 @@ class CodeController
 
     @ignoreChange = false
     @ignoreNextHashChange = false
-
-    @worspace = $('#worspace')
+    
+    @workspace = $('#workspace')
 
     @console = new InteractiveConsole(this)
 
@@ -74,7 +76,12 @@ class CodeController
       this._trackChanges()
 
     if $codearea.data('needs-environment')
-      this._changeEnvironment()
+      this._changeEnvironment()    
+    
+    @supportsLocalStorage = typeof(Storage) != "undefined"
+      
+    return
+    
 
 
   # ---------------------------------------------------------------
@@ -228,7 +235,7 @@ class CodeController
           clearTimeout(@timerHandle)
         @timerHandle = setTimeout =>
           this._sendChangeRequest(this)
-        , 500
+        , 5000
 
     window.onbeforeunload = (e) =>
       this._sendMessage async: false, data: message: 'remove_user'
@@ -377,11 +384,31 @@ class CodeController
 
   # -------------------------------------------------------------
   _sendChangeRequest: ->
-    value = @codeArea.getValue()
-    $.ajax type: 'PUT', url: window.location.href, data: { code: value }
+    @codeValueToSave = @codeArea.getValue()
+    
+    # Save times-out in 8 seconds.
+    $.ajax type: 'PUT', url: window.location.href, timeout: 8000, data: { code: @codeValueToSave }, error: this._saveAjaxError, context: this
+    
     $('#save-state-icon').html('<i class="icon-spinner icon-spin"></i>')
     $('#save-state-message').html('saving')
 
+
+  # -------------------------------------------------------------
+  _saveAjaxError: (xmlhttprequest, status, message) ->
+    # There was an error saving the code.
+    # Try to abort the ajax request if possible.
+    xmlhttprequest.abort()
+    
+    # Try to save in local storage instead.
+    if ( @supportsLocalStorage )
+      window.localStorage[@localStoragePath] = @codeValueToSave
+      $('#save-state-icon').html('<i class="icon-warning-sign"></i>')
+      $('#save-state-message').html('local')
+    else
+      $('#save-state-icon').html('<i class="icon-remove"></i>')
+      $('#save-state-message').html('unsaved')
+      
+    return
 
   # -------------------------------------------------------------
   _setRunButtonStop: (stop) ->
@@ -581,7 +608,7 @@ class InteractiveConsole
     @consoleWrapper = $('#console')
     
     @resizeBar.mousedown (e) => this.initDrag(e)
-    @codeController.worspace.mouseup (e) => this.stopDrag(e)
+    @codeController.workspace.mouseup (e) => this.stopDrag(e)
     
     @inputField = $('<input type="text" class="input-xlarge"
       placeholder=" Type something..."/>')
@@ -602,18 +629,18 @@ class InteractiveConsole
     
   # -------------------------------------------------------------
   initDrag: (e) ->
-    @codeController.worspace.disableSelection()
+    @codeController.workspace.disableSelection()
     @consoleInitDragHeight = @consoleWrapper.height()
     @codearea = $("#code-area")
     @codeareaInitDragHeight = @codearea.height()
     @initDragY = e.pageY
-    @codeController.worspace.bind "mousemove", (e) => this.drag(e)
+    @codeController.workspace.bind "mousemove", (e) => this.drag(e)
     return
       
   # -------------------------------------------------------------
   stopDrag: (e) ->
-    @codeController.worspace.unbind "mousemove"
-    @codeController.worspace.enableSelection()
+    @codeController.workspace.unbind "mousemove"
+    @codeController.workspace.enableSelection()
     return
 
 
