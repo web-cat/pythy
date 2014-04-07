@@ -12,6 +12,8 @@ class ActivityLog < ActiveRecord::Base
 
   default_scope -> { includes(:user).order('activity_logs.created_at desc') }
 
+  validates :action, presence: true
+  validates :user, presence: true
 
   #~ Instance methods .........................................................
 
@@ -25,8 +27,10 @@ class ActivityLog < ActiveRecord::Base
   # the prefix, sorted in ascending order.
   #
   def self.all_actions(prefix = '')
-    self.uniq.where(self.arel_table[:action].matches(
-      "#{prefix}%")).reorder('action asc').pluck(:action)
+    self.uniq
+      .where(self.arel_table[:action].matches("#{prefix}%"))
+      .reorder('action asc')
+      .pluck(:action)
   end
 
 end
