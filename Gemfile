@@ -2,10 +2,10 @@ source 'https://rubygems.org'
 
 gem 'rails', '4.0.0'
 gem 'puma'
+gem 'mysql2'
 
 group :development, :test do
   gem 'sqlite3', '~> 1.3.4'
-  gem 'mysql2'
   gem 'quiet_assets'
   gem 'pg'              # Postgres db support
 end
@@ -13,10 +13,15 @@ end
 group :development do
   gem 'annotate'
   gem 'rails-erd'
+  gem 'rspec-rails', '2.13.1'
 end
 
-group :production, :staging do
-  gem 'mysql2'
+group :test do
+  gem 'selenium-webdriver', '2.35.1'
+  gem 'capybara', '2.1.0'
+  gem 'factory_girl_rails', '4.2.1'
+  gem 'shoulda-matchers'
+  gem 'simplecov', '~> 0.7.1'
 end
 
 gem 'sass-rails',   '~> 4.0.0'

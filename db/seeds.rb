@@ -59,3 +59,5 @@ CourseRole.create!(name:                       'Student',
                    can_manage_assignments:     false,
                    can_grade_submissions:      false,
                    can_view_other_submissions: false)
+
+Environment.create(name: 'Python')

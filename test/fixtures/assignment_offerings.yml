@@ -1,8 +1,0 @@
-# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
-
-cs1064_p1_98765:
-  assignment: cs1064_p1
-  course_offering: cs1064_98765
-  opens_at: <%= 1.day.ago.to_s(:db) %>
-  due_at: <%= 1.week.from_now.to_s(:db) %>
-  closes_at: <%= 2.weeks.from_now.to_s(:db) %>
