@@ -9,6 +9,12 @@ class CodeController
     @mediaKey = $codearea.data('user-media-key')
     
     @localStoragePath = $codearea.data('user-email') + $codearea.data('path')
+    @updated_at = parseInt($codearea.data('updated-at'))
+    
+    # Date shim for old browsers.
+    if (!Date.now)
+      Date.now = -> 
+        return new Date().getTime()    
 
     # Convert the text area to a CodeMirror widget.
     @codeArea = CodeMirror.fromTextArea $codearea[0],
@@ -287,11 +293,33 @@ class CodeController
 
 
   # ---------------------------------------------------------------
-  updateCode: (code, force, newHistoryRow, amend) ->
+  updateCode: (code, force, newHistoryRow, amend, initial = false) ->
     if force || !force && !@desynched
       @ignoreChange = true
+      
+      loadFromLocal = false
+      
+      # Load code from local storage if more currrent.
+      if @supportsLocalStorage
+        localTimestamp = window.localStorage[@localStoragePath + '-timestamp']
+        if localTimestamp
+          localTimestamp = parseInt(localTimestamp)
+  
+        if initial && localTimestamp && localTimestamp > @updated_at
+          loadFromLocal = true
+          code = window.localStorage[@localStoragePath]
+          $('#save-state-icon').html('<i class="icon-warning-sign"></i>')
+          $('#save-state-message').html('local')
+          # Remove the local storage item.
+          window.localStorage.removeItem(@localStoragePath + '-timestamp')
+          window.localStorage.removeItem(@localStoragePath)
+        
       @codeArea.setValue code
+      
       @ignoreChange = false
+      
+      if loadFromLocal
+        this._sendChangeRequest(this) # Try to update the code in the server if it was loaded from local storage.
 
     if newHistoryRow
       this.updateHistory(newHistoryRow, amend)
@@ -385,9 +413,10 @@ class CodeController
   # -------------------------------------------------------------
   _sendChangeRequest: ->
     @codeValueToSave = @codeArea.getValue()
+    timestamp = Math.round(timestamp: Date.now() / 1000)
     
     # Save times-out in 8 seconds.
-    $.ajax type: 'PUT', url: window.location.href, timeout: 8000, data: { code: @codeValueToSave }, error: this._saveAjaxError, context: this
+    $.ajax type: 'PUT', url: window.location.href, timeout: 8000, data: { code: @codeValueToSave, timestamp}, error: this._saveAjaxError, context: this
     
     $('#save-state-icon').html('<i class="icon-spinner icon-spin"></i>')
     $('#save-state-message').html('saving')
@@ -400,7 +429,9 @@ class CodeController
     xmlhttprequest.abort()
     
     # Try to save in local storage instead.
-    if ( @supportsLocalStorage )
+    if @supportsLocalStorage
+      
+      window.localStorage[@localStoragePath + '-timestamp'] = Math.round(Date.now() / 1000)
       window.localStorage[@localStoragePath] = @codeValueToSave
       $('#save-state-icon').html('<i class="icon-warning-sign"></i>')
       $('#save-state-message').html('local')

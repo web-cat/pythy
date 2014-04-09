@@ -53,7 +53,8 @@ class CodeController < FriendlyUrlController
         :editor => can?(:update, @repository),
         :'user-media-key' => current_user.resource_key,
         :'user-email' => current_user.email,
-        :'path' => codeDataPath
+        :'path' => codeDataPath,
+        :'updated-at' => @repository.updated_at.to_i.to_s
       }
 
       if @repository.is_a? ScratchpadRepository
@@ -68,13 +69,20 @@ class CodeController < FriendlyUrlController
     authorize! :update, @repository
 
     code = params[:code]
-
-    # Update the code in the working copy of the repo.
-    @committed = @repository.commit(current_user) do |git|
-      path = File.join(@repository.git_path, @filename)
-      File.open(path, 'w') { |f| f.write(code) }
-
-      git.add path
+    
+    timestamp = params[:timestamp]
+    timestamp = timestamp.to_i if timestamp
+    
+    if !timestamp || timestamp < @repository.updated_at.to_i
+      
+      # Update the code in the working copy of the repo.
+      @committed = @repository.commit(current_user) do |git|
+        path = File.join(@repository.git_path, @filename)
+        File.open(path, 'w') { |f| f.write(code) }
+  
+        git.add path
+      end
+      
     end
 
     respond_to do |format|
@@ -86,7 +94,8 @@ class CodeController < FriendlyUrlController
               code: code,
               commit: @commit_hash,
               amend: @committed[:amend],
-              force: false
+              force: false,
+              initial: false
             }
         end
       end
@@ -126,7 +135,7 @@ class CodeController < FriendlyUrlController
     
     respond_to do |format|
       format.js { render template: 'code/update_code',
-        locals: { code: code, force: true } }
+        locals: { code: code, force: true, initial: true } }
     end
     
   end
@@ -161,7 +170,8 @@ class CodeController < FriendlyUrlController
           locals: {
             code: code,
             environment: @repository.environment,
-            force: true
+            force: true,
+            initial: true
           }
       }
     end
@@ -223,7 +233,7 @@ class CodeController < FriendlyUrlController
 
       respond_to do |format|
         format.js { render template: 'code/update_code',
-          locals: { code: code, force: true } }
+          locals: { code: code, force: true, initial: false } }
       end
     rescue IOError
       respond_to do |format|
@@ -292,7 +302,7 @@ class CodeController < FriendlyUrlController
 
       respond_to do |format|
         format.js { render template: 'code/update_code',
-          locals: { code: code, force: true } }
+          locals: { code: code, force: true, initial: false } }
       end
     rescue IOError
       respond_to do |format|
