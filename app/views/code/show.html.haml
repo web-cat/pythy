@@ -3,7 +3,7 @@
 #workspace
   #code-area
     #code-loading-overlay
-      = icon_tag('spinner icon-spin')
+      = icon_tag('spinner', 'spin')
       Loading...
     = text_area_tag :codearea, nil, data: @code_area_data
     
@@ -13,7 +13,7 @@
       %tr
         %td
           #save-state-icon{'style' => 'color: grey;'}
-            = icon_tag('ok')
+            = icon_tag('check')
         %td    
           #save-state-message{'align' => 'center', 'style' => 'color: grey; line-height: 25px;'}
             saved
@@ -52,7 +52,7 @@
       %tfoot
         %tr
           %td.next-page{ colspan: 2, data: { :'appear-top-offset' => '40' }, height: 0}
-            %i.icon-refresh
+            = icon_tag('refresh')
             Earlier history
     
   
@@ -66,5 +66,5 @@
         You haven't run your code yet. When you do, this console is where
         its output will be displayed and where you will be asked to enter
         any input that your program requests.
-    %i#console-spinner.icon-spinner.icon-large.icon-spin
+    %i#console-spinner.fa-spinner.fa-lg.fa-spin
     

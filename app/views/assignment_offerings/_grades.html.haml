@@ -10,11 +10,11 @@
       %tr
         %td
           = link_to assignment_regrade_all_path(@assignment, course_offering), class: 'btn btn-info btn-block' do
-            = icon_tag('ok')
+            = icon_tag('check')
             Regrade All
         %td
           = link_to assignment_path(@assignment, format: :csv), class: 'btn btn-primary btn-block' do
-            = icon_tag('bar-chart')
+            = icon_tag('bar-chart-o')
             Download CSV of grades
 
 .row.collapse{ id: "grades_#{course_offering.id}", class: visible && 'in' }
@@ -52,10 +52,10 @@
                 %td
                   = score_bar(most_recent.overall_score)
                 %td{ style: 'border-left: none' }
-                  = link_to icon_tag('bar-chart'), assignment_repository_assignment_checks_path(repository), remote: true
+                  = link_to icon_tag('bar-chart-o'), assignment_repository_assignment_checks_path(repository), remote: true
                 %td{ style: 'border-left: none' }
                   = link_to assignment_regrade_path(@assignment, course_offering, repository) do
-                    = icon_tag('ok')
+                    = icon_tag('check')
                 %td{ style: 'border-left: none' }
                   = link_to staff_code_url(repository) do
                     = icon_tag('laptop')

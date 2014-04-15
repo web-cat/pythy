@@ -9,7 +9,7 @@
           - if @course && @term            
             %li.nav-courses
               = link_to home_path(@course, term: @term) do
-                %i.icon-home.icon-large
+                = icon_tag('home', 'lg')
                 %span.hidden-phone
                   = @course.number
         
@@ -18,7 +18,7 @@
               - current_course = Course.find_by_id(current_user.current_course_id)
               - current_term = Term.find_by_id(current_user.current_term_id)
               = link_to home_path(current_course, term: current_term) do
-                %i.icon-home.icon-large
+                = icon_tag('home', 'lg')
                 %span.hidden-phone
                   = current_course.number
         
@@ -27,10 +27,10 @@
               - @current_user_courses = current_user.courses
             %li.dropdown.nav-courses              
               = dropdown_tag do
-                = icon_tag('home icon-large')
+                = icon_tag('home', 'lg')
                 %span.hidden-phone
-                  Courses                    
-                %i.icon-caret-down
+                  Courses
+                = icont_tag('caret-down')
                 
               %ul.dropdown-menu
                 - if current_user.course_offerings.any?
@@ -54,15 +54,15 @@
                       
           %li.nav-scratchpad
             = link_to '/code/scratchpad' do
-              %i.icon-edit-sign.icon-large
+              = icon_tag('edit', 'lg')
               %span.hidden-phone Scratchpad
               
       %ul.nav.pull-right
         - if can_manage_anything?
           %li.dropdown.nav-settings
             = dropdown_tag do
-              %i.icon-wrench.icon-large
-              %i.icon-caret-down.hidden-phone
+              = icon_tag('wrench', 'lg')
+              = icon_tag('caret-down')
             %ul.dropdown-menu
               %li.nav-header Manage
               = menu_link_to_if can?(:manage, User), icon_tag('user') + ' Users', users_path
@@ -87,8 +87,8 @@
           %li.nav-logout
             - if session[:original_user]
               = link_to unimpersonate_users_path, title: "Unimpersonate User" do
-                %i.icon-signout.icon-large
+                = icon_tag('sign-out', 'lg')
               
             - else 
               = link_to destroy_user_session_path, title: "Logout", method: :delete do
-                %i.icon-signout.icon-large
+                = icon_tag('sign-out', 'lg')

@@ -82,9 +82,9 @@ module CodeHelper
 
     if outcome.possible_score == 1.0
       if score < 0.001
-        bar_text = icon_tag('remove')
+        bar_text = icon_tag('times')
       else
-        bar_text = icon_tag('ok')
+        bar_text = icon_tag('check')
       end
 
       progress = 100
