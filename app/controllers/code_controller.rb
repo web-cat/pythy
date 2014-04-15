@@ -257,13 +257,20 @@ class CodeController < FriendlyUrlController
   def check
     @closed = @repository.assignment_offering.closed?
     @was_changed = @repository.changed_since_last_check?
+    @is_instructor = can? :manage, @repository.assignment_offering
+    @last_check = @repository.assignment_checks.last
 
-    if !@closed && @was_changed
+    if (!@closed && @was_changed) || @is_instructor
       assignment_check = @repository.assignment_checks.create(
         number: @repository.next_assignment_check_number)
 
       CheckCodeWorker.perform_async(assignment_check.id,
         request.headers['X-Session-ID'])
+    elsif !@was_changed && @last_check
+      respond_to do |format|
+        format.js { render template: 'code/check_results',
+          locals: { assignment_check: @last_check } }
+      end
     end
 
     respond_to do |format|
