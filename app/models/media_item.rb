@@ -54,7 +54,7 @@ class MediaItem < ActiveRecord::Base
     elsif audio?
       thumb_class = 'music'
     elsif text?
-      thumb_class = 'file-alt'
+      thumb_class = 'file-text'
     else
       thumb_class = 'file'
     end

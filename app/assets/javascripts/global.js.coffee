@@ -174,7 +174,7 @@ window.pythy =
   appendLoaderTo: (selector) ->
     selector.append(
       $('<div>').addClass('loading-widget').append(
-        $('<i>').addClass('icon-spinner icon-spin')
+        $('<i>').addClass('fa-spinner fa-spin')
       )
     )
 
