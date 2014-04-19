@@ -9,7 +9,7 @@ class CourseRole < ActiveRecord::Base
 
   validates :name, presence: true, uniqueness: true
   
-  with_options if: :builtin?, on: :update, changeable: false do |builtin|
+  with_options if: :builtin?, on: :update, changeable: {with: false} do |builtin|
     builtin.validates :can_manage_course
     builtin.validates :can_manage_assignments
     builtin.validates :can_grade_submissions
