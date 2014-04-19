@@ -1,18 +1,16 @@
-class PathValidator < ActiveModel::Validator
-  def validate(system_configuration)
-    storage_dir = find_writable_path(system_configuration.storage_path)
-    work_dir = find_writable_path(system_configuration.work_path)
+# Validates that the path exists and is writable by the server.
+class PathValidator < ActiveModel::EachValidator
+  def validate_each(record, attribute, value)
+    dir = find_writable_path(value)
 
-    # Returns an error if there is no such path or if the user
-    # doesn't have permission to write to the path
-    unless File.exists?(storage_dir) and File.stat(storage_dir).writable? 
-      system_configuration.errors[:storage_path_permission_denied] <<
-        "Storage path must be writable by the server."
+    if not File.exists?(dir)
+      record.errors.add(attribute, "#{value} must exist.")
     end
-    unless File.exists?(work_dir) and File.stat(work_dir).writable?
-      system_configuration.errors[:work_path_permission_denied] <<
-        "Work path must be writable by the server."
+
+    if not File.stat(dir).writable? 
+      record.errors.add(attribute, "#{value} must be writable by the server.")
     end
+
   end
   
   private
