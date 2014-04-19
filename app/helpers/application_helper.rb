@@ -25,12 +25,21 @@ module ApplicationHelper
 
 
   # -------------------------------------------------------------
-  # Creates an <i> tag with the specified icon class.
+  # Creates a font-awesome <i> tag with the specified icon class.
   #
-  # name: the icon class, without the 'icon-' prefix
+  # name: the icon class, without the 'fa-' prefix
+  # *extra: as many other fa-### options as you need.
   #
-  def icon_tag(name)
-    content_tag :i, nil, class: "icon-#{name}"
+  def icon_tag(name, *extra)
+    
+    class_str = "fa fa-#{name}"
+    
+    extra.each do |opt|
+      class_str += " fa-#{opt}"
+    end
+    
+    content_tag :i, nil, class: class_str
+    
   end
 
 
@@ -255,7 +264,7 @@ module ApplicationHelper
 
     params = options[:params] || {}
 
-    text = icon_tag('remove')
+    text = icon_tag('times')
     text += ' Delete...' if options.delete(:text)
 
     link_to text,

@@ -8,4 +8,4 @@ amend = <%= amend %>
 new_history_row = null
 amend = false
 <% end %>
-window.codeController.updateCode '<%= j raw code %>', <%= force %>, new_history_row, amend
+window.codeController.updateCode '<%= j raw code %>', <%= force %>, new_history_row, amend, <%= initial %>

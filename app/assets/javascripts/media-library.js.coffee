@@ -108,7 +108,7 @@ class MediaLibrary
   # -------------------------------------------------------------
   _createThumbnail: (item) ->
     if item.thumbnail_class
-      node = """<i class="media-object icon-#{item.thumbnail_class}"></i>"""
+      node = """<i class="media-object fa fa-#{item.thumbnail_class}"></i>"""
     else
       node = """<img class="media-object" width="64" height="64" src="#{item.thumbnail_url}"/>"""
 

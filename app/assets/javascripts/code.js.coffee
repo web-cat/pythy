@@ -9,6 +9,12 @@ class CodeController
     @mediaKey = $codearea.data('user-media-key')
     
     @localStoragePath = $codearea.data('user-email') + $codearea.data('path')
+    @updated_at = parseInt($codearea.data('updated-at'))
+    
+    # Date shim for old browsers.
+    if (!Date.now)
+      Date.now = -> 
+        return new Date().getTime()    
 
     # Convert the text area to a CodeMirror widget.
     @codeArea = CodeMirror.fromTextArea $codearea[0],
@@ -43,7 +49,7 @@ class CodeController
 
     this._initializeSkulpt()
 
-    $('#check').data('loading-text', '<i class="icon-spinner icon-spin"></i>')
+    $('#check').data('loading-text', '<i class="fa fa-spinner fa-spin"></i>')
 
     # Register event handlers for widgets.
     #$('#toggle-dock').click (e) => this._toggleDock()
@@ -137,13 +143,13 @@ class CodeController
     else
       @loading = true
       skip = $('#history-table tbody tr').length
-      $('#history .next-page i').addClass 'icon-spin'
+      $('#history .next-page i').addClass 'fa-spin'
       this._sendMessage data: message: 'history', start: skip
 
 
   # ---------------------------------------------------------------
   nextHistoryPageLoaded: ->
-    $('#history .next-page i').removeClass 'icon-spin'
+    $('#history .next-page i').removeClass 'fa-spin'
     @loading = false
     if @pendingHistoryLoad
       this._loadNextHistoryPage()
@@ -229,7 +235,7 @@ class CodeController
     @codeArea.on 'change', (_editor, change) =>
       if !@ignoreChange
         $('#check').attr 'disabled', 'disabled'
-        $('#save-state-icon').html('<i class="icon-ban-circle"></i>')
+        $('#save-state-icon').html('<i class="fa fa-ban"></i>')
         $('#save-state-message').html('wait')
         if (@timerHandle)
           clearTimeout(@timerHandle)
@@ -287,11 +293,33 @@ class CodeController
 
 
   # ---------------------------------------------------------------
-  updateCode: (code, force, newHistoryRow, amend) ->
+  updateCode: (code, force, newHistoryRow, amend, initial = false) ->
     if force || !force && !@desynched
       @ignoreChange = true
+      
+      loadFromLocal = false
+      
+      # Load code from local storage if more currrent.
+      if @supportsLocalStorage
+        localTimestamp = window.localStorage[@localStoragePath + '-timestamp']
+        if localTimestamp
+          localTimestamp = parseInt(localTimestamp)
+  
+        if initial && localTimestamp && localTimestamp > @updated_at
+          loadFromLocal = true
+          code = window.localStorage[@localStoragePath]
+          $('#save-state-icon').html('<i class="fa fa-warning"></i>')
+          $('#save-state-message').html('local')
+          # Remove the local storage item.
+          window.localStorage.removeItem(@localStoragePath + '-timestamp')
+          window.localStorage.removeItem(@localStoragePath)
+        
       @codeArea.setValue code
+      
       @ignoreChange = false
+      
+      if loadFromLocal
+        this._sendChangeRequest(this) # Try to update the code in the server if it was loaded from local storage.
 
     if newHistoryRow
       this.updateHistory(newHistoryRow, amend)
@@ -385,11 +413,12 @@ class CodeController
   # -------------------------------------------------------------
   _sendChangeRequest: ->
     @codeValueToSave = @codeArea.getValue()
+    timestamp = Math.round(timestamp: Date.now() / 1000)
     
     # Save times-out in 8 seconds.
-    $.ajax type: 'PUT', url: window.location.href, timeout: 8000, data: { code: @codeValueToSave }, error: this._saveAjaxError, context: this
+    $.ajax type: 'PUT', url: window.location.href, timeout: 8000, data: { code: @codeValueToSave, timestamp}, error: this._saveAjaxError, context: this
     
-    $('#save-state-icon').html('<i class="icon-spinner icon-spin"></i>')
+    $('#save-state-icon').html('<i class="fa fa-spinner fa-spin"></i>')
     $('#save-state-message').html('saving')
 
 
@@ -400,12 +429,14 @@ class CodeController
     xmlhttprequest.abort()
     
     # Try to save in local storage instead.
-    if ( @supportsLocalStorage )
+    if @supportsLocalStorage
+      
+      window.localStorage[@localStoragePath + '-timestamp'] = Math.round(Date.now() / 1000)
       window.localStorage[@localStoragePath] = @codeValueToSave
-      $('#save-state-icon').html('<i class="icon-warning-sign"></i>')
+      $('#save-state-icon').html('<i class="fa fa-warning"></i>')
       $('#save-state-message').html('local')
     else
-      $('#save-state-icon').html('<i class="icon-remove"></i>')
+      $('#save-state-icon').html('<i class="fa fa-times"></i>')
       $('#save-state-message').html('unsaved')
       
     return
@@ -414,11 +445,11 @@ class CodeController
   _setRunButtonStop: (stop) ->
     if stop
       $('#run').removeClass('btn-success').addClass('btn-danger').
-        data('running', true).html('<i class="icon-spinner icon-large icon-spin"></i>')
+        data('running', true).html('<i class="fa fa-spinner fa-lg fa-spin"></i>')
       $('#console-spinner').show()
     else
       $('#run').removeClass('btn-danger').addClass('btn-success').
-        data('running', false).html('<i class="icon-play"></i>')
+        data('running', false).html('<i class="fa fa-play"></i>')
       $('#console-spinner').hide()
 
 
