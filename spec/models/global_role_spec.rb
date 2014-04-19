@@ -25,6 +25,10 @@ describe GlobalRole do
     it { should respond_to(:can_manage_all_courses) }
     it { should respond_to(:can_create_courses) }
 
+    it "can not be deleted" do
+      expect { builtin_role.destroy }.not_to change(GlobalRole, :count)
+    end
+
     describe "'s properties should not be update-able" do
       before do
         builtin_role.update(can_edit_system_configuration: false)
