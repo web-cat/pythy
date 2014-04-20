@@ -30,4 +30,12 @@ FactoryGirl.define do
     password                "foobar"
     password_confirmation   "foobar"
   end
+
+  factory :vt_user, class: User do
+    first_name              "Test"
+    last_name               "User"
+    email                   "vt_user@vt.edu"
+    password                "foobar"
+    password_confirmation   "foobar"
+  end
 end
