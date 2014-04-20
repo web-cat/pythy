@@ -67,6 +67,7 @@ gem 'gravtastic'      # For Gravatar integration
 #gem 'turbolinks'      # Rails 4 turbolinks
 gem 'js-routes'       # Route helpers in Javascript
 gem 'awesome_print'   # For debugging/logging output
+gem 'validates_timeliness', '~> 3.0' # For validating date/time
 
 # Gems for server-side event support.
 gem 'redis'
@@ -74,7 +75,7 @@ gem 'redis-namespace'
 gem 'juggernaut'
 
 # Gems for background job support.
-gem 'sidekiq'
+gem 'sidekiq', '~> 2.17.6'
 gem 'sidekiq-failures'
 
 # Required for Sidekiq's web-based monitoring interface.

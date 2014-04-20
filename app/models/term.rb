@@ -22,6 +22,14 @@ class Term < ActiveRecord::Base
 
   attr_accessible :ends_on, :season, :starts_on, :year
 
+  # Validations
+  validates_date :starts_on
+  validates_date :ends_on, after: lambda {|term| term.starts_on }
+  validates :season, presence: true
+  validates :year, numericality: { greater_than: 2000 } 
+
+  validate :season_should_be_in_range
+
   # Orders terms in descending order (latest time first).
   scope :latest_first, -> { order('year desc, season desc') }
   
@@ -102,6 +110,17 @@ class Term < ActiveRecord::Base
           FileUtils.mv old_path, new_path
         end
       end
+    end
+  end
+
+  def season_should_be_in_range
+    if SEASONS.rassoc(season).nil?
+      error_msg = "The season should be one of ["
+      SEASONS.each do |key, value|
+        error_msg += "#{value}, "
+      end
+      error_msg += error_msg.chop + "]"
+      errors.add(:season, error_msg)
     end
   end
 end
