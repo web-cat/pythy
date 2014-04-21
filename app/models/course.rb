@@ -14,12 +14,13 @@ class Course < ActiveRecord::Base
 
   before_validation :set_url_part
 
-  validates :number, presence: true
-  validates :name, presence: true
-  validates :default_environment, presence: true
-  validates :url_part,
-    presence: true,
-    uniqueness: { case_sensitive: false }
+  with_options presence: true do |course|
+    course.validates :number, uniqueness: { case_sensitive: false }
+    course.validates :name
+    course.validates :default_environment
+    course.validates :organization
+    course.validates :url_part, uniqueness: { case_sensitive: false }
+  end
 
   after_update :update_file_path
 
