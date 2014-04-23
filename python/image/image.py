@@ -1,3 +1,6 @@
+import urllib.request as urlrequest
+import PIL.Image as PILImage
+import io
 
 # -------------------------------------------------------------
 def _clamp(value):
@@ -85,21 +88,23 @@ class Image:
 
   # -------------------------------------------------------------
   def __init__(self, url):
-    # TODO hack used for testing, would be nice if this supported
-    # actual image URLs (at least file: ones) eventually. Right now,
-    # url is expected to be a string in the format:
-    # "width,height,red,green,blue", where the image will be filled
-    # entirely with that color.
+    
+    # TODO only supports RGB pictures. Will fail if given RGBA (like a png).
+    
+    self.filename = url.split('/')[-1]
+    
+    response = urlrequest.urlopen(url)    
+    
+    stream = io.BytesIO( response.read() )
+    
+    PILpic = PILImage.open( stream )
+    
+    picPixelsFlat = list(PILpic.getdata())
+    
+    self.width = PILpic.size[0]
+    self.height = PILpic.size[1]
 
-    parts = url.split(',')
-    self.width = int(parts[0])
-    self.height = int(parts[1])
-    r = int(parts[2])
-    g = int(parts[3])
-    b = int(parts[4])
-
-    row = [Pixel(r, g, b) for x in range(self.width)]
-    self.pixels = [row[:] for y in range(self.height)]
+    self.pixels = [ [Pixel(r, g, b) for r, g, b in picPixelsFlat[row * self.width:(row + 1) * self.width]] for row in range(self.height) ]
 
 
   # -------------------------------------------------------------
