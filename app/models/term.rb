@@ -117,9 +117,9 @@ class Term < ActiveRecord::Base
     if SEASONS.rassoc(season).nil?
       error_msg = "The season should be one of ["
       SEASONS.each do |key, value|
-        error_msg += "#{value}, "
+        error_msg += "#{value},"
       end
-      error_msg += error_msg.chop + "]"
+      error_msg = error_msg.chop + "]"
       errors.add(:season, error_msg)
     end
   end
