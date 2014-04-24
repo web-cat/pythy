@@ -271,11 +271,12 @@ class CodeController < FriendlyUrlController
         format.js { render template: 'code/check_results',
           locals: { assignment_check: @last_check } }
       end
+    else
+      respond_to do |format|
+        format.js { render template: 'code/check' }
+      end
     end
 
-    respond_to do |format|
-      format.js { render template: 'code/check' }
-    end
   end
 
 
