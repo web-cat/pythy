@@ -32,6 +32,9 @@ Setup Instructions
 7.  Seed the database with the initial values. `bundle exec rake db:seed`
 8.  Run the server. `rails server`
 9.  If the server is running locally, visit [http://localhost:3000](http://localhost:3000), else, visit the corresponding url.
+10. To be able to use the grading feature, you need to have
+[sidekiq](https://github.com/mperham/sidekiq) running on the server.
+`bundle exec sidekiq`. The sidekiq dashboard can be accessed at /sidekiq. 
 
 #### Running the tests
 The tests are located in the `spec` directory. To run them, first prepare the
@@ -70,6 +73,7 @@ Open the `index.html` file in a web browser to view the test coverage.
     		username: <your mysql username>
     		password: <your mysql password>
 ```
+
 Objectives and Plans
 --------------------
 
