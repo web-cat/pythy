@@ -16,10 +16,11 @@ def _clamp(value):
 class Pixel:
 
   # -------------------------------------------------------------
-  def __init__(self, r, g, b):
+  def __init__(self, r, g, b, a):
     self.red = _clamp(r)
     self.green = _clamp(g)
     self.blue = _clamp(b)
+    self.alpha = _clamp(a)
 
 
   # -------------------------------------------------------------
@@ -89,10 +90,6 @@ class Image:
   # -------------------------------------------------------------
   def __init__(self, url):
     
-    # TODO only supports RGB pictures. Will fail if given RGBA (like a png).
-    
-    self.filename = url.split('/')[-1]
-    
     response = urlrequest.urlopen(url)    
     
     stream = io.BytesIO( response.read() )
@@ -103,8 +100,12 @@ class Image:
     
     self.width = PILpic.size[0]
     self.height = PILpic.size[1]
-
-    self.pixels = [ [Pixel(r, g, b) for r, g, b in picPixelsFlat[row * self.width:(row + 1) * self.width]] for row in range(self.height) ]
+    
+    if len(picPixelsFlat[0]) == 3:
+        self.pixels = [ [Pixel(r, g, b, 255) for r, g, b in picPixelsFlat[row * self.width:(row + 1) * self.width]] for row in range(self.height) ]
+    else:
+        self.pixels = [ [Pixel(r, g, b, a) for r, g, b, a in picPixelsFlat[row * self.width:(row + 1) * self.width]] for row in range(self.height) ]
+    
 
 
   # -------------------------------------------------------------
