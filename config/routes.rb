@@ -77,6 +77,9 @@ Pythy::Application.routes.draw do
   match 'home' => 'home#index', via: [:get, :post]
   match 'home/:organization/:course/:term' => 'home#course',
     via: [:get, :post]
+    
+  get 'template_picker/:organization/:course/:term' => 'assignments#template_picker'
+  get 'pick_template/:organization/:course/:term/:template_id' => 'assignments#pick_template'
 
   # Route for accessing the media library.
   medias_pattern = 'media(/user/:user)(/assignment/:assignment)'

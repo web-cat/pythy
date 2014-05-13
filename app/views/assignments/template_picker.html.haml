@@ -1,0 +1,24 @@
+%table.table.table-bordered.table-striped.table-condensed
+  %thead
+    %tr
+      %th.span4 Short Name
+      %th.span4 Full Name
+      %th.span3 Term
+      %th.span1
+      
+  %tbody
+    - if @assignments.empty?
+      %td{ colspan: 4 }
+        .alert There are no past assignments that you can access in this course.
+    - else
+      - @assignments.each do |assignment|
+        %tr
+          %td= assignment.short_name
+          %td= assignment.long_name
+          %td= assignment.term.display_name
+          %td= link_to "Select", simple_course_path('pick_template', @course, @term, assignment.id.to_s)
+
+- unless @assignments.empty?
+  #assignments_paginator
+    = paginate @assignments
+    

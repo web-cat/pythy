@@ -146,7 +146,6 @@ class AssignmentsController < ApplicationController
     
     @repository = @assignment_offering.assignment_repositories.where(:id => params[:repository_id].to_i).first
     
-    # TODO: Is this the correct authorization?
     authorize! :manage, @assignment_offering
 
     assignment_check = @repository.assignment_checks.create(number: @repository.next_assignment_check_number)
@@ -154,6 +153,58 @@ class AssignmentsController < ApplicationController
     CheckCodeWorker.perform_async(assignment_check.id, request.headers['X-Session-ID'])
     
     redirect_to assignment_path(@assignment, anchor: 'grades')
+  end
+  
+  
+  def template_picker
+
+    @course = Course.from_path_component(params[:course]).first    
+    authorize! :manage, @course
+
+    @term = Term.from_path_component(params[:term]).first
+    
+    @assignments = @course.assignments.select{ |o| can?(:show, o) }
+    
+    @assignments = Kaminari.paginate_array(@assignments).page(params[:page]).per(25)
+  end
+  
+  
+  def pick_template
+    
+    @course = Course.from_path_component(params[:course]).first    
+    authorize! :manage, @course
+
+    @term = Term.from_path_component(params[:term]).first
+    
+    template = Assignment.find(params[:template_id])    
+    authorize! :show, template
+    
+    @assignment = Assignment.new
+    @assignment.creator = current_user
+    @assignment.course = @course
+    @assignment.term = @term
+    @assignment.short_name = template.short_name
+    @assignment.long_name = template.long_name
+    @assignment.brief_summary = template.brief_summary
+    @assignment.description = template.description
+    @assignment.set_url_part
+    
+    @assignment.save!
+    
+    # Create in all offerings.
+    course_offerings = CourseOffering.where(:course_id => @course.id, :term_id => @term.id)
+    
+    course_offerings.each do |offering|
+      # FIXME This should be "can manage assignment offerings in offering"
+      if can? :manage, offering
+        new_assignment_offering = offering.assignment_offerings.build(
+          params[:assignment_offering])
+        new_assignment_offering.assignment = @assignment
+        new_assignment_offering.save
+      end
+    end
+    
+    redirect_to edit_assignment_path(@assignment)
   end
 
 

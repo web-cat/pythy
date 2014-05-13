@@ -36,6 +36,9 @@ class AssignmentOfferingsController < ApplicationController
   def new
     @assignment = @assignment_offering.build_assignment
 
+    @course = @course_offering.course
+    @term = @course_offering.term
+
     respond_to do |format|
       format.html
       format.js
@@ -61,16 +64,14 @@ class AssignmentOfferingsController < ApplicationController
     @assignment.term_id = @assignment_offering.course_offering.term.id
     @assignment.save!
 
-    # Create in all offerings if checked.
-    if params[:add_to_all_offerings]
-      @assignment_offering.course_offering.other_concurrent_offerings.each do |offering|
-        # FIXME This should be "can manage assignment offerings in offering"
-        if can? :manage, offering
-          new_assignment_offering = offering.assignment_offerings.build(
-            params[:assignment_offering])
-          new_assignment_offering.assignment = @assignment
-          new_assignment_offering.save
-        end
+    # Create in all offerings.
+    @assignment_offering.course_offering.other_concurrent_offerings.each do |offering|
+      # FIXME This should be "can manage assignment offerings in offering"
+      if can? :manage, offering
+        new_assignment_offering = offering.assignment_offerings.build(
+          params[:assignment_offering])
+        new_assignment_offering.assignment = @assignment
+        new_assignment_offering.save
       end
     end
 
