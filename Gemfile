@@ -7,7 +7,7 @@ gem 'mysql2'
 group :development, :test do
   gem 'sqlite3', '~> 1.3.4'
   gem 'quiet_assets'
-  gem 'pg'              # Postgres db support
+  gem 'pg', '~> 0.16.0'              # Postgres db support
 end
 
 group :development do
@@ -86,4 +86,4 @@ gem 'slim'
 gem 'protected_attributes'
 
 # Gems for deployment.
-gem 'capistrano'
+gem 'capistrano', '~> 2.15.4'
