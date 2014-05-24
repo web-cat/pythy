@@ -112,5 +112,18 @@ module FriendlyUrlHelper
 
     URI::encode('/' + File.join(path_parts))
   end
+  
+  # -------------------------------------------------------------
+  def simple_course_path(prefix, course, term, suffix=nil)
+    path_parts = []
+    
+    path_parts.unshift suffix if suffix
+    path_parts.unshift term.url_part
+    path_parts.unshift course.url_part
+    path_parts.unshift course.organization.url_part    
+    path_parts.unshift prefix
+
+    '/' + File.join(path_parts)
+  end
 
 end

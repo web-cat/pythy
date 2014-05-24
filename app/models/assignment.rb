@@ -16,8 +16,8 @@ class Assignment < ActiveRecord::Base
   
   after_update :update_file_paths
 
-  validates :url_part, uniqueness: { scope: :course_id,
-    message: 'cannot collide with the URL for another assignment in the same course' }
+  validates :url_part, uniqueness: { scope: [:course_id, :term_id],
+    message: 'cannot collide with the URL for another assignment in the same course in the same term' }
   validates :short_name, presence: true
   validates :long_name, presence: true
 

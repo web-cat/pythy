@@ -9,7 +9,6 @@
       #flashbar-placeholder
 
       = f.fields_for :assignment do |assignment|
-        = select_tag :model_after, options_from_collection_for_select(@past_assignments, :id) if @past_assignments
       
         = assignment.text_field :short_name, class: 'input-large' do
           .help-block A brief name for the assignment, such as "Project 1".
@@ -19,15 +18,14 @@
             %strong "Short Name: Long Name"
             in many displays.
 
-      .control-group
-        .controls
-          %label.checkbox
-            = check_box_tag :add_to_all_offerings
-            Create assignment in all course offerings in the current term
-          .help-block
-            If unchecked, the assignment will only be created in the offering with CRN
-            = succeed '.' do
-              %strong= @assignment_offering.course_offering.short_label
+    %div{'style' => 'border-top: 1px solid #eeeeee; padding: 9px;' }
+      %table
+        %tr
+          %td
+            %h4 Or use previous assignment as template:
+          %td{'width' => '10px'}
+          %td
+            = link_to "Use Template", simple_course_path('template_picker', @course, @term), :class => "btn btn-success"
 
     .modal-footer
       = f.submit

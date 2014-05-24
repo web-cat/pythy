@@ -50,8 +50,6 @@ class HomeController < FriendlyUrlController
     end
       
     @course_scores = Kaminari.paginate_array(@course_scores).page(params[:page])
-    
-    @past_assignments = @course.assignments.select{ |o| can?(:show, o) }
 
     @assignments.sort! { |a, b| a.updated_at <=> b.updated_at }
     @examples.sort! { |a, b| b.created_at <=> a.created_at }
