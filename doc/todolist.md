@@ -6,6 +6,7 @@ that need to be implemented/fixed to make Pythy Python 3.0 compatible
 in the browser and make the media computation programs in the book
 'Introduction to Computing and Programming in Python' work on it.
 
+1. merge the interrupted execution changes with the main skulpt repository.
 1. pickAFile/writePictureTo should work with cloud files and
    makePicture/Sound() should load the file into memory.
 2. Is there a specific reason for the book using a procedural style of calling methods, like getHeight(img), instead of an object oriented way, like img.getHeight()? And do we want to mimic this style?
