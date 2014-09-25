@@ -17,8 +17,9 @@ Setup Instructions
 2. The Ruby on Rails framework. 
 3. Mysql client and server. (For linux install the dev packages also.)
 4. A JavaScript runtime (Ex: Node.js)
+5. The Redis server.
 
-(For an ubuntu installation see [Install Ruby on Rails - Ubuntu Linux](http://railsapps.github.io/installrubyonrails-ubuntu.html))
+(For an ubuntu installation see [Setup Ruby on Rails on Ubuntu](https://gorails.com/setup/ubuntu/14.04))
 
 ### Linux
 1.  Clone the git repository. `git clone https://github.com/web-cat/pythy.git`
