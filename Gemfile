@@ -5,9 +5,7 @@ gem 'puma'
 gem 'mysql2'
 
 group :development, :test do
-  gem 'sqlite3', '~> 1.3.4'
   gem 'quiet_assets'
-  gem 'pg', '~> 0.16.0'              # Postgres db support
 end
 
 group :development do
