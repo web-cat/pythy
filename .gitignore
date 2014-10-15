@@ -33,3 +33,6 @@ erd.pdf
 
 # Ignore test coverage reports
 /coverage/
+
+# Ignore node modules
+node_modules
