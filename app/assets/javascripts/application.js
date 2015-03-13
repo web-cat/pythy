@@ -30,6 +30,7 @@
 //= require codemirror/modes/markdown
 //= require global
 //= require media-library
+//= require color-picker
 //= require typeaheads
 //= require highcharts
 //= require highcharts/highcharts-more
