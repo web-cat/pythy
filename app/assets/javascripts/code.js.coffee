@@ -141,7 +141,7 @@ class CodeController
       else
         @codeArea.replaceSelection("'#{url}'")
 
-    $('#media_library_modal').modal 'hide'
+    $('#media_library_modal').modal('hide')
     @codeArea.focus()
 
   _sendMessage : (settings) ->
@@ -444,7 +444,7 @@ class CodeController
       output : @console.output
       inputfun  : (prompt) =>
         Sk.future (continueWith) =>
-          @console.promptForInput(prompt, (text) -> continueWith(text))
+          @console.promptForInput(prompt, continueWith)
       read   : @_skRead
       transformUrl : @_skTransformUrl
 
