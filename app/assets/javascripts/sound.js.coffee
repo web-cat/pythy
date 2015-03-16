@@ -62,6 +62,9 @@ class pythy.Sound
       toChannel[j] = fromChannel[j] for j in [0..fromChannel.length - 1]
     return buffer
 
+  getUrl: () ->
+    return @url
+
   play : (callback) ->
     source = @_getPlayback(if callback then false else true)
     source.onended = callback

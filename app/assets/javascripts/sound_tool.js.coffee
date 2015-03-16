@@ -273,8 +273,14 @@ class SoundTool
 
     @attachEventHandlers()
 
-  start: (@url, nthSample) ->
-    @sound = new pythy.Sound((() => @_onLoad(nthSample)), null, @url)
+  start: (arg, nthSample) ->
+    if(arg instanceof pythy.Sound)
+      @sound = arg
+      @url = @sound.getUrl()
+      @_onLoad(nthSample)
+    else
+      @url = arg
+      @sound = new pythy.Sound((() => @_onLoad(nthSample)), null, @url)
 
   detachEventHandlers: () ->
     evtHldr.element.removeEventListener(evtHldr.evt, evtHldr.handler) for evtHldr in @eventHandlers
