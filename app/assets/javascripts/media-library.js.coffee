@@ -52,14 +52,7 @@ class MediaLibrary
         if not @mediaLinkWasClicked and @canceled then @canceled()
 
   _openPictureTool: (url) ->
-    $('<img></img>').load () ->
-      canvas = document.createElement('canvas')
-      canvas.width = @naturalWidth
-      canvas.height = @naturalHeight
-      ctx = canvas.getContext('2d')
-      ctx.drawImage(this, 0, 0)
-      window.pythy.pictureTool.show(canvas)
-    .attr('src', url)
+    window.pythy.pictureTool.show(url)
 
   _openSoundTool: (url) ->
     window.pythy.soundTool.start(window.location.protocol + '//' + window.location.host + url)
