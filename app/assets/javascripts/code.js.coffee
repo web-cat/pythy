@@ -446,7 +446,7 @@ class CodeController
         Sk.future (continueWith) =>
           @console.promptForInput(prompt, continueWith)
       read   : @_skRead
-      transformUrl : @_skTransformUrl
+      transformUrl : CodeController.transformUrl
 
     # Configure the media comp module's foreign function interface.
     window.mediaffi =
@@ -458,7 +458,9 @@ class CodeController
       throw("File not found: '#{file}'")
     else Sk.builtinFiles['files'][file]
 
-  _skTransformUrl: (url) ->
+  @transformUrl: (url) ->
+    # TODO check for the case where the url is not in the form http://host/path
+    # and is simple the path as then it will not result in a 404 if it's supposed to
     encodedUrl = encodeURIComponent(url)
     clientHost = "#{window.location.protocol}//#{window.location.host}"
     {protocol, host} = window.location

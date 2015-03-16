@@ -30,9 +30,9 @@ class pythy.Sound
     else if(type is 'number')
       # NOTE: Pythy supports a maximum of 2 sound channels, so any new empty
       # sound will have 2 channels by default
-      @buffer = __$audioContext$__.createBuffer(2, arg0, arg1 || SAMPLE_RATE)
+      @buffer = __$audioContext$__.createBuffer(2, arg0, arg1 || pythy.Sound.SAMPLE_RATE)
       @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
-      onSuccess(this)
+      onSuccess and onSuccess(this)
      
     #else
       #TODO: throw exception
@@ -44,7 +44,7 @@ class pythy.Sound
       __$audioContext$__.decodeAudioData request.response, (decodedData) =>
         @buffer = decodedData
         @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
-        onSuccess(this)
+        onSuccess && onSuccess(this)
    
     #TODO: Fix this [because server doesn't respond with 404 if not prefixed with http:]
     # Also use jquery ajax instead of xmlhttprequest for now. (it has better error handling)
@@ -68,13 +68,13 @@ class pythy.Sound
     source.start(0)
 
   playBefore: (time) ->
-    @getPlayback().start(0, 0, time)
+    @_getPlayback().start(0, 0, time)
 
   playAfter: (time) ->
-    @getPlayback().start(0, time)
+    @_getPlayback().start(0, time)
 
   playSelection: (from, to) ->
-    @getPlayback().start(0, 0, from, to - from)
+    @_getPlayback().start(0, from, to - from)
 
   stop: () ->
     playback.stop() for playback in @playbacks
@@ -101,5 +101,5 @@ class pythy.Sound
     @playbacks.push(source)
     #Protects it from being affected by subsequent setSampleValueAt modifications
     source.buffer = if clone then @_cloneBuffer() else @buffer
-    source.connect(context.destination)
+    source.connect(window.__$audioContext$__.destination)
     return source

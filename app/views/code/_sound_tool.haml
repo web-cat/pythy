@@ -1,0 +1,36 @@
+#mediacomp-soundtool.modal.hide
+  .modal-header
+    = close_button_tag dismiss: 'modal'
+    %h3 Sound Tool 
+
+  .modal-body
+    #soundtool
+      #container
+        %canvas#waveform{ height: '380px', width: '10px' }
+        %canvas#selection{ height: '380px', width: '10px' }
+        %canvas#line-overlay{ height: '380px', width: '10px' }
+
+  .modal-footer
+    %p
+      %button.btn.btn-primary#play Play entire sound
+      %button.btn.btn-primary#play-after Play after 
+      %button.btn.btn-primary#play-before Play before 
+      %button.btn.btn-primary#stop Stop 
+    %p
+      %button.btn.btn-primary#play-selection Play selection
+      %button.btn.btn-primary#clear-selection Clear selection
+    %p
+      %button.btn#line-to-start &lt;&lt;
+      %button.btn#previous-pixel &lt;
+      Current index = 
+      %input#sample-number
+      Sample value = 
+      %span#value
+      %button.btn#next-pixel &gt;
+      %button.btn#line-to-end &gt;&gt;
+    %p
+      Number of samples between pixels:
+      %input#zoom
+    %p
+      %button.btn.btn-primary#zoom-in Zoom In
+      %button.btn.btn-primary#zoom-out Zoom Out

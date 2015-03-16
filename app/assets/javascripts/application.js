@@ -31,6 +31,9 @@
 //= require global
 //= require media-library
 //= require color-picker
+//= require picture_tool 
+//= require sound_tool 
+//= require sound
 //= require typeaheads
 //= require highcharts
 //= require highcharts/highcharts-more

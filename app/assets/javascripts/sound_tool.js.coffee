@@ -133,10 +133,8 @@ class Selection
     @ctx.fillStyle = @color
     @ctx.fillRect(start, 0, end - start, @height)
 
-class pythy.SoundTool
-  constructor: (url, @channelNum) ->
-    @sound = new pythy.Sound(url)
-
+class SoundTool
+  constructor: (@channelNum) ->
     @playBtn           = document.getElementById('play')
     @playAfterBtn      = document.getElementById('play-after')
     @playBeforeBtn     = document.getElementById('play-before')
@@ -152,6 +150,9 @@ class pythy.SoundTool
     @sampleNumberEl    = document.getElementById('sample-number')
     @zoomIn            = document.getElementById('zoom-in')
     @zoomOut           = document.getElementById('zoom-out')
+    @widget            = $('#mediacomp-soundtool')
+    @widget.modal({ backdrop: false, keyboard: true, show: false })
+    @widget.draggable({ handle: '.modal-header' })
 
     canvases = document.getElementsByTagName('canvas')
     @topCanvas = canvases[canvases.length - 1]
@@ -160,7 +161,7 @@ class pythy.SoundTool
       {
         element: @playSelectionBtn,
         evt: 'click',
-        handler: () => @sound.playSelection(@getStartSelection, @getEndSelection)
+        handler: () => @sound.playSelection(@getStartSelection(), @getEndSelection())
       },
       {
         element: @clearSelectionBtn,
@@ -185,7 +186,7 @@ class pythy.SoundTool
       {
         element: @lineToEnd,
         evt: 'click',
-        handler: () => @moveLineToEnd
+        handler: () => @moveLineToEnd()
       },
       {
         element: @playBtn,
@@ -195,12 +196,12 @@ class pythy.SoundTool
       {
         element: @playAfterBtn,
         evt: 'click',
-        handler: () => @sound.playAfter(@getSelectionTime)
+        handler: () => @sound.playAfter(@getSelectionTime())
       },
       {
         element: @playBeforeBtn,
         evt: 'click',
-        handler: () => @sound.playBefore(@getSelectionTime)
+        handler: () => @sound.playBefore(@getSelectionTime())
       },
       {
         element: @stopBtn,
@@ -210,17 +211,17 @@ class pythy.SoundTool
       {
         element: @zoomValue,
         evt: 'keyup',
-        handler: (evt) => if evt.keyCode is 13 then @start(parseInt(@zoomValue.value))
+        handler: (evt) => if evt.keyCode is 13 then @start(@url, parseInt(@zoomValue.value))
       },
       {
         element: @zoomIn,
         evt: 'click',
-        handler: () => @start(1)
+        handler: () => @start(@url, 1)
       },
       {
         element: @zoomOut,
         evt: 'click',
-        handler: () => @start()
+        handler: () => @start(@url)
       },
       {
         element: @sampleNumberEl,
@@ -249,16 +250,13 @@ class pythy.SoundTool
       }
     ]
 
+
   getActualX: (evt) ->
-    return (evt.x or evt.clientX) + @container.scrollLeft - @container.offsetLeft
+    return (evt.x or evt.clientX) + @container.scrollLeft - @container.offsetLeft - @widget[0].offsetLeft
 
-  cleanup: () ->
+  _onLoad: (nthSample) ->
+    @widget.modal('show')
     @detachEventHandlers()
-    @waveform and @waveform.destroy()
-    @line and @line.destroy()
-
-  start: (nthSample) ->
-    @cleanup()
 
     if not nthSample then nthSample = parseInt(@sound.getLength() / @container.clientWidth)
 
@@ -274,6 +272,9 @@ class pythy.SoundTool
     @selection = new Selection('selection', @width, nthSample)
 
     @attachEventHandlers()
+
+  start: (@url, nthSample) ->
+    @sound = new pythy.Sound((() => @_onLoad(nthSample)), null, @url)
 
   detachEventHandlers: () ->
     evtHldr.element.removeEventListener(evtHldr.evt, evtHldr.handler) for evtHldr in @eventHandlers
@@ -296,12 +297,16 @@ class pythy.SoundTool
     @scrollToPosition()
 
   getSelectionTime: () ->
-    return @line.getSampleNumber() * @buffer.duration / @buffer.length
+    return @line.getSampleNumber() * @sound.getDuration() / @sound.getLength()
 
   getStartSelection: () ->
-    return @selection.getStart() * @buffer.duration / @buffer.length
+    return @selection.getStart() * @sound.getDuration() / @sound.getLength()
 
   getEndSelection: () ->
-    return @selection.getEnd() * @buffer.duration / @buffer.length
+    return @selection.getEnd() * @sound.getDuration() / @sound.getLength()
 
   clearSelection: () -> @selection.clear()
+
+  hide: () -> @widget.modal('hide')
+
+window.addEventListener 'load', () -> window.pythy.soundTool = new SoundTool(0)
