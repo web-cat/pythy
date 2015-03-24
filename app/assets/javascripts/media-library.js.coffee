@@ -221,9 +221,6 @@ window.pythy.showMediaModal = (options) ->
 #     can be chained to the request
 #
 window.pythy.uploadFileFromDataURL = (filename, dataURL) ->
-  uploader = $('<input type="file" name="files[]">')
-  uploader.fileupload({url: '/media', dataType: 'json'})
-
   match = /data:([^;]+);base64,(.*)/.exec(dataURL)
   contentType = match[1]
   data = decode64(match[2])
@@ -233,6 +230,11 @@ window.pythy.uploadFileFromDataURL = (filename, dataURL) ->
   # filename[] parameter and use those if found.
   blob = new Blob([data.buffer], { type: contentType, name: filename })
 
+  pythy.uploadFileFromBlob(filename, blob)
+
+window.pythy.uploadFileFromBlob = (filename, blob) ->
+  uploader = $('<input type="file" name="files[]">')
+  uploader.fileupload({url: '/media', dataType: 'json'})
   uploader.fileupload 'send',
     files: [blob],
     formData: { 'filenames[0]': filename }

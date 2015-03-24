@@ -106,3 +106,75 @@ class pythy.Sound
     source.buffer = if clone then @_cloneBuffer() else @buffer
     source.connect(window.__$audioContext$__.destination)
     return source
+
+  _getExtension: (filename) ->
+    return filename.split('.').pop()
+
+  save: (filename) ->
+    type = "audio/#{@_getExtension(filename)}"
+
+    switch @buffer.numberOfChannels
+      when 1 then samples = @buffer.getChannelData(0)
+      when 2 then samples = @_interleave(@buffer.getChannelData(0), @buffer.getChannelData(1))
+      else throw new Error('Pythy does not support more than 2 channels')
+
+    blob = new Blob([@_encodeWAV(samples)], { type: type })
+    pythy.uploadFileFromBlob(filename, blob)
+
+  # The following methods for encoding to Wav are based on https://github.com/mattdiamond/Recorderjs
+
+  _interleave: (inputL, inputR) ->
+    length = inputL.length + inputR.length
+    result = new Float32Array(length)
+
+    index = 0; inputIndex = 0
+
+    while index < length
+      result[index++] = inputL[inputIndex]
+      result[index++] = inputR[inputIndex]
+      inputIndex++
+
+    return result
+
+  _floatTo16BitPCM: (output, offset, input) ->
+    for value in input
+      s = Math.max(-1, Math.min(1, value))
+      output.setInt16(offset, (if s < 0 then s * 0x8000 else s * 0x7FFF), true)
+      offset += 2
+
+  _writeString: (view, offset, string) ->
+    view.setUint8(offset + i, string.charCodeAt(i)) for i in [0..(string.length - 1)]
+
+  _encodeWAV: (samples) ->
+    view = new DataView(new ArrayBuffer(44 + samples.length * 2))
+
+    # RIFF identifier
+    @_writeString(view, 0, 'RIFF')
+    # RIFF chunk length
+    view.setUint32(4, 36 + samples.length * 2, true)
+    # RIFF type
+    @_writeString(view, 8, 'WAVE')
+    # format chunk identifier
+    @_writeString(view, 12, 'fmt ')
+    # format chunk length
+    view.setUint32(16, 16, true)
+    # sample format (raw)
+    view.setUint16(20, 1, true)
+    # channel count
+    view.setUint16(22, @buffer.numberOfChannels, true)
+    # sample rate
+    view.setUint32(24, @buffer.sampleRate, true)
+    # byte rate (sample rate * block align)
+    view.setUint32(28, @buffer.sampleRate * 4, true)
+    # block align (channel count * bytes per sample)
+    view.setUint16(32, @buffer.numberOfChannels * 2, true)
+    # bits per sample
+    view.setUint16(34, 16, true)
+    # data chunk identifier
+    @_writeString(view, 36, 'data')
+    # data chunk length
+    view.setUint32(40, samples.length * 2, true)
+
+    @_floatTo16BitPCM(view, 44, samples)
+
+    return view
