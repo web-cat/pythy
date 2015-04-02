@@ -25,23 +25,31 @@ class PictureTool
       $('#canvas-blue', @widget).text(b)
       $('#canvas-color-swatch', @widget).css('background-color', rgb)
 
-  show: (url) ->
+  show: (arg) ->
     _this = this
 
-    $('<img></img>').load () ->
-      canvas = document.createElement('canvas')
-      canvas.width = @naturalWidth
-      canvas.height = @naturalHeight
-      ctx = canvas.getContext('2d')
-      ctx.drawImage(this, 0, 0)
+    if(typeof(arg) is 'string')
+      $('<img></img>').load () ->
+        canvas = document.createElement('canvas')
+        canvas.width = @naturalWidth
+        canvas.height = @naturalHeight
+        ctx = canvas.getContext('2d')
+        ctx.drawImage(this, 0, 0)
 
-      _this.canvas and $(_this.canvas).off('mousemove')
-      _this.canvas = canvas
-      _this.body.empty().append(_this.canvas)
-      _this.widget.modal('show')
-      _this.widget.css('marginLeft', '-' + (_this.canvas.width + 30) / 2 + 'px')
-      _this.addEventListeners(_this.canvas)
-    .attr('src', url)
+        _this.canvas and $(_this.canvas).off('mousemove')
+        _this.canvas = canvas
+        _this.body.empty().append(_this.canvas)
+        _this.widget.modal('show')
+        _this.widget.css('marginLeft', '-' + (_this.canvas.width + 30) / 2 + 'px')
+        _this.addEventListeners(_this.canvas)
+      .attr('src', arg)
+    else
+      @canvas and $(@canvas).off('mousemove')
+      @canvas = arg
+      @body.empty().append(@canvas)
+      @widget.modal('show')
+      @widget.css('marginLeft', '-' + (@canvas.width + 30) / 2 + 'px')
+      @addEventListeners(@canvas)
 
   hide: () -> @widget.modal('hide')
 
