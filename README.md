@@ -18,6 +18,7 @@ Setup Instructions
 3. Mysql client and server. (For linux install the dev packages also.)
 4. A JavaScript runtime (Ex: Node.js)
 5. The Redis server.
+6. The [lame](http://lame.sourceforge.net/) mp3 encoder.
 
 (For an ubuntu installation see [Setup Ruby on Rails on Ubuntu](https://gorails.com/setup/ubuntu/14.04))
 

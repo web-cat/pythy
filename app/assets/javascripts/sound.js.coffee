@@ -107,11 +107,19 @@ class pythy.Sound
     source.connect(window.__$audioContext$__.destination)
     return source
 
+  _getMimeType: (filename) ->
+    switch(@_getExtension(filename))
+      when 'mp3' then 'audio/mpeg'
+      when 'wav' then 'audio/wav'
+
   _getExtension: (filename) ->
     return filename.split('.').pop()
 
+  _replaceExtension: (filename, ext) ->
+    return filename.split('.')[0] + ext
+
   save: (filename) ->
-    type = "audio/#{@_getExtension(filename)}"
+    type = @_getMimeType(filename)
 
     switch @buffer.numberOfChannels
       when 1 then samples = @buffer.getChannelData(0)
@@ -119,6 +127,8 @@ class pythy.Sound
       else throw new Error('Pythy does not support more than 2 channels')
 
     blob = new Blob([@_encodeWAV(samples)], { type: type })
+    # This tells the server that it's actually a wav binary that needs to be converted into an mp3 file
+    if type is 'audio/mpeg' then filename = @_replaceExtension(filename, '.wavmp3')
     pythy.uploadFileFromBlob(filename, blob)
 
   # The following methods for encoding to Wav are based on https://github.com/mattdiamond/Recorderjs
