@@ -36,3 +36,5 @@ erd.pdf
 
 # Ignore node modules
 node_modules
+
+*.pyc
