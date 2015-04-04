@@ -54,6 +54,7 @@ class CheckCodeWorker
         message: e.message.force_encoding('UTF-8'),
         backtrace: e.backtrace
       }
+      logger.error(e.inspect)
       @assignment_check.status = AssignmentCheck::FAILED
     end
 
