@@ -15,6 +15,10 @@ class Style:
   emphasis = ['.ttf', '_Bold.ttf', '_Italic.ttf', '_Bold_Italic.ttf']
 
   def __init__(self, family, emphasis, size):
+    self.family = family
+    self.emphasis = emphasis
+    self.size = size
+
     if family in Style.fonts:
       fontName = './fonts/' + Style.fonts[family]
     else:
@@ -26,6 +30,9 @@ class Style:
     fontName += Style.emphasis[emphasis]
       
     self.font = ImageFont.truetype(filename=fontName, size=size)
+
+  def __str__(self):
+    return 'Style, family ' + self.family + ', emph ' + str(self.emphasis) + ', size ' + str(self.size)
 
   def _getPILFont(self):
     return self.font
