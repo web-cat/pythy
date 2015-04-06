@@ -10,7 +10,7 @@ class CheckCodeWorker
   # duplication under the same scenario.
   sidekiq_options retry: false, backtrace: true
 
-  DEFAULT_TIMEOUT = 10 # seconds
+  DEFAULT_TIMEOUT = 30 # seconds
 
   SCORES_FOR_RESULTS = {
     'success' => 1.0,
