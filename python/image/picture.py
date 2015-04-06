@@ -4,6 +4,10 @@ from PIL import Image, ImageDraw
 from image.pixel import *
 from image.color import *
 
+#def pickAFile():
+
+#def writePictureTo():
+
 def makePicture(url):
   return Picture(url)
 
