@@ -1,4 +1,5 @@
-#def pickAColor():
+def pickAColor():
+  return black
 
 def makeColor(red, green, blue):
   return Color(red, green, blue)
