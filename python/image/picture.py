@@ -1,8 +1,8 @@
 import urllib.request as urlrequest
 import io
 from PIL import Image, ImageDraw
-from pixel import *
-from color import *
+from image.pixel import *
+from image.color import *
 
 def makePicture(url):
   return Picture(url)
@@ -28,11 +28,10 @@ def getPixel(picture, x, y):
 getPixelAt = getPixel
 
 def show(picture):
-  picture.pilImage.show()
-  Picture.__last_shown = picture
+  Picture._last_shown = picture
 
 def repaint(picture):
-  Picture.__last_shown = picture
+  Picture._last_shown = picture
 
 def addArc(picture, x, y, width, height, startAngle, arcAngle, color=black):
   picture.pilDraw.arc([x, y, x + width, y + height], startAngle, arcAngle, fill=color._getTuple())
@@ -80,7 +79,7 @@ def setAllPixelsToAColor(picture, color):
 
 class Picture:
 
-  __last_shown = None
+  _last_shown = None
 
   def __init__(self, url):
     self.pilImage = Image.open(io.BytesIO(urlrequest.urlopen(url).read()))
@@ -95,7 +94,7 @@ class Picture:
 
   @staticmethod
   def last_shown():
-    return Picture.__last_shown
+    return Picture._last_shown
 
   # The following methods are not part of the public api and
   # are hence prefixed with '_' so that student's do not

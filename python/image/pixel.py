@@ -1,4 +1,4 @@
-from color import *
+from image.color import *
 
 def getX(pixel):
   return pixel.x
