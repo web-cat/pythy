@@ -1,20 +1,88 @@
 import urllib.request as urlrequest
-from PIL import Image, ImageDraw
 import io
+from PIL import Image, ImageDraw
 from pixel import *
 from color import *
 
+def makePicture(url):
+  return Picture(url)
+
+def makeEmptyPicture(width, height, color=black):
+  return EmptyPicture(width, height, color)
+
+def duplicatePicture(picture):
+  if hasattr(picture, 'url'):
+    return Picture(picture.url)
+  else:
+    return EmptyPicture(picture.width, picture.height)
+
+def getWidth(picture):
+  return picture.width
+
+def getHeight(picture):
+  return picture.height
+
+def getPixel(picture, x, y):
+  return Pixel(picture, x, y)
+
+getPixelAt = getPixel
+
+def show(picture):
+  picture.pilImage.show()
+  Picture.__last_shown = picture
+
+def repaint(picture):
+  Picture.__last_shown = picture
+
+def addArc(picture, x, y, width, height, startAngle, arcAngle, color=black):
+  picture.pilDraw.arc([x, y, x + width, y + height], startAngle, arcAngle, fill=color._getTuple())
+
+def addArcFilled(picture, x, y, width, height, startAngle, arcAngle, color=black):
+  c = color._getTuple()
+  picture.pilDraw.chord([x, y, x + width, y + height], startAngle, arcAngle, c, c)
+
+def addLine(picture, x1, y1, x2, y2, color=black):
+  picture.pilDraw.line([x1, y1, x2, y2], color._getTuple())
+
+def addOval(picture, x, y, width, height, color=black):
+  picture.pilDraw.ellipse([x, y, x + width, y + height], None, color._getTuple())
+
+def addOvalFilled(picture, x, y, width, height, color=black):
+  c = color._getTuple()
+  picture.pilDraw.ellipse([x, y, x + width, y + height], c, c)
+
+def addRect(picture, x, y, width, height, color=black):
+  picture.pilDraw.rectangle([x, y, x + width, y + height], None, color._getTuple())
+
+def addRectFilled(picture, x, y, width, height, color=black):
+  c = color._getTuple()
+  picture.pilDraw.rectangle([x, y, x + width, y + height], c, c)
+
+def addText(picture, x, y, string, color=black):
+  picture.pilDraw.text([x, y], string, color._getTuple())
+
+def addTextWithStyle(picture, x, y, string, style, color=black):
+  picture.pilDraw.text([x, y], string, color._getTuple(), style._getPILFont())
+
+def getPixels(picture):
+  return [[Pixel(picture, x, y) for y in range(picture.height)] for x in range(picture.width)]
+
+getAllPixels = getPixels
+
+def setAllPixelsToAColor(picture, color):
+  c = color._getTuple()
+
+  for y in range(picture.height):
+    for x in range(picture.width):
+      picture.pixels[x, y] = c 
+
 #def copyInto(smallPic, bigPic, startX, startY):
-#def makePicture(url):
-#def makeEmptyPicture(width, height, color):
-#def duplicatePicture(picture):
 
 class Picture:
 
   __last_shown = None
 
   def __init__(self, url):
-    
     self.pilImage = Image.open(io.BytesIO(urlrequest.urlopen(url).read()))
     self.pilDraw = ImageDraw.Draw(self.pilImage)
     self.width = self.pilImage.size[0]
@@ -22,71 +90,12 @@ class Picture:
     self.pixels = self.pilImage.load()
     self.url = url
 
-  def getWidth(self):
-    return self.width
-
-  def getHeight(self):
-    return self.height
-
-  def getPixel(self, x, y):
-    return Pixel(self, x, y)
-
-  def getPixelAt(self, x, y):
-    return Pixel(self, x, y)
-
-  def show(self):
-    self.pilImage.show()
-    Picture.__last_shown = self
-
-  def repaint(self):
-    Picture.__last_shown = self
-
-  def addArc(self, x, y, width, height, startAngle, arcAngle, color=black):
-    self.pilDraw.arc([x, y, x + width, y + height], startAngle, arcAngle, fill=color._getTuple())
-
-  def addArcFilled(self, x, y, width, height, startAngle, arcAngle, color=black):
-    c = color._getTuple()
-    self.pilDraw.chord([x, y, x + width, y + height], startAngle, arcAngle, c, c)
-
-  def addLine(self, x1, y1, x2, y2, color=black):
-    self.pilDraw.line([x1, y1, x2, y2], color._getTuple())
-
-  def addOval(self, x, y, width, height, color=black):
-    self.pilDraw.ellipse([x, y, x + width, y + height], None, color._getTuple())
-
-  def addOvalFilled(self, x, y, width, height, color=black):
-    c = color._getTuple()
-    self.pilDraw.ellipse([x, y, x + width, y + height], c, c)
-
-  def addRect(self, x, y, width, height, color=black):
-    self.pilDraw.rectangle([x, y, x + width, y + height], None, color._getTuple())
-
-  def addRectFilled(self, x, y, width, height, color=black):
-    c = color._getTuple()
-    self.pilDraw.rectangle([x, y, x + width, y + height], c, c)
-
-  #def addText(self, x, y, string, color):
-  #def addTextWithStyle(self, x, y, text, style, color):
-
-  def getPixels(self):
-    return [[Pixel(self, x, y) for y in range(self.height)] for x in range(self.width)]
-
-  def setAllPixelsToAColor(self, color):
-    c = color._getTuple()
-
-    for y in range(self.height):
-      for x in range(self.width):
-        self.pixels[x, y] = c 
-
-  def duplicate(self):
-    if(self.url):
-      return Picture(self.url)
-    else:
-      return EmptyPicture(self.width, self.height)
+  def __str__(self):
+    return 'Picture, url ' + self.url + ', height ' + str(self.height) + ', width ' + str(self.width)
 
   @staticmethod
   def last_shown():
-    return Image.__last_shown
+    return Picture.__last_shown
 
   # The following methods are not part of the public api and
   # are hence prefixed with '_' so that student's do not
@@ -116,11 +125,34 @@ class Picture:
   def _setColor(self, x, y, color):
     self.pixels[x, y] = color
 
+Picture.duplicate = duplicatePicture
+Picture.getWidth = getWidth
+Picture.getHeight = getHeight
+Picture.getPixel = getPixel
+Picture.getPixelAt = getPixelAt
+Picture.show = show
+Picture.repaint = repaint
+Picture.addArc = addArc
+Picture.addArcFilled = addArcFilled
+Picture.addLine = addLine
+Picture.addOval = addOval
+Picture.addOvalFilled = addOvalFilled
+Picture.addRect = addRect
+Picture.addRectFilled = addRectFilled
+Picture.addText = addText
+Picture.addTextWithStyle = addTextWithStyle
+Picture.getPixels = getPixels
+Picture.getAllPixels = getAllPixels
+Picture.setAllPixelsToAColor = setAllPixelsToAColor
+
 class EmptyPicture(Picture):
 
   def __init__(self, width, height, color=black):
     self.width = width
     self.height = height
-    self.pilImage = Image.new("RGB", (width, height), color._getTuple())
+    self.pilImage = Image.new("RGBA", (width, height), color._getTuple())
     self.pilDraw = ImageDraw.Draw(self.pilImage)
     self.pixels = self.pilImage.load()
+
+  def __str__(self):
+    return 'Picture, height ' + str(self.height) + ', width ' + str(self.width)
