@@ -75,7 +75,8 @@ def setAllPixelsToAColor(picture, color):
     for x in range(picture.width):
       picture.pixels[x, y] = c 
 
-#def copyInto(smallPic, bigPic, startX, startY):
+def copyInto(smallPic, bigPic, startX, startY):
+  bigPic.pilImage.paste(smallPic.pilImage, (startX, startY))
 
 class Picture:
 
