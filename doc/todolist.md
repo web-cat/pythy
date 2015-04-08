@@ -6,33 +6,20 @@ that need to be implemented/fixed to make Pythy Python 3.0 compatible
 in the browser and make the media computation programs in the book
 'Introduction to Computing and Programming in Python' work on it.
 
-1. merge the interrupted execution changes with the main skulpt repository.
-1. pickAFile/writePictureTo should work with cloud files and
-   makePicture/Sound() should load the file into memory.
-2. Is there a specific reason for the book using a procedural style of calling methods, like getHeight(img), instead of an object oriented way, like img.getHeight()? And do we want to mimic this style?
-3. output of the media computation methods differ from what's given in the textbook.
-4. getRed(), getGreen() and getBlue() all return the 'red' value.
-5. getX(), getY() don't work.
-6. getPixels doesn't work.
-7. What is the return type of getPixel? type(img.getPixel(x,y)) throws an error. The pixel returned should also include the corresponding x and y coordinate apart from rgb values.
-8. setRed(), setGreen() and setBlue() do not change the corresponding value of the pixel in the image.
-9. getColor, makeColor, setColor don't work.
+1. Implement playNote() preferably with a browser API, else with MIDI.js.
+2. Fix browser resampling of wav files. See [step 4](https://dvcs.w3.org/hg/audio/raw-file/tip/webaudio/specification.html#dfn-decodeAudioData)
 10. `print` with the delimiter argument doesn't work.
 11 id() doesn't work.
 12. The `is` operator doesn't work correctly. (skulpt bug)
 13. strip doesn't work.
-14. pickAColor doesn't work.
-15. No predefined colors.
-16. makeLighter and makeDarker don't work.
 17. The decimal, fraction, pylab, string modules do not exist or are incomplete.
 18. Division -    
   `5.0 // 3.0` -> Expected : 1.0 (float), Actual : 1 (int)    
   `5.0 % 3.0` -> Expected : 2.0 (float), Actual : 2 (int)    
   `5 // 3.0` -> Expected : 1.0 (float), Actual : 1 (int)    
   `6 / 3` -> Expected : 2.0 (float), Actual : 2 (int)    
-19. repaint(picture) doesn't work - we use show instead.
 20. No help menu/API.
-21. zoom and color don't work interactively in the picture tool.
+21. zoom does not work in the picture tool.
 22. setting colors should wrap around, i.e 256 should wrap around to 0.
 23. print('1' < 2) should throw an error but prints false instead.
 24. Incorrect error messages that print 'undefined' instead of a literal number.     
