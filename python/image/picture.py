@@ -87,7 +87,7 @@ class Picture:
   _last_shown = None
 
   def __init__(self, url):
-    self.pilImage = Image.open(io.BytesIO(urlrequest.urlopen(url).read()))
+    self.pilImage = Image.open(io.BytesIO(urlrequest.urlopen(url).read())).convert('RGBA')
     self.pilDraw = ImageDraw.Draw(self.pilImage)
     self.width = self.pilImage.size[0]
     self.height = self.pilImage.size[1]
