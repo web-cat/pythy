@@ -5,13 +5,13 @@ import struct
 from sample import *
 
 def stopPlaying(sound):
-  return
+  Sound._last_stopped = sound
 
 def play(sound):
-  return
+  Sound._last_played = sound
 
 def blockingPlay(sound):
-  return
+  Sound._last_blocking_played = sound
 
 def getDuration(sound):
   return sound.numSamples / sound.samplingRate
@@ -123,6 +123,18 @@ class Sound:
     string += "Number of samples:  {}".format(self.getLength())
 
     return string
+
+  @staticmethod
+  def last_played():
+    return Sound._last_played
+
+  @staticmethod
+  def last_blocking_played():
+    return Sound._last_blocking_played
+
+  @staticmethod
+  def last_stopped():
+    return Sound._last_stopped
 
 class EmptySound(Sound):
   def __init__(self, numSamples, samplingRate=22050):
