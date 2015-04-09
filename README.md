@@ -19,6 +19,8 @@ Setup Instructions
 4. A JavaScript runtime (Ex: Node.js)
 5. The Redis server.
 6. The [lame](http://lame.sourceforge.net/) mp3 encoder.
+7. [Pillow](https://pypi.python.org/pypi/Pillow) - The Python Imaging Library Fork for server side image processing.
+8. The [wave](https://docs.python.org/2/library/wave.html) module for server side sound processing.
 
 (For an ubuntu installation see [Setup Ruby on Rails on Ubuntu](https://gorails.com/setup/ubuntu/14.04))
 
