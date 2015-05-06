@@ -1,17 +1,20 @@
+# Note: The browser resamples the sound with the sampling rate of the audio context (usually 44100).
+# So, the sampling rate and number of samples reported through this API
+# may be different from the original. See - https://github.com/WebAudio/web-audio-api/issues/30
 class pythy.Sound
   @SAMPLE_RATE : 22050
 
   # NOTE: The maximum number of audio contexts is 6 and it looks like everytime a program is 
   # run it executes this file again, so, we need this check to protect against repeated
   # context creation.
-  initializeContext: () ->
+  _initializeContext: () ->
     if window.__$audioContext$__ then return
 
     window.AudioContext = window.AudioContext || window.webkitAudioContext
     window.__$audioContext$__ = new window.AudioContext()
 
   constructor: () ->
-    @initializeContext()
+    @_initializeContext()
 
     @buffer = null
     @channels = []
@@ -23,8 +26,7 @@ class pythy.Sound
     arg1 = arguments[3]
     type = typeof(arg0)
 
-    #TODO more validation on args
-    if(type is 'string')
+    if(type is 'string' && arg0.trim().length)
       @url = window.mediaffi.customizeMediaURL(arg0)
       @load(onSuccess, onError)
     else if(type is 'number')
@@ -33,21 +35,23 @@ class pythy.Sound
       @buffer = __$audioContext$__.createBuffer(2, arg0, arg1 || pythy.Sound.SAMPLE_RATE)
       @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
       onSuccess and onSuccess(this)
-     
-    #else
-      #TODO: throw exception
+    else
+      throw new Error('Must provide either a url or number of samples with the sample rate optionally')
    
   load : (onSuccess, onError) ->
     request = new XMLHttpRequest()
 
     request.onload = () =>
+      if request.status isnt 200
+        onError && onError(request.statusText)
+      else if typeof(request.response) isnt ArrayBuffer
+        onError && onError('File not found or is not of the correct type')
+      else
       __$audioContext$__.decodeAudioData request.response, (decodedData) =>
         @buffer = decodedData
         @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
         onSuccess && onSuccess(this)
    
-    #TODO: Fix this [because server doesn't respond with 404 if not prefixed with http:]
-    # Also use jquery ajax instead of xmlhttprequest for now. (it has better error handling)
     request.onerror = request.timeout = onError
 
     request.open('GET', CodeController.transformUrl(@url), true)
