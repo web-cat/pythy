@@ -1,7 +1,7 @@
 // IMPORTANT: This test file plays audio
 
 describe('pythy.Sound', function () {
-  var doAfterSomeTime, timeout;
+  var doAfterSomeTime, timeout, asyncIt;
 
   // Note: If tests fail, try after increasing the timeout
   TIMEOUT = 15;
@@ -15,6 +15,23 @@ describe('pythy.Sound', function () {
       });
     });
   };
+
+  describe('mapFloatTo16BitInt', function () {
+    var isInt;
+
+    isInt = function (num) { return (num % 1 === 0); };
+
+    asyncIt('should convert a sample value to a 16 bit integer value', function () {
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(0.456), 14942);
+      assert.isTrue(isInt(pythy.Sound.mapFloatTo16BitInt(0.992348)));
+    });
+
+    asyncIt('should handle corner cases correctly', function () {
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(0), 0);
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(-1), -32767);
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(1), 32768);
+    });
+  });
 
   describe('constructor', function () {
     asyncIt('should take an onSuccess callback, an onError callback and a url', function () {
