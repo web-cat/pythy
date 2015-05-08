@@ -10,6 +10,12 @@ class pythy.Sound
     else
       return parseInt(sampleValue * 32768)
 
+  @map16BitIntToFloat: (sampleValue) ->
+    if(sampleValue > 0)
+      return sampleValue / 32767
+    else
+      return sampleValue / 32768
+
   # NOTE: The maximum number of audio contexts is 6 and it looks like everytime a program is 
   # run it executes this file again, so, we need this check to protect against repeated
   # context creation.

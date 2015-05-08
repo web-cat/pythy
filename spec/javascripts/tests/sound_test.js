@@ -33,6 +33,18 @@ describe('pythy.Sound', function () {
     });
   });
 
+  describe('map16BitIntToFloat', function () {
+    asyncIt('should convert a sample value to a float value between -1 and 1', function () {
+      assert.closeTo(pythy.Sound.map16BitIntToFloat(14941), 0.456, 0.001);
+    });
+
+    asyncIt('should handle corner cases correctly', function () {
+      assert.strictEqual(pythy.Sound.map16BitIntToFloat(0), 0);
+      assert.strictEqual(pythy.Sound.map16BitIntToFloat(-32768), -1);
+      assert.strictEqual(pythy.Sound.map16BitIntToFloat(32767), 1);
+    });
+  });
+
   describe('constructor', function () {
     asyncIt('should take an onSuccess callback, an onError callback and a url', function () {
       var execFunc;
