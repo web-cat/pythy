@@ -109,23 +109,6 @@ describe('pythy.Sound', function () {
       });
     });
 
-    asyncIt('should not allow sounds greater than 600s', function () {
-      var execFunc;
-
-      execFunc = function () { new pythy.Sound(null, null, 13252050); };
-      assert.throws(execFunc, Error, 'Duration can not be greater than 600 seconds');
-    });
-
-    asyncIt('should not allow negative sample size and sampling rate', function () {
-      var execFunc;
-
-      execFunc = function () { new pythy.Sound(null, null, -10); };
-      assert.throws(execFunc, Error, 'Number of samples can not be negative');
-
-      execFunc = function () { new pythy.Sound(null, null, 10, -100); };
-      assert.throws(execFunc, Error, 'Sampling rate can not be negative');
-    });
-
     asyncIt('should have the default sampling rate if not provided', function () {
       var onSuccess, sound;
 
@@ -200,6 +183,60 @@ describe('pythy.Sound', function () {
             args = spy.getCall(0).args;
             assert.lengthOf(args, 1);
             assert.strictEqual(args[0], 'File not found or is not of the correct type');
+            done();
+          });
+        });
+      });
+
+      it('should be called when the sound duration is greater than 600 seconds', function (done) {
+        doAfterSomeTime(function () {
+          var spy, args;
+
+          spy = sinon.spy();
+
+          new pythy.Sound(null, spy, 13252050);
+
+          doAfterSomeTime(function () {
+            assert.isTrue(spy.calledOnce);
+            args = spy.getCall(0).args;
+            assert.lengthOf(args, 1);
+            assert.strictEqual(args[0], 'Duration can not be greater than 600 seconds');
+            done();
+          });
+        });
+      });
+
+      it('should be called when the number of samples is negative', function (done) {
+        doAfterSomeTime(function () {
+          var spy, args;
+
+          spy = sinon.spy();
+
+          new pythy.Sound(null, spy, -10);
+
+          doAfterSomeTime(function () {
+            assert.isTrue(spy.calledOnce);
+            args = spy.getCall(0).args;
+            assert.lengthOf(args, 1);
+            assert.strictEqual(args[0], 'Number of samples can not be negative');
+            done();
+          });
+        });
+      });
+
+      it('should be called when the sampling rate is negative', function (done) {
+        doAfterSomeTime(function () {
+          var spy, args;
+
+          spy = sinon.spy();
+
+          new pythy.Sound(null, spy, 10, -1000);
+
+          doAfterSomeTime(function () {
+            assert.isTrue(spy.calledOnce);
+            args = spy.getCall(0).args;
+            assert.lengthOf(args, 1);
+            assert.strictEqual(args[0], 'Sampling rate can not be negative');
             done();
           });
         });
