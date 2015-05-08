@@ -45,8 +45,9 @@ class pythy.Sound
       # NOTE: Pythy supports a maximum of 2 sound channels, so any new empty
       # sound will have 2 channels by default
       arg1 = arg1 || pythy.Sound.SAMPLE_RATE
-      if(arg0 / arg1 > 600)
-        throw new Error('Duration can not be greater than 600 seconds')
+      if(arg0 < 0) then throw new Error('Number of samples can not be negative')
+      if(arg1 < 0) then throw new Error('Sampling rate can not be negative')
+      if(arg0 / arg1 > 600) then throw new Error('Duration can not be greater than 600 seconds')
       @buffer = __$audioContext$__.createBuffer(2, arg0, arg1)
       @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
       onSuccess and onSuccess(this)

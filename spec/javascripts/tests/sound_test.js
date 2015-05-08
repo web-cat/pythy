@@ -116,6 +116,16 @@ describe('pythy.Sound', function () {
       assert.throws(execFunc, Error, 'Duration can not be greater than 600 seconds');
     });
 
+    asyncIt('should not allow negative sample size and sampling rate', function () {
+      var execFunc;
+
+      execFunc = function () { new pythy.Sound(null, null, -10); };
+      assert.throws(execFunc, Error, 'Number of samples can not be negative');
+
+      execFunc = function () { new pythy.Sound(null, null, 10, -100); };
+      assert.throws(execFunc, Error, 'Sampling rate can not be negative');
+    });
+
     asyncIt('should have the default sampling rate if not provided', function () {
       var onSuccess, sound;
 
