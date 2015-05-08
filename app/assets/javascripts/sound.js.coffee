@@ -47,6 +47,9 @@ class pythy.Sound
       @buffer = __$audioContext$__.createBuffer(2, arg0, arg1 || pythy.Sound.SAMPLE_RATE)
       @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
       onSuccess and onSuccess(this)
+    else if(arg0 instanceof pythy.Sound)
+      @buffer = __$audioContext$__.createBuffer(arg0.buffer.numberOfChannels, arg0.getLength(), arg0.getSamplingRate())
+      @channels[i] = arg0.buffer.getChannelData(i) for i in [0..arg0.buffer.numberOfChannels - 1]
     else
       throw new Error('Must provide either a url or number of samples with the sample rate optionally')
    

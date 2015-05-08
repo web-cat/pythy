@@ -75,6 +75,38 @@ describe('pythy.Sound', function () {
       assert.doesNotThrow(execFunc, Error);
     });
 
+    asyncIt('should take an onSuccess callback, an onError callback and another sound', function () {
+      var snd, execFunc;
+
+      snd = new pythy.Sound(function () {}, function () {}, 100);
+      execFunc = function () { new pythy.Sound(function () {}, function () {}, snd); };
+      assert.doesNotThrow(execFunc, Error);
+    });
+
+    it('should duplicate a sound if provided', function (done) {
+      var sound1, onSuccess, soundCmp;
+
+      soundCmp = function (s1, s2) {
+        for(var i = 0; i < s1.getLength(); i++) {
+          if(s1.getLeftSample(i) !== s2.getLeftSample(i)) { return false; }
+        };
+        return true;
+      };
+
+      onSuccess = function (snd) { sound1 = snd };
+      sound1 = new pythy.Sound(onSuccess, null, './sounds/test_mono.wav');
+
+      doAfterSomeTime(function () {
+        onSuccess = function (snd) { sound2 = snd };
+        sound2 = new pythy.Sound(onSuccess, null, sound1); 
+        doAfterSomeTime(function () {
+          assert.strictEqual(sound1.getLength(), sound2.getLength());
+          assert.isTrue(soundCmp(sound1, sound2));
+          done();
+        });
+      });
+    });
+
     asyncIt('should have the default sampling rate if not provided', function () {
       var onSuccess, sound;
 
