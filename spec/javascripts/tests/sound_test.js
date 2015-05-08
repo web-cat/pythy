@@ -100,6 +100,8 @@ describe('pythy.Sound', function () {
         onSuccess = function (snd) { sound2 = snd };
         sound2 = new pythy.Sound(onSuccess, null, sound1); 
         doAfterSomeTime(function () {
+          assert.notStrictEqual(sound1, sound2);
+          assert.notStrictEqual(sound1.buffer, sound2.buffer);
           assert.strictEqual(sound1.getLength(), sound2.getLength());
           assert.isTrue(soundCmp(sound1, sound2));
           done();
