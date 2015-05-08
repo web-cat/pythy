@@ -44,7 +44,10 @@ class pythy.Sound
     else if(type is 'number')
       # NOTE: Pythy supports a maximum of 2 sound channels, so any new empty
       # sound will have 2 channels by default
-      @buffer = __$audioContext$__.createBuffer(2, arg0, arg1 || pythy.Sound.SAMPLE_RATE)
+      arg1 = arg1 || pythy.Sound.SAMPLE_RATE
+      if(arg0 / arg1 > 600)
+        throw new Error('Duration can not be greater than 600 seconds')
+      @buffer = __$audioContext$__.createBuffer(2, arg0, arg1)
       @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
       onSuccess and onSuccess(this)
     else if(arg0 instanceof pythy.Sound)

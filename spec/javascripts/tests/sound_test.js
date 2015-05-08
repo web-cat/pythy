@@ -109,6 +109,13 @@ describe('pythy.Sound', function () {
       });
     });
 
+    asyncIt('should not allow sounds greater than 600s', function () {
+      var execFunc;
+
+      execFunc = function () { new pythy.Sound(null, null, 13252050); };
+      assert.throws(execFunc, Error, 'Duration can not be greater than 600 seconds');
+    });
+
     asyncIt('should have the default sampling rate if not provided', function () {
       var onSuccess, sound;
 
