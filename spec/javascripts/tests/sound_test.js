@@ -22,14 +22,14 @@ describe('pythy.Sound', function () {
     isInt = function (num) { return (num % 1 === 0); };
 
     asyncIt('should convert a sample value to a 16 bit integer value', function () {
-      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(0.456), 14942);
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(0.456), 14941);
       assert.isTrue(isInt(pythy.Sound.mapFloatTo16BitInt(0.992348)));
     });
 
     asyncIt('should handle corner cases correctly', function () {
       assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(0), 0);
-      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(-1), -32767);
-      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(1), 32768);
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(-1), -32768);
+      assert.strictEqual(pythy.Sound.mapFloatTo16BitInt(1), 32767);
     });
   });
 
