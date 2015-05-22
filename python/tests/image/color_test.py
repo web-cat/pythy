@@ -80,7 +80,7 @@ class ColorTest(unittest.TestCase):
   def test_str(self):
     color = Color(42, 133, 56)
 
-    self.assertEqual('Color, r=42, g=133, b=56', color.__str__());
+    self.assertEqual('Color, r=42, g=133, b=56', color.__str__())
 
   def test_pickAColor(self):
     color = pickAColor()
@@ -94,80 +94,80 @@ class ColorTest(unittest.TestCase):
 
     darker = makeDarker(color)
 
-    self.assertEqual(142, darker._red);
-    self.assertEqual(107, darker._green);
-    self.assertEqual(178, darker._blue);
+    self.assertEqual(142, darker._red)
+    self.assertEqual(107, darker._green)
+    self.assertEqual(178, darker._blue)
 
   def test_makeDarker_object_oriented(self):
     color = Color(204, 153, 255)
 
     darker = color.makeDarker()
 
-    self.assertEqual(142, darker._red);
-    self.assertEqual(107, darker._green);
-    self.assertEqual(178, darker._blue);
+    self.assertEqual(142, darker._red)
+    self.assertEqual(107, darker._green)
+    self.assertEqual(178, darker._blue)
 
   def test_makeLighter_procedural(self):
     color = Color(142, 107, 178)
 
     lighter = makeLighter(color)
 
-    self.assertEqual(202, lighter._red);
-    self.assertEqual(152, lighter._green);
-    self.assertEqual(254, lighter._blue);
+    self.assertEqual(202, lighter._red)
+    self.assertEqual(152, lighter._green)
+    self.assertEqual(254, lighter._blue)
 
   def test_makeLighter_object_oriented(self):
     color = Color(142, 107, 178)
     lighter = color.makeLighter()
 
-    self.assertEqual(202, lighter._red);
-    self.assertEqual(152, lighter._green);
-    self.assertEqual(254, lighter._blue);
+    self.assertEqual(202, lighter._red)
+    self.assertEqual(152, lighter._green)
+    self.assertEqual(254, lighter._blue)
 
   def test_makeLighter_black_procedural(self):
     gray = makeLighter(black)
 
-    self.assertEqual(3, gray._red);
-    self.assertEqual(3, gray._green);
-    self.assertEqual(3, gray._blue);
+    self.assertEqual(3, gray._red)
+    self.assertEqual(3, gray._green)
+    self.assertEqual(3, gray._blue)
 
   def test_makeLighter_black_object_oriented(self):
     gray = black.makeLighter()
 
-    self.assertEqual(3, gray._red);
-    self.assertEqual(3, gray._green);
-    self.assertEqual(3, gray._blue);
+    self.assertEqual(3, gray._red)
+    self.assertEqual(3, gray._green)
+    self.assertEqual(3, gray._blue)
 
   def test_makeBrighter_procedural(self):
     color = Color(142, 107, 178)
 
     lighter = makeBrighter(color)
 
-    self.assertEqual(202, lighter._red);
-    self.assertEqual(152, lighter._green);
-    self.assertEqual(254, lighter._blue);
+    self.assertEqual(202, lighter._red)
+    self.assertEqual(152, lighter._green)
+    self.assertEqual(254, lighter._blue)
 
   def test_makeBrighter_object_oriented(self):
     color = Color(142, 107, 178)
     lighter = color.makeBrighter()
 
-    self.assertEqual(202, lighter._red);
-    self.assertEqual(152, lighter._green);
-    self.assertEqual(254, lighter._blue);
+    self.assertEqual(202, lighter._red)
+    self.assertEqual(152, lighter._green)
+    self.assertEqual(254, lighter._blue)
 
   def test_makeBrighter_black_procedural(self):
     gray = makeBrighter(black)
 
-    self.assertEqual(3, gray._red);
-    self.assertEqual(3, gray._green);
-    self.assertEqual(3, gray._blue);
+    self.assertEqual(3, gray._red)
+    self.assertEqual(3, gray._green)
+    self.assertEqual(3, gray._blue)
 
   def test_makeBrighter_black_object_oriented(self):
     gray = black.makeBrighter()
 
-    self.assertEqual(3, gray._red);
-    self.assertEqual(3, gray._green);
-    self.assertEqual(3, gray._blue);
+    self.assertEqual(3, gray._red)
+    self.assertEqual(3, gray._green)
+    self.assertEqual(3, gray._blue)
 
   def test_distance_procedural(self):
     dist = distance(orange, pink)
@@ -196,6 +196,3 @@ class ColorTest(unittest.TestCase):
     setColorWrapAround(False)
 
     self.assertFalse(getColorWrapAround())
-
-if __name__ == '__main__':
-    unittest.main()
