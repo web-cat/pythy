@@ -1,19 +1,35 @@
+# TODO make this configurable
+
+def _noWrapColor(value):
+  if value < 0:
+    value = 0
+  elif value > 255:
+    value = 255
+  return value
+
+def _wrapColor(value):
+  value = value % 256
+  if(value < 0): value += 256
+  return value
+
+_validateColor = _noWrapColor
+
 def pickAColor():
   return black
 
-def makeColor(red, green, blue):
+def makeColor(red, green=None, blue=None):
   return Color(red, green, blue)
 
 def makeDarker(color):
-  return Color(color.red * Color.COLOR_FACTOR,
-               color.green * Color.COLOR_FACTOR,
-               color.blue * Color.COLOR_FACTOR)
+  return Color(color._red * Color.COLOR_FACTOR,
+               color._green * Color.COLOR_FACTOR,
+               color._blue * Color.COLOR_FACTOR)
 
 def makeLighter(color):
   factor = 1.0 / (1.0 - Color.COLOR_FACTOR)
-  r = color.red
-  g = color.green
-  b = color.blue
+  r = color._red
+  g = color._green
+  b = color._blue
 
   if(r == 0 and b == 0 and g == 0):
     return Color(factor, factor, factor)
@@ -28,24 +44,42 @@ def makeLighter(color):
   return Color(r / Color.COLOR_FACTOR, g / Color.COLOR_FACTOR, b / Color.COLOR_FACTOR)
 
 def distance(color, other):
-  return ((color.red - other.red) ** 2 + (color.green - other.green) ** 2 + (color.blue - other.blue) ** 2) ** (0.5)
+  return ((color._red - other._red) ** 2 + (color._green - other._green) ** 2 + (color._blue - other._blue) ** 2) ** 0.5
+
+def setColorWrapAround(flag):
+  global _validateColor
+  if(flag):
+    _validateColor = _noWrapColor
+  else:
+    _validateColor = _wrapColor
+
+def getColorWrapAround():
+  return _validateColor == _noWrapColor
 
 class Color:
-  COLOR_FACTOR = 0.85
+  COLOR_FACTOR = 0.70
 
-  def __init__(self, red, green, blue):
-    self.red = red
-    self.green = green
-    self.blue = blue
+  def __init__(self, red, green=None, blue=None):
+    try:
+      otherColor = red
+      self._red = _validateColor(otherColor._red)
+      self._green = _validateColor(otherColor._green)
+      self._blue = _validateColor(otherColor._blue)
+    except AttributeError:
+      self._red = _validateColor(int(red))
+      self._green = _validateColor(int(green)) if green != None else self._red
+      self._blue = _validateColor(int(blue)) if blue != None else self._red
 
   def __str__(self):
-    return 'Color, r=' + str(self.red) + ', g=' + str(self.green) + ', b=' + str(self.blue)
+    return 'Color, r=' + str(self._red) + ', g=' + str(self._green) + ', b=' + str(self._blue)
 
   def _getTuple(self):
-    return (self.red, self.green, self.blue, 255)
+    return (self._red, self._green, self._blue, 255)
 
+makeBrighter = makeLighter
 Color.makeDarker = makeDarker
 Color.makeLighter = makeLighter
+Color.makeBrighter = makeLighter
 Color.distance = distance
 
 black = Color(0, 0, 0)
