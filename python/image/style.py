@@ -1,4 +1,5 @@
 from PIL import ImageFont
+import os
 
 def makeStyle(family, emphasis, size):
   return Style(family, emphasis, size)
@@ -19,10 +20,11 @@ class Style:
     self.emphasis = emphasis
     self.size = size
 
+    base = os.path.dirname(__file__)
     if family in Style.fonts:
-      fontName = './fonts/' + Style.fonts[family]
+      fontName = base + '/fonts/' + Style.fonts[family]
     else:
-      fontName = './fonts/Times_New_Roman' # The default
+      fontName = base + '/fonts/Times_New_Roman' # The default
 
     if emphasis < 0 or emphasis >= len(Style.emphasis):
       emphasis = 0
