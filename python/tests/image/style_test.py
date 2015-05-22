@@ -1,5 +1,6 @@
 import unittest
 from image.style import *
+from PIL import ImageFont
 
 class StyleTest(unittest.TestCase):
   def test_constants(self):
@@ -23,3 +24,11 @@ class StyleTest(unittest.TestCase):
 
     style = makeStyle(sansSerif, PLAIN, 10)
     self.assertEqual('Style, family Sans Serif, emph 0, size 10', style.__str__())
+
+  def test_getPILFont(self):
+    style = makeStyle(serif, BOLD + ITALIC, 14)
+
+    pilFont = style._getPILFont()
+    self.assertIsInstance(pilFont, ImageFont.FreeTypeFont)
+    self.assertRegex(pilFont.path, 'Times_New_Roman_Bold_Italic.ttf$')
+    self.assertEqual(14, pilFont.size)
