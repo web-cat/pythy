@@ -405,48 +405,26 @@ class PictureTest(unittest.TestCase):
 
   def test_makeEmptyPicture(self):
     pic = makeEmptyPicture(10, 11)
-    self.assertEqual(10, pic.getWidth())
-    self.assertEqual(11, pic.getHeight())
+    self.assertEqual('Picture, height 11, width 10', pic.__str__())
     for x in range(10):
       for y in range(11):
-        (r, g, b, a) = pic.pixels[x, y]
-        self.assertEqual(255, r)
-        self.assertEqual(255, g)
-        self.assertEqual(255, b)
-        self.assertEqual(255, a)
+        self.assertEqual((255, 255, 255, 255), pic.pixels[x,y])
 
   def test_makeEmptyPicture_color(self):
     pic = makeEmptyPicture(10, 11, lightGray)
-    self.assertEqual(10, pic.getWidth())
-    self.assertEqual(11, pic.getHeight())
     for x in range(10):
       for y in range(11):
-        (r, g, b, a) = pic.pixels[x, y]
-        self.assertEqual(192, r)
-        self.assertEqual(192, g)
-        self.assertEqual(192, b)
-        self.assertEqual(255, a)
+        self.assertEqual((192, 192, 192, 255), pic.pixels[x,y])
 
-  def test_EmptyPicture_init(self):
+  def test_EmptyPicture(self):
     pic = EmptyPicture(10, 11)
-    self.assertEqual(10, pic.getWidth())
-    self.assertEqual(11, pic.getHeight())
+    self.assertEqual('Picture, height 11, width 10', pic.__str__())
     for x in range(10):
       for y in range(11):
-        (r, g, b, a) = pic.pixels[x, y]
-        self.assertEqual(255, r)
-        self.assertEqual(255, g)
-        self.assertEqual(255, b)
-        self.assertEqual(255, a)
+        self.assertEqual((255, 255, 255, 255), pic.pixels[x,y])
 
-  def test_EmptyPicture_init_color(self):
+  def test_EmptyPicture_color(self):
     pic = EmptyPicture(10, 11, lightGray)
-    self.assertEqual(10, pic.getWidth())
-    self.assertEqual(11, pic.getHeight())
     for x in range(10):
       for y in range(11):
-        (r, g, b, a) = pic.pixels[x, y]
-        self.assertEqual(192, r)
-        self.assertEqual(192, g)
-        self.assertEqual(192, b)
-        self.assertEqual(255, a)
+        self.assertEqual((192, 192, 192, 255), pic.pixels[x,y])
