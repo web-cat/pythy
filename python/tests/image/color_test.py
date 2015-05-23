@@ -196,3 +196,6 @@ class ColorTest(unittest.TestCase):
     setColorWrapAround(False)
 
     self.assertFalse(getColorWrapAround())
+
+  def test_getTuple(self):
+    self.assertEqual(orange._getTuple(), (255, 200, 0, 255))
