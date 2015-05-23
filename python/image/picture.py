@@ -11,14 +11,8 @@ from image.color import *
 def makePicture(url):
   return Picture(url)
 
-def makeEmptyPicture(width, height, color=black):
+def makeEmptyPicture(width, height, color=white):
   return EmptyPicture(width, height, color)
-
-def duplicatePicture(picture):
-  if hasattr(picture, 'url'):
-    return Picture(picture.url)
-  else:
-    return EmptyPicture(picture.width, picture.height)
 
 def getWidth(picture):
   return picture.width
@@ -38,11 +32,25 @@ def repaint(picture):
   Picture._last_shown = picture
 
 def addArc(picture, x, y, width, height, startAngle, arcAngle, color=black):
-  picture.pilDraw.arc([x, y, x + width, y + height], startAngle, arcAngle, fill=color._getTuple())
+  if (arcAngle >= 0):
+    start = -startAngle - arcAngle
+    end = -startAngle
+  else:
+    start = -startAngle
+    end = -startAngle - arcAngle
+
+  picture.pilDraw.arc([x, y, x + width, y + height], start, end, fill=color._getTuple())
 
 def addArcFilled(picture, x, y, width, height, startAngle, arcAngle, color=black):
   c = color._getTuple()
-  picture.pilDraw.chord([x, y, x + width, y + height], startAngle, arcAngle, c, c)
+  if (arcAngle >= 0):
+    start = -startAngle - arcAngle
+    end = -startAngle
+  else:
+    start = -startAngle
+    end = -startAngle - arcAngle
+
+  picture.pilDraw.pieslice([x, y, x + width, y + height], start, end, c, c)
 
 def addLine(picture, x1, y1, x2, y2, color=black):
   picture.pilDraw.line([x1, y1, x2, y2], color._getTuple())
@@ -81,6 +89,11 @@ def setAllPixelsToAColor(picture, color):
 
 def copyInto(smallPic, bigPic, startX, startY):
   bigPic.pilImage.paste(smallPic.pilImage, (startX, startY))
+
+def duplicatePicture(picture):
+  dup = EmptyPicture(picture.width, picture.height)
+  copyInto(picture, dup, 0, 0)
+  return dup
 
 class Picture:
 
@@ -148,10 +161,11 @@ Picture.addTextWithStyle = addTextWithStyle
 Picture.getPixels = getPixels
 Picture.getAllPixels = getAllPixels
 Picture.setAllPixelsToAColor = setAllPixelsToAColor
+Picture.copyInto = copyInto
 
 class EmptyPicture(Picture):
 
-  def __init__(self, width, height, color=black):
+  def __init__(self, width, height, color=white):
     self.width = width
     self.height = height
     self.pilImage = Image.new("RGBA", (width, height), color._getTuple())
