@@ -2,7 +2,9 @@ import urllib.request as urlrequest
 import io
 import wave
 import struct
+from subprocess import call
 from sample import *
+import os
 
 def stopPlaying(sound):
   Sound._last_stopped = sound
@@ -56,6 +58,7 @@ def getSamples(sound):
   return sound.leftSamples
 
 def duplicateSound(sound):
+  return
   # TODO
 
 def makeSound(url):
@@ -80,14 +83,29 @@ class IncorrectOperation(Exception):
 class Sound:
   def __init__(self, url):
     self.url = url
+    extension = url.split('.')[1]
+    wavInput = ''
 
-    waveFile = wave.open(io.BytesIO(urlrequest.urlopen(url).read()), 'r')
+    if extension == 'mp3':
+      tempFileName = 'temp-' + str(os.getpid())
+      wavInput = tempFileName + '.wav'
+      mp3Input = tempFileName + '.mp3'
+      mp3File = urlrequest.urlretrieve(url, mp3Input)
+      call(['/usr/bin/lame', '--decode', mp3Input, wavInput])
+
+    elif extension == 'wav':
+      wavInput = io.BytesIO(urlrequest.urlopen(url).read())
+
+    waveFile = wave.open(wavInput, 'r')
 
     self.samplingRate = waveFile.getframerate()
     self.numSamples = waveFile.getnframes()
     (self.leftSamples, self.rightSamples) = self._loadSamples(waveFile)
 
     waveFile.close()
+
+    if extension == 'mp3':
+      call(['rm', mp3Input, wavInput])
 
   # Inspired by http://www.bravegnu.org/blog/python-wave.html 
   def _loadSamples(self, waveFile):
