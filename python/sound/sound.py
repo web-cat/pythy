@@ -13,36 +13,41 @@ def play(sound): pass
 
 def blockingPlay(sound): pass
 
-def getDuration(sound):
-  return sound.numSamples / sound.samplingRate
+def getDuration(sound): return sound.numSamples / sound.samplingRate
 
-def getNumSamples(sound):
-  return sound.numSamples
+def getNumSamples(sound): return sound.numSamples
 
-def getLength(sound):
-  return sound.numSamples
+def getLength(sound): return sound.numSamples
 
-def getSamplingRate(sound):
-  return sound.samplingRate
+def getSamplingRate(sound): return sound.samplingRate
 
 def setSampleValueAt(sound, index, value):
-  if(index < -32768 or index > 32767):
+  if(index < 0 or index >= sound.getLength()):
+    raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
+
+  if(value < -32768 or value > 32767):
     raise ValueError('Value must be within range -32768 to 32767')
 
   sound.leftSamples[index] = int(value)
 
 def setLeftSample(sound, index, value):
+  if(index < 0 or index >= sound.getLength()):
+    raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
+
   if(value < -32768 or value > 32767):
     raise ValueError('Value must be within range -32768 to 32767')
 
   sound.leftSamples[index] = int(value)
 
 def setRightSample(sound, index, value):
+  if not len(sound.rightSamples):
+    raise IncorrectOperation('Tried to access the second channel of a mono sound')
+
+  if(index < 0 or index >= sound.getLength()):
+    raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
+
   if(value < -32768 or value > 32767):
     raise ValueError('Value must be within range -32768 to 32767')
-
-  if not len(sound.rightSamples):
-    raise IncorrectOperation("Tried to access the second channel of a mono sound")
 
   sound.rightSamples[index] = int(value)
 
@@ -60,7 +65,7 @@ def getLeftSample(sound, index):
 
 def getRightSample(sound, index):
   if not len(sound.rightSamples):
-    raise IncorrectOperation("Tried to access the second channel of a mono sound")
+    raise IncorrectOperation('Tried to access the second channel of a mono sound')
 
   if(index < 0 or index >= sound.getLength()):
     raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
@@ -97,11 +102,9 @@ def writeSoundTo(sound, path): pass
 
 def stopPlaying(sound): pass
   
-class UnsupportedFileType(Exception):
-  pass
+class UnsupportedFileType(Exception): pass
 
-class IncorrectOperation(Exception):
-  pass
+class IncorrectOperation(Exception): pass
 
 class Sound:
   def __init__(self, url, samplingRate=22050):
@@ -161,11 +164,11 @@ class Sound:
     numChannels = waveFile.getnchannels()
 
     if numChannels is 1:
-      fmts = (None, "=B", "=h", None, "=l")
+      fmts = (None, '=B', '=h', None, '=l')
     elif numChannels is 2:
-      fmts = (None, "=BB", "=hh", None, "=ll")
+      fmts = (None, '=BB', '=hh', None, '=ll')
     else:
-      raise UnsupportedFileType("Pythy does not support wave files with more than 2 channels")
+      raise UnsupportedFileType('Pythy does not support wave files with more than 2 channels')
 
     fmt = fmts[sampleWidth]
     leftSamples = []
@@ -181,12 +184,12 @@ class Sound:
     return (leftSamples, rightSamples)
 
   def __str__(self):
-    string = "Sound, "
+    string = 'Sound, '
 
     if(hasattr(self, 'url')):
-      string += "File: {}, ".format(self.url)
+      string += 'File: {}, '.format(self.url)
 
-    string += "Number of samples: {}".format(self.getLength())
+    string += 'Number of samples: {}'.format(self.getLength())
 
     return string
 
