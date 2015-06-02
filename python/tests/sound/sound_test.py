@@ -290,3 +290,31 @@ class SoundTest(unittest.TestCase):
   def test_openSoundTool(self):
     sound = makeSound('http://localhost:9000/sounds/test_mono.wav')
     openSoundTool(sound)
+
+  def test_setSampleValueAt_outOfRange_procedural(self):
+    sound = makeSound('http://localhost:9000/sounds/test_mono.wav')
+    setSampleValueAt(sound, 10, -40000)
+    self.assertEqual(getSampleValueAt(sound, 10), -32768)
+    setSampleValueAt(sound, 10, 40000)
+    self.assertEqual(getSampleValueAt(sound, 10), 32767)
+
+  def test_setSampleValueAt_procedural(self):
+    sound = makeSound('http://localhost:9000/sounds/test_mono.wav')
+    setSampleValueAt(sound, 1008, 9081)
+    self.assertEqual(getSampleValueAt(sound, 1008), 9081)
+    setSampleValueAt(sound, 1008, -100)
+    self.assertEqual(getSampleValueAt(sound, 1008), -100)
+
+  def test_setSampleValueAt_outOfRange_object_oriented(self):
+    sound = makeSound('http://localhost:9000/sounds/test_mono.wav')
+    sound.setSampleValueAt(10, -40000)
+    self.assertEqual(sound.getSampleValueAt(10), -32768)
+    sound.setSampleValueAt(10, 40000)
+    self.assertEqual(sound.getSampleValueAt(10), 32767)
+
+  def test_setSampleValueAt_object_oriented(self):
+    sound = makeSound('http://localhost:9000/sounds/test_mono.wav')
+    sound.setSampleValueAt(1008, 9081)
+    self.assertEqual(sound.getSampleValueAt(1008), 9081)
+    sound.setSampleValueAt(1008, -100)
+    self.assertEqual(sound.getSampleValueAt(1008), -100)

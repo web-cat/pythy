@@ -25,8 +25,8 @@ def setSampleValueAt(sound, index, value):
   if(index < 0 or index >= sound.getLength()):
     raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
 
-  if(value < -32768 or value > 32767):
-    raise ValueError('Value must be within range -32768 to 32767')
+  if(value < -32768): value = -32768
+  if(value > 32767): value = 32767
 
   sound.leftSamples[index] = int(value)
 
@@ -34,8 +34,8 @@ def setLeftSample(sound, index, value):
   if(index < 0 or index >= sound.getLength()):
     raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
 
-  if(value < -32768 or value > 32767):
-    raise ValueError('Value must be within range -32768 to 32767')
+  if(value < -32768): value = -32768
+  if(value > 32767): value = 32767
 
   sound.leftSamples[index] = int(value)
 
@@ -46,8 +46,8 @@ def setRightSample(sound, index, value):
   if(index < 0 or index >= sound.getLength()):
     raise ValueError('Index must have a value between 0 and {}'.format(sound.getLength()))
 
-  if(value < -32768 or value > 32767):
-    raise ValueError('Value must be within range -32768 to 32767')
+  if(value < -32768): value = -32768
+  if(value > 32767): value = 32767
 
   sound.rightSamples[index] = int(value)
 
