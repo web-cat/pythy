@@ -130,30 +130,26 @@ class PictureTest(unittest.TestCase):
   def test_getPixels_procedural(self):
     picture = Picture('http://localhost:9000/imgs/test.jpg')
     pixels = getPixels(picture)
-    self.assertEqual(len(pixels), 315)
-    self.assertEqual(len(pixels[0]), 309)
-    self.assertIsInstance(pixels[0][0], Pixel)
+    self.assertEqual(len(pixels), 315 * 309)
+    self.assertIsInstance(pixels[0], Pixel)
 
   def test_getPixels_object_oriented(self):
     picture = Picture('http://localhost:9000/imgs/test.jpg')
     pixels = picture.getPixels()
-    self.assertEqual(len(pixels), 315)
-    self.assertEqual(len(pixels[0]), 309)
-    self.assertIsInstance(pixels[0][0], Pixel)
+    self.assertEqual(len(pixels), 315 * 309)
+    self.assertIsInstance(pixels[0], Pixel)
 
   def test_getAllPixels_procedural(self):
     picture = Picture('http://localhost:9000/imgs/test.jpg')
     pixels = getAllPixels(picture)
-    self.assertEqual(len(pixels), 315)
-    self.assertEqual(len(pixels[0]), 309)
-    self.assertIsInstance(pixels[0][0], Pixel)
+    self.assertEqual(len(pixels), 315 * 309)
+    self.assertIsInstance(pixels[0], Pixel)
 
   def test_getAllPixels_object_oriented(self):
     picture = Picture('http://localhost:9000/imgs/test.jpg')
     pixels = picture.getAllPixels()
-    self.assertEqual(len(pixels), 315)
-    self.assertEqual(len(pixels[0]), 309)
-    self.assertIsInstance(pixels[0][0], Pixel)
+    self.assertEqual(len(pixels), 315 * 309)
+    self.assertIsInstance(pixels[0], Pixel)
 
   def test_duplicatePicture(self):
     picture = Picture('http://localhost:9000/imgs/test.jpg')

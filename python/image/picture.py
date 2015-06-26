@@ -86,7 +86,7 @@ def addTextWithStyle(picture, x, y, string, style, color=black):
   picture.pilDraw.text([x, y], string, color._getTuple(), style._getPILFont())
 
 def getPixels(picture):
-  return [[Pixel(picture, x, y) for y in range(picture.height)] for x in range(picture.width)]
+  return [Pixel(picture, x, y) for y in range(picture.height) for x in range(picture.width)]
 
 getAllPixels = getPixels
 
