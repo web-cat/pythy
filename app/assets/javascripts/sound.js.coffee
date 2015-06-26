@@ -2,19 +2,13 @@
 # So, the sampling rate and number of samples reported through this API
 # may be different from the original. See - https://github.com/WebAudio/web-audio-api/issues/30
 class pythy.Sound
-  @SAMPLE_RATE : 22050
+  @SAMPLE_RATE : 44100
 
   @mapFloatTo16BitInt: (sampleValue) ->
-    if(sampleValue > 0)
-      return parseInt(sampleValue * 32767)
-    else
-      return parseInt(sampleValue * 32768)
+    return parseInt(sampleValue * 32768)
 
   @map16BitIntToFloat: (sampleValue) ->
-    if(sampleValue > 0)
-      return sampleValue / 32767
-    else
-      return sampleValue / 32768
+    return sampleValue / 32768
 
   # NOTE: The maximum number of audio contexts is 6 and it looks like everytime a program is 
   # run it executes this file again, so, we need this check to protect against repeated
@@ -64,13 +58,16 @@ class pythy.Sound
     request.onload = () =>
       if request.status isnt 200
         onError && onError(request.statusText)
-      else if typeof(request.response) isnt ArrayBuffer
+      else if not request.response instanceof ArrayBuffer
         onError && onError('File not found or is not of the correct type')
       else
-      __$audioContext$__.decodeAudioData request.response, (decodedData) =>
-        @buffer = decodedData
-        @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
-        onSuccess && onSuccess(this)
+        __$audioContext$__.decodeAudioData request.response,
+        (decodedData) =>
+          @buffer = decodedData
+          @channels[i] = @buffer.getChannelData(i) for i in [0..@buffer.numberOfChannels - 1]
+          onSuccess && onSuccess(this)
+        , (error) ->
+          onError && onError('File not found or is not of the correct type')
    
     request.onerror = request.timeout = onError
 
@@ -142,7 +139,7 @@ class pythy.Sound
   _replaceExtension: (filename, ext) ->
     return filename.split('.')[0] + ext
 
-  save: (filename) ->
+  save: (filename, continueWith) ->
     type = @_getMimeType(filename)
 
     switch @buffer.numberOfChannels
@@ -153,7 +150,8 @@ class pythy.Sound
     blob = new Blob([@_encodeWAV(samples)], { type: type })
     # This tells the server that it's actually a wav binary that needs to be converted into an mp3 file
     if type is 'audio/mpeg' then filename = @_replaceExtension(filename, '.wavmp3')
-    pythy.uploadFileFromBlob(filename, blob)
+    pythy.uploadFileFromBlob(filename, blob).done (e, data) ->
+      continueWith(e)
 
   # The following methods for encoding to Wav are based on https://github.com/mattdiamond/Recorderjs
 

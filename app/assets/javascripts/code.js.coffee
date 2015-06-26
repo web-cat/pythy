@@ -472,7 +472,7 @@ class CodeController
 
   _mcWritePictureTo: (dataURL, path, continueWith) ->
     window.pythy.uploadFileFromDataURL(path, dataURL).done (e, data) ->
-      continueWith(null)
+      continueWith(e)
 
   _mcCustomizeMediaURL: (url) =>
     {protocol, host} = window.location
