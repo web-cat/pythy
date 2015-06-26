@@ -36,7 +36,7 @@ class Line
     @draw(x)
 
     @sampleNumberEl.value = sampleNumber
-    @valueEl.innerText = @sound.getSample(@channelNum, sampleNumber)
+    @valueEl.innerText = pythy.Sound.mapFloatTo16BitInt(@sound.getSample(@channelNum, sampleNumber))
 
   getSampleNumber: () -> return @x * @nthSample
 
