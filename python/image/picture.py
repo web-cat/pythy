@@ -4,16 +4,6 @@ from PIL import Image, ImageDraw
 from image.pixel import *
 from image.color import *
 
-#TODO make this configurable
-def pickAFile():
-  return 'http://localhost:9000/imgs/test.jpg'
-
-def setMediaPath(path):
-  raise NotImplementedError('Pythy does not support setting the media path')
-
-def getMediaPath():
-  raise NotImplementedError('Pythy does not support getting the media path')
-
 def writePictureTo(pic, path): pass
 
 def openPictureTool(pic): pass

@@ -315,6 +315,20 @@ class TestCase(unittest.TestCase):
       _originalBuiltins[name] = __builtins__[name]
       safeBuiltins[name] = function
 
+  def assertSoundsSimilar(self, expected, actual):
+    length = actual.getLength()
+
+    self.assertEqual(expected.getLength(), length)
+
+    ALLOWABLE_ERROR = 0
+
+    for i in range(length):
+      actualSample = actual.getSampleValueAt(i)
+      expectedSample = expected.getSampleValueAt(i)
+
+      if abs(actualSample - expectedSample) > ALLOWABLE_ERROR:
+        self.fail('Some samples do not have the expected values')
+
   # --------------------------------------------------------------
   def assertImagesSimilar(self, reason, expected, actual):
     width = actual.getWidth()

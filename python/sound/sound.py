@@ -9,9 +9,9 @@ import os
 
 def stopPlaying(sound): pass
 
-def play(sound): pass
+def play(sound): Sound._last_played = sound
 
-def blockingPlay(sound): pass
+def blockingPlay(sound): Sound._last_played = sound
 
 def getDuration(sound): return sound.numSamples / sound.samplingRate
 
@@ -107,6 +107,12 @@ class UnsupportedFileType(Exception): pass
 class IncorrectOperation(Exception): pass
 
 class Sound:
+  _last_played = None
+
+  @staticmethod
+  def last_played():
+    return Sound._last_played
+
   def __init__(self, url, samplingRate=22050):
     if type(url) is str:
       self.url = url
