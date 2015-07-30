@@ -4222,6 +4222,641 @@ goog.asserts.assertObjectPrototypeIsIntact = function() {
     goog.asserts.fail(key + ' should not be enumerable in Object.prototype.');
   }
 };
+// Copyright 2006 The Closure Library Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS-IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/**
+ * @fileoverview Utilities for manipulating objects/maps/hashes.
+ */
+
+goog.provide('goog.object');
+
+
+/**
+ * Calls a function for each element in an object/map/hash.
+ *
+ * @param {Object.<K,V>} obj The object over which to iterate.
+ * @param {function(this:T,V,?,Object.<K,V>):?} f The function to call
+ *     for every element. This function takes 3 arguments (the element, the
+ *     index and the object) and the return value is ignored.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @template T,K,V
+ */
+goog.object.forEach = function(obj, f, opt_obj) {
+  for (var key in obj) {
+    f.call(opt_obj, obj[key], key, obj);
+  }
+};
+
+
+/**
+ * Calls a function for each element in an object/map/hash. If that call returns
+ * true, adds the element to a new object.
+ *
+ * @param {Object.<K,V>} obj The object over which to iterate.
+ * @param {function(this:T,V,?,Object.<K,V>):boolean} f The function to call
+ *     for every element. This
+ *     function takes 3 arguments (the element, the index and the object)
+ *     and should return a boolean. If the return value is true the
+ *     element is added to the result object. If it is false the
+ *     element is not included.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {!Object.<K,V>} a new object in which only elements that passed the
+ *     test are present.
+ * @template T,K,V
+ */
+goog.object.filter = function(obj, f, opt_obj) {
+  var res = {};
+  for (var key in obj) {
+    if (f.call(opt_obj, obj[key], key, obj)) {
+      res[key] = obj[key];
+    }
+  }
+  return res;
+};
+
+
+/**
+ * For every element in an object/map/hash calls a function and inserts the
+ * result into a new object.
+ *
+ * @param {Object.<K,V>} obj The object over which to iterate.
+ * @param {function(this:T,V,?,Object.<K,V>):R} f The function to call
+ *     for every element. This function
+ *     takes 3 arguments (the element, the index and the object)
+ *     and should return something. The result will be inserted
+ *     into a new object.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {!Object.<K,R>} a new object with the results from f.
+ * @template T,K,V,R
+ */
+goog.object.map = function(obj, f, opt_obj) {
+  var res = {};
+  for (var key in obj) {
+    res[key] = f.call(opt_obj, obj[key], key, obj);
+  }
+  return res;
+};
+
+
+/**
+ * Calls a function for each element in an object/map/hash. If any
+ * call returns true, returns true (without checking the rest). If
+ * all calls return false, returns false.
+ *
+ * @param {Object.<K,V>} obj The object to check.
+ * @param {function(this:T,V,?,Object.<K,V>):boolean} f The function to
+ *     call for every element. This function
+ *     takes 3 arguments (the element, the index and the object) and should
+ *     return a boolean.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {boolean} true if any element passes the test.
+ * @template T,K,V
+ */
+goog.object.some = function(obj, f, opt_obj) {
+  for (var key in obj) {
+    if (f.call(opt_obj, obj[key], key, obj)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+
+/**
+ * Calls a function for each element in an object/map/hash. If
+ * all calls return true, returns true. If any call returns false, returns
+ * false at this point and does not continue to check the remaining elements.
+ *
+ * @param {Object.<K,V>} obj The object to check.
+ * @param {?function(this:T,V,?,Object.<K,V>):boolean} f The function to
+ *     call for every element. This function
+ *     takes 3 arguments (the element, the index and the object) and should
+ *     return a boolean.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {boolean} false if any element fails the test.
+ * @template T,K,V
+ */
+goog.object.every = function(obj, f, opt_obj) {
+  for (var key in obj) {
+    if (!f.call(opt_obj, obj[key], key, obj)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+
+/**
+ * Returns the number of key-value pairs in the object map.
+ *
+ * @param {Object} obj The object for which to get the number of key-value
+ *     pairs.
+ * @return {number} The number of key-value pairs in the object map.
+ */
+goog.object.getCount = function(obj) {
+  // JS1.5 has __count__ but it has been deprecated so it raises a warning...
+  // in other words do not use. Also __count__ only includes the fields on the
+  // actual object and not in the prototype chain.
+  var rv = 0;
+  for (var key in obj) {
+    rv++;
+  }
+  return rv;
+};
+
+
+/**
+ * Returns one key from the object map, if any exists.
+ * For map literals the returned key will be the first one in most of the
+ * browsers (a know exception is Konqueror).
+ *
+ * @param {Object} obj The object to pick a key from.
+ * @return {string|undefined} The key or undefined if the object is empty.
+ */
+goog.object.getAnyKey = function(obj) {
+  for (var key in obj) {
+    return key;
+  }
+};
+
+
+/**
+ * Returns one value from the object map, if any exists.
+ * For map literals the returned value will be the first one in most of the
+ * browsers (a know exception is Konqueror).
+ *
+ * @param {Object.<K,V>} obj The object to pick a value from.
+ * @return {V|undefined} The value or undefined if the object is empty.
+ * @template K,V
+ */
+goog.object.getAnyValue = function(obj) {
+  for (var key in obj) {
+    return obj[key];
+  }
+};
+
+
+/**
+ * Whether the object/hash/map contains the given object as a value.
+ * An alias for goog.object.containsValue(obj, val).
+ *
+ * @param {Object.<K,V>} obj The object in which to look for val.
+ * @param {V} val The object for which to check.
+ * @return {boolean} true if val is present.
+ * @template K,V
+ */
+goog.object.contains = function(obj, val) {
+  return goog.object.containsValue(obj, val);
+};
+
+
+/**
+ * Returns the values of the object/map/hash.
+ *
+ * @param {Object.<K,V>} obj The object from which to get the values.
+ * @return {!Array.<V>} The values in the object/map/hash.
+ * @template K,V
+ */
+goog.object.getValues = function(obj) {
+  var res = [];
+  var i = 0;
+  for (var key in obj) {
+    res[i++] = obj[key];
+  }
+  return res;
+};
+
+
+/**
+ * Returns the keys of the object/map/hash.
+ *
+ * @param {Object} obj The object from which to get the keys.
+ * @return {!Array.<string>} Array of property keys.
+ */
+goog.object.getKeys = function(obj) {
+  var res = [];
+  var i = 0;
+  for (var key in obj) {
+    res[i++] = key;
+  }
+  return res;
+};
+
+
+/**
+ * Get a value from an object multiple levels deep.  This is useful for
+ * pulling values from deeply nested objects, such as JSON responses.
+ * Example usage: getValueByKeys(jsonObj, 'foo', 'entries', 3)
+ *
+ * @param {!Object} obj An object to get the value from.  Can be array-like.
+ * @param {...(string|number|!Array.<number|string>)} var_args A number of keys
+ *     (as strings, or numbers, for array-like objects).  Can also be
+ *     specified as a single array of keys.
+ * @return {*} The resulting value.  If, at any point, the value for a key
+ *     is undefined, returns undefined.
+ */
+goog.object.getValueByKeys = function(obj, var_args) {
+  var isArrayLike = goog.isArrayLike(var_args);
+  var keys = isArrayLike ? var_args : arguments;
+
+  // Start with the 2nd parameter for the variable parameters syntax.
+  for (var i = isArrayLike ? 0 : 1; i < keys.length; i++) {
+    obj = obj[keys[i]];
+    if (!goog.isDef(obj)) {
+      break;
+    }
+  }
+
+  return obj;
+};
+
+
+/**
+ * Whether the object/map/hash contains the given key.
+ *
+ * @param {Object} obj The object in which to look for key.
+ * @param {*} key The key for which to check.
+ * @return {boolean} true If the map contains the key.
+ */
+goog.object.containsKey = function(obj, key) {
+  return key in obj;
+};
+
+
+/**
+ * Whether the object/map/hash contains the given value. This is O(n).
+ *
+ * @param {Object.<K,V>} obj The object in which to look for val.
+ * @param {V} val The value for which to check.
+ * @return {boolean} true If the map contains the value.
+ * @template K,V
+ */
+goog.object.containsValue = function(obj, val) {
+  for (var key in obj) {
+    if (obj[key] == val) {
+      return true;
+    }
+  }
+  return false;
+};
+
+
+/**
+ * Searches an object for an element that satisfies the given condition and
+ * returns its key.
+ * @param {Object.<K,V>} obj The object to search in.
+ * @param {function(this:T,V,string,Object.<K,V>):boolean} f The
+ *      function to call for every element. Takes 3 arguments (the value,
+ *     the key and the object) and should return a boolean.
+ * @param {T=} opt_this An optional "this" context for the function.
+ * @return {string|undefined} The key of an element for which the function
+ *     returns true or undefined if no such element is found.
+ * @template T,K,V
+ */
+goog.object.findKey = function(obj, f, opt_this) {
+  for (var key in obj) {
+    if (f.call(opt_this, obj[key], key, obj)) {
+      return key;
+    }
+  }
+  return undefined;
+};
+
+
+/**
+ * Searches an object for an element that satisfies the given condition and
+ * returns its value.
+ * @param {Object.<K,V>} obj The object to search in.
+ * @param {function(this:T,V,string,Object.<K,V>):boolean} f The function
+ *     to call for every element. Takes 3 arguments (the value, the key
+ *     and the object) and should return a boolean.
+ * @param {T=} opt_this An optional "this" context for the function.
+ * @return {V} The value of an element for which the function returns true or
+ *     undefined if no such element is found.
+ * @template T,K,V
+ */
+goog.object.findValue = function(obj, f, opt_this) {
+  var key = goog.object.findKey(obj, f, opt_this);
+  return key && obj[key];
+};
+
+
+/**
+ * Whether the object/map/hash is empty.
+ *
+ * @param {Object} obj The object to test.
+ * @return {boolean} true if obj is empty.
+ */
+goog.object.isEmpty = function(obj) {
+  for (var key in obj) {
+    return false;
+  }
+  return true;
+};
+
+
+/**
+ * Removes all key value pairs from the object/map/hash.
+ *
+ * @param {Object} obj The object to clear.
+ */
+goog.object.clear = function(obj) {
+  for (var i in obj) {
+    delete obj[i];
+  }
+};
+
+
+/**
+ * Removes a key-value pair based on the key.
+ *
+ * @param {Object} obj The object from which to remove the key.
+ * @param {*} key The key to remove.
+ * @return {boolean} Whether an element was removed.
+ */
+goog.object.remove = function(obj, key) {
+  var rv;
+  if ((rv = key in obj)) {
+    delete obj[key];
+  }
+  return rv;
+};
+
+
+/**
+ * Adds a key-value pair to the object. Throws an exception if the key is
+ * already in use. Use set if you want to change an existing pair.
+ *
+ * @param {Object.<K,V>} obj The object to which to add the key-value pair.
+ * @param {string} key The key to add.
+ * @param {V} val The value to add.
+ * @template K,V
+ */
+goog.object.add = function(obj, key, val) {
+  if (key in obj) {
+    throw Error('The object already contains the key "' + key + '"');
+  }
+  goog.object.set(obj, key, val);
+};
+
+
+/**
+ * Returns the value for the given key.
+ *
+ * @param {Object.<K,V>} obj The object from which to get the value.
+ * @param {string} key The key for which to get the value.
+ * @param {R=} opt_val The value to return if no item is found for the given
+ *     key (default is undefined).
+ * @return {V|R|undefined} The value for the given key.
+ * @template K,V,R
+ */
+goog.object.get = function(obj, key, opt_val) {
+  if (key in obj) {
+    return obj[key];
+  }
+  return opt_val;
+};
+
+
+/**
+ * Adds a key-value pair to the object/map/hash.
+ *
+ * @param {Object.<K,V>} obj The object to which to add the key-value pair.
+ * @param {string} key The key to add.
+ * @param {V} value The value to add.
+ * @template K,V
+ */
+goog.object.set = function(obj, key, value) {
+  obj[key] = value;
+};
+
+
+/**
+ * Adds a key-value pair to the object/map/hash if it doesn't exist yet.
+ *
+ * @param {Object.<K,V>} obj The object to which to add the key-value pair.
+ * @param {string} key The key to add.
+ * @param {V} value The value to add if the key wasn't present.
+ * @return {V} The value of the entry at the end of the function.
+ * @template K,V
+ */
+goog.object.setIfUndefined = function(obj, key, value) {
+  return key in obj ? obj[key] : (obj[key] = value);
+};
+
+
+/**
+ * Does a flat clone of the object.
+ *
+ * @param {Object.<K,V>} obj Object to clone.
+ * @return {!Object.<K,V>} Clone of the input object.
+ * @template K,V
+ */
+goog.object.clone = function(obj) {
+  // We cannot use the prototype trick because a lot of methods depend on where
+  // the actual key is set.
+
+  var res = {};
+  for (var key in obj) {
+    res[key] = obj[key];
+  }
+  return res;
+  // We could also use goog.mixin but I wanted this to be independent from that.
+};
+
+
+/**
+ * Clones a value. The input may be an Object, Array, or basic type. Objects and
+ * arrays will be cloned recursively.
+ *
+ * WARNINGS:
+ * <code>goog.object.unsafeClone</code> does not detect reference loops. Objects
+ * that refer to themselves will cause infinite recursion.
+ *
+ * <code>goog.object.unsafeClone</code> is unaware of unique identifiers, and
+ * copies UIDs created by <code>getUid</code> into cloned results.
+ *
+ * @param {*} obj The value to clone.
+ * @return {*} A clone of the input value.
+ */
+goog.object.unsafeClone = function(obj) {
+  var type = goog.typeOf(obj);
+  if (type == 'object' || type == 'array') {
+    if (obj.clone) {
+      return obj.clone();
+    }
+    var clone = type == 'array' ? [] : {};
+    for (var key in obj) {
+      clone[key] = goog.object.unsafeClone(obj[key]);
+    }
+    return clone;
+  }
+
+  return obj;
+};
+
+
+/**
+ * Returns a new object in which all the keys and values are interchanged
+ * (keys become values and values become keys). If multiple keys map to the
+ * same value, the chosen transposed value is implementation-dependent.
+ *
+ * @param {Object} obj The object to transpose.
+ * @return {!Object} The transposed object.
+ */
+goog.object.transpose = function(obj) {
+  var transposed = {};
+  for (var key in obj) {
+    transposed[obj[key]] = key;
+  }
+  return transposed;
+};
+
+
+/**
+ * The names of the fields that are defined on Object.prototype.
+ * @type {Array.<string>}
+ * @private
+ */
+goog.object.PROTOTYPE_FIELDS_ = [
+  'constructor',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toLocaleString',
+  'toString',
+  'valueOf'
+];
+
+
+/**
+ * Extends an object with another object.
+ * This operates 'in-place'; it does not create a new Object.
+ *
+ * Example:
+ * var o = {};
+ * goog.object.extend(o, {a: 0, b: 1});
+ * o; // {a: 0, b: 1}
+ * goog.object.extend(o, {c: 2});
+ * o; // {a: 0, b: 1, c: 2}
+ *
+ * @param {Object} target  The object to modify.
+ * @param {...Object} var_args The objects from which values will be copied.
+ */
+goog.object.extend = function(target, var_args) {
+  var key, source;
+  for (var i = 1; i < arguments.length; i++) {
+    source = arguments[i];
+    for (key in source) {
+      target[key] = source[key];
+    }
+
+    // For IE the for-in-loop does not contain any properties that are not
+    // enumerable on the prototype object (for example isPrototypeOf from
+    // Object.prototype) and it will also not include 'replace' on objects that
+    // extend String and change 'replace' (not that it is common for anyone to
+    // extend anything except Object).
+
+    for (var j = 0; j < goog.object.PROTOTYPE_FIELDS_.length; j++) {
+      key = goog.object.PROTOTYPE_FIELDS_[j];
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+};
+
+
+/**
+ * Creates a new object built from the key-value pairs provided as arguments.
+ * @param {...*} var_args If only one argument is provided and it is an array
+ *     then this is used as the arguments,  otherwise even arguments are used as
+ *     the property names and odd arguments are used as the property values.
+ * @return {!Object} The new object.
+ * @throws {Error} If there are uneven number of arguments or there is only one
+ *     non array argument.
+ */
+goog.object.create = function(var_args) {
+  var argLength = arguments.length;
+  if (argLength == 1 && goog.isArray(arguments[0])) {
+    return goog.object.create.apply(null, arguments[0]);
+  }
+
+  if (argLength % 2) {
+    throw Error('Uneven number of arguments');
+  }
+
+  var rv = {};
+  for (var i = 0; i < argLength; i += 2) {
+    rv[arguments[i]] = arguments[i + 1];
+  }
+  return rv;
+};
+
+
+/**
+ * Creates a new object where the property names come from the arguments but
+ * the value is always set to true
+ * @param {...*} var_args If only one argument is provided and it is an array
+ *     then this is used as the arguments,  otherwise the arguments are used
+ *     as the property names.
+ * @return {!Object} The new object.
+ */
+goog.object.createSet = function(var_args) {
+  var argLength = arguments.length;
+  if (argLength == 1 && goog.isArray(arguments[0])) {
+    return goog.object.createSet.apply(null, arguments[0]);
+  }
+
+  var rv = {};
+  for (var i = 0; i < argLength; i++) {
+    rv[arguments[i]] = true;
+  }
+  return rv;
+};
+
+
+/**
+ * Creates an immutable view of the underlying object, if the browser
+ * supports immutable objects.
+ *
+ * In default mode, writes to this view will fail silently. In strict mode,
+ * they will throw an error.
+ *
+ * @param {!Object.<K,V>} obj An object.
+ * @return {!Object.<K,V>} An immutable view of that object, or the
+ *     original object if this browser does not support immutables.
+ * @template K,V
+ */
+goog.object.createImmutableView = function(obj) {
+  var result = obj;
+  if (Object.isFrozen && !Object.isFrozen(obj)) {
+    result = Object.create(obj);
+    Object.freeze(result);
+  }
+  return result;
+};
+
+
+/**
+ * @param {!Object} obj An object.
+ * @return {boolean} Whether this is an immutable view of the object.
+ */
+goog.object.isImmutableView = function(obj) {
+  return !!Object.isFrozen && Object.isFrozen(obj);
+};
 /**
  * Base namespace for Skulpt. This is the only symbol that Skulpt adds to the
  * global namespace. Other user accessible symbols are noted and described
@@ -5720,8 +6355,29 @@ Sk.builtin.globals = function globals() {
     
     return ret;
 
-}
+};
 
+Sk.builtin.print = function () {
+  var args, len, sep, end;
+
+  args = Array.prototype.slice.call(arguments);
+  len = args.length;
+
+  end = new Sk.builtin.str(args[len - 1]);
+  sep = new Sk.builtin.str(args[len - 2]);
+
+  for(var i = 0; i < len - 3; i++) {
+    Sk.output(new Sk.builtins.str(args[i]).v);
+    Sk.output(sep.v);
+  }
+  if(i >= 0 && args.length > 2) {
+    Sk.output(new Sk.builtins.str(args[i]).v);
+  }
+  Sk.output(end.v);
+  return Sk.builtin.none.none$;
+};
+Sk.builtin.print.co_varnames = ['sep', 'end'];
+Sk.builtin.print.$defaults = [' ', '\n'];
 
 
 Sk.builtin.bytearray = function bytearray() { throw new Sk.builtin.NotImplementedError("bytearray is not yet implemented")}
@@ -7730,6 +8386,7 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
             var numPosParams = args.length - numNonOptParams;
             
             //add defaults
+            var numNonOptParams_alt = args.length;
             args = args.concat(func.$defaults.slice(numPosParams));
             
             for(var i = 0; i < kws.length; i = i + 2) {
@@ -7743,8 +8400,17 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
                     throw new Sk.builtin.TypeError("Argument given by name ('" + kws[i] + "') and position (" + (kwix + numNonOptParams + 1) + ")");
                 }
                 
-                args[kwix + numNonOptParams] = kws[i + 1];  
+                if(isNaN(numNonOptParams)) {
+                  args[kwix + numNonOptParams_alt] = kws[i + 1];
+                } else {
+                  args[kwix + numNonOptParams] = kws[i + 1];  
+                }
             }  
+        } else if(func.$defaults !== undefined &&
+                  func.co_numargs === undefined &&
+                  func.$defaults.length > 0) {
+            //For funcs with variable number of args and opt args (like print)
+            args = args.concat(func.$defaults);
         }
         //append kw args to args, filling in the default value where none is provided.
         return func.apply(null, args);
@@ -8044,7 +8710,11 @@ Sk.abstr.boNumPromote_ = {
     },
     "Div": function(a, b) {
         if (b === 0)
-            throw new Sk.builtin.ZeroDivisionError("division or modulo by zero");
+            throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+        else if (a === +a && a === (a | 0)
+                 && b === +b && b === (b | 0)
+                 && a % b != 0)
+            return a / (1.0 * b);
         else
             return a / b;
     },
@@ -10134,10 +10804,191 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
 // Added by allevato
 Sk.builtin.str.prototype['format'] = new Sk.builtin.func(function() {
     var self = arguments[0];
+    
+    // Turn all {} in string into {0}, {1}, etc.
+    var count = 0;
+    var v = self.v.replace(/{}/g, function(){ return '{' + count++ + '}' })
     var args = Array.prototype.slice.call(arguments, 1);
-    return Sk.builtin.str.prototype.nb$remainder.call(
-        self, new Sk.builtin.tuple(args));
+
+    return new Sk.builtin.str(v.replace(/{([a-zA-Z0-9_]+)(:((\.[0-9]+)?[bcdefoxX]))?}/g,
+      function(match, key, unused, format, precision) {
+        var val = args[key];
+        if (val == null
+            && args[0].constructor == Sk.builtin.dict)
+        {
+        	val = args[0].mp$subscript(new Sk.builtin.str(key));
+        }
+        
+        if (val != null)
+        {
+        	// unwrap Python string, if needed
+            if (val.constructor === Sk.builtin.str)
+            {
+            	val = val.v;
+            }
+            if (format != null)
+            {
+                val = vsprintf("%" + format, [val]);
+            }
+            return val;
+        }
+        else
+        {
+            return match;
+        }
+    }));
+//    return Sk.builtin.str.prototype.nb$remainder.call(
+//        self, new Sk.builtin.tuple(args));
 });
+
+
+// sprintf code, adapted from https://github.com/alexei/sprintf.js, is:
+
+// Copyright (c) 2007-2013, Alexandru Marasteanu <hello [at) alexei (dot] ro>
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+// * Redistributions of source code must retain the above copyright
+//   notice, this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright
+//   notice, this list of conditions and the following disclaimer in the
+//   documentation and/or other materials provided with the distribution.
+// * Neither the name of this software nor the names of its contributors may be
+//   used to endorse or promote products derived from this software without
+//   specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
+// ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+var sprintf = function() {
+		if (!sprintf.cache.hasOwnProperty(arguments[0])) {
+			sprintf.cache[arguments[0]] = sprintf.parse(arguments[0]);
+		}
+		return sprintf.format.call(null, sprintf.cache[arguments[0]], arguments);
+	};
+
+sprintf.format = function(parse_tree, argv) {
+		var cursor = 1, tree_length = parse_tree.length, node_type = '', arg, output = [], i, k, match, pad, pad_character, pad_length;
+		for (i = 0; i < tree_length; i++) {
+			node_type = get_type(parse_tree[i]);
+			if (node_type === 'string') {
+				output.push(parse_tree[i]);
+			}
+			else if (node_type === 'array') {
+				match = parse_tree[i]; // convenience purposes only
+				if (match[2]) { // keyword argument
+					arg = argv[cursor];
+					for (k = 0; k < match[2].length; k++) {
+						if (!arg.hasOwnProperty(match[2][k])) {
+							throw(vsprintf('[sprintf] property "%s" does not exist', [match[2][k]]));
+						}
+						arg = arg[match[2][k]];
+					}
+				}
+				else if (match[1]) { // positional argument (explicit)
+					arg = argv[match[1]];
+				}
+				else { // positional argument (implicit)
+					arg = argv[cursor++];
+				}
+
+				if (/[^s]/.test(match[8]) && (get_type(arg) != 'number')) {
+					throw(vsprintf('[sprintf] expecting number but found %s', [get_type(arg)]));
+				}
+				switch (match[8]) {
+					case 'b': arg = arg.toString(2); break;
+					case 'c': arg = String.fromCharCode(arg); break;
+					case 'd': arg = parseInt(arg, 10); break;
+					case 'e': arg = match[7] ? arg.toExponential(match[7]) : arg.toExponential(); break;
+					case 'f': arg = match[7] ? parseFloat(arg).toFixed(match[7]) : parseFloat(arg); break;
+					case 'o': arg = arg.toString(8); break;
+					case 's': arg = ((arg = String(arg)) && match[7] ? arg.substring(0, match[7]) : arg); break;
+					case 'u': arg = arg >>> 0; break;
+					case 'x': arg = arg.toString(16); break;
+					case 'X': arg = arg.toString(16).toUpperCase(); break;
+				}
+				arg = (/[def]/.test(match[8]) && match[3] && arg >= 0 ? '+'+ arg : arg);
+				pad_character = match[4] ? match[4] == '0' ? '0' : match[4].charAt(1) : ' ';
+				pad_length = match[6] - String(arg).length;
+				pad = match[6] ? str_repeat(pad_character, pad_length) : '';
+				output.push(match[5] ? arg + pad : pad + arg);
+			}
+		}
+		return output.join('');
+	};
+
+sprintf.cache = {};
+
+sprintf.parse = function(fmt) {
+		var _fmt = fmt, match = [], parse_tree = [], arg_names = 0;
+		while (_fmt) {
+			if ((match = /^[^\x25]+/.exec(_fmt)) !== null) {
+				parse_tree.push(match[0]);
+			}
+			else if ((match = /^\x25{2}/.exec(_fmt)) !== null) {
+				parse_tree.push('%');
+			}
+			else if ((match = /^\x25(?:([1-9]\d*)\$|\(([^\)]+)\))?(\+)?(0|'[^$])?(-)?(\d+)?(?:\.(\d+))?([b-fosuxX])/.exec(_fmt)) !== null) {
+				if (match[2]) {
+					arg_names |= 1;
+					var field_list = [], replacement_field = match[2], field_match = [];
+					if ((field_match = /^([a-z_][a-z_\d]*)/i.exec(replacement_field)) !== null) {
+						field_list.push(field_match[1]);
+						while ((replacement_field = replacement_field.substring(field_match[0].length)) !== '') {
+							if ((field_match = /^\.([a-z_][a-z_\d]*)/i.exec(replacement_field)) !== null) {
+								field_list.push(field_match[1]);
+							}
+							else if ((field_match = /^\[(\d+)\]/.exec(replacement_field)) !== null) {
+								field_list.push(field_match[1]);
+							}
+							else {
+								throw('[sprintf] huh?');
+							}
+						}
+					}
+					else {
+						throw('[sprintf] huh?');
+					}
+					match[2] = field_list[0]; //Fix for closure compiler
+				}
+				else {
+					arg_names |= 2;
+				}
+				if (arg_names === 3) {
+					throw('[sprintf] mixing positional and named placeholders is not (yet) supported');
+				}
+				parse_tree.push(match);
+			}
+			else {
+				throw('[sprintf] huh?');
+			}
+			_fmt = _fmt.substring(match[0].length);
+		}
+		return parse_tree;
+	};
+
+var vsprintf = function(fmt, argv) {
+		var _argv = argv.slice(0);
+		_argv.splice(0, 0, fmt);
+		return sprintf.apply(null, _argv);
+	};
+
+function get_type(variable) {
+		return Object.prototype.toString.call(variable).slice(8, -1).toLowerCase();
+	}
+
+function str_repeat(input, multiplier) {
+		for (var output = []; multiplier > 0; output[--multiplier] = input) {/* do nothing */}
+		return output.join('');
+	}
 /**
  * @constructor
  * @param {Array.<Object>|Object} L
@@ -14585,106 +15436,6 @@ Sk.ffi.checkArgs = function(name, args, count)
 };
 goog.exportSymbol("Sk.ffi.checkArgs", Sk.ffi.checkArgs);
 /**
- * @fileoverview
- * @suppress {undefinedVars|missingProperties}
- */
-Sk.canvas = {};
-
-// --------------------------------------------------------------
-Sk.canvas.show = function(canvas)
-{
-  if (!window.canvasModal)
-  {
-    // Create the modal dialog for the first time if needed.
-    var outer = $('<div>')
-        .addClass('modal hide')
-        .attr('id', 'Sk-canvasModal')
-        .css('width', 'auto');
-
-    var header = $('<div>')
-        .addClass('modal-header')
-        .append(
-            '<button type="button" class="close" data-dismiss="modal"'
-            + ' aria-hidden="true">&times;</button>'
-            + '<h3><i class="icon-reorder"></i>&nbsp;Picture</h3>')
-        .css('cursor', 'move');
-
-    var body = $('<div>').addClass('modal-body');
-    var footer = $('<div>').addClass('modal-footer');
-
-    outer.append(header);
-    outer.append(body);
-    outer.append(footer);
-    $('body').append(outer);
-
-    window.canvasModal = outer;
-    outer.modal({ backdrop: false, keyboard: true });
-    outer.draggable({ handle: '.modal-header' });
-  }
-
-  $('.modal-body', window.canvasModal)
-    .empty()
-    .append(canvas);
-
-  $('.modal-footer', window.canvasModal)
-    .empty()
-    .append(
-      '<form class="form-inline pull-left">' +
-      '<label for="canvas-x">X:</label>' +
-      '<input type="number" id="canvas-x" class="input-mini"/>' +
-      '<label for="canvas-y">Y:</label>' +
-      '<input type="number" id="canvas-y" class="input-mini"/>' +
-      '</form>')
-    .append(
-      '<table class="pull-right"><tbody><tr>' +
-      '<td class="canvas-color-label">R:</td><td id="canvas-red"></td>' +
-      '<td class="canvas-color-label">G:</td><td id="canvas-green"></td>' +
-      '<td class="canvas-color-label">B:</td><td id="canvas-blue"></td>' +
-      '<td id="canvas-color-swatch"></td>' +
-      '</tr></tbody></table>');
-
-  Sk.canvas._addMouseEvents(canvas, window.canvasModal);
-
-  window.canvasModal.css('marginLeft', '-' + (canvas.width + 30) / 2 + 'px');
-  window.canvasModal.modal('show');
-};
-
-
-// --------------------------------------------------------------
-Sk.canvas.hide = function()
-{
-  window.canvasModal.modal('hide');
-};
-
-
-// --------------------------------------------------------------
-Sk.canvas._addMouseEvents = function(canvas, modal)
-{
-  $(canvas).mousemove(function(e) {
-    var x = e.offsetX;
-    var y = e.offsetY;
-
-    $('#canvas-x', modal).val(x);
-    $('#canvas-y', modal).val(y);
-
-    var ctx = canvas.getContext('2d');
-    var colordata = ctx.getImageData(x, y, 1, 1).data;
-    var r = colordata[0];
-    var g = colordata[1];
-    var b = colordata[2];
-
-    var rgb = 'rgb(' + r + ', ' + g + ', ' + b + ')';
-    $('#canvas-red', modal).text(r);
-    $('#canvas-green', modal).text(g);
-    $('#canvas-blue', modal).text(b);
-    $('#canvas-color-swatch', modal).css('background-color', rgb);
-  });
-};
-
-
-goog.exportSymbol("Sk.canvas.show", Sk.canvas.show);
-goog.exportSymbol("Sk.canvas.hide", Sk.canvas.hide);
-/**
  * @constructor
  * @param {Object} iterable
  * @param {number=} start
@@ -15354,33 +16105,32 @@ sym:
  parameters: 312,
  pass_stmt: 313,
  power: 314,
- print_stmt: 315,
- raise_stmt: 316,
- return_stmt: 317,
- shift_expr: 318,
- simple_stmt: 319,
+ raise_stmt: 315,
+ return_stmt: 316,
+ shift_expr: 317,
+ simple_stmt: 318,
  single_input: 256,
- sliceop: 320,
- small_stmt: 321,
- stmt: 322,
- subscript: 323,
- subscriptlist: 324,
- suite: 325,
- term: 326,
- test: 327,
- testlist: 328,
- testlist1: 329,
- testlist_gexp: 330,
- testlist_safe: 331,
- trailer: 332,
- try_stmt: 333,
- varargslist: 334,
- while_stmt: 335,
- with_stmt: 336,
- with_var: 337,
- xor_expr: 338,
- yield_expr: 339,
- yield_stmt: 340},
+ sliceop: 319,
+ small_stmt: 320,
+ stmt: 321,
+ subscript: 322,
+ subscriptlist: 323,
+ suite: 324,
+ term: 325,
+ test: 326,
+ testlist: 327,
+ testlist1: 328,
+ testlist_gexp: 329,
+ testlist_safe: 330,
+ trailer: 331,
+ try_stmt: 332,
+ varargslist: 333,
+ while_stmt: 334,
+ with_stmt: 335,
+ with_var: 336,
+ xor_expr: 337,
+ yield_expr: 338,
+ yield_stmt: 339},
 number2symbol:
 {256: 'single_input',
  257: 'and_expr',
@@ -15441,32 +16191,31 @@ number2symbol:
  312: 'parameters',
  313: 'pass_stmt',
  314: 'power',
- 315: 'print_stmt',
- 316: 'raise_stmt',
- 317: 'return_stmt',
- 318: 'shift_expr',
- 319: 'simple_stmt',
- 320: 'sliceop',
- 321: 'small_stmt',
- 322: 'stmt',
- 323: 'subscript',
- 324: 'subscriptlist',
- 325: 'suite',
- 326: 'term',
- 327: 'test',
- 328: 'testlist',
- 329: 'testlist1',
- 330: 'testlist_gexp',
- 331: 'testlist_safe',
- 332: 'trailer',
- 333: 'try_stmt',
- 334: 'varargslist',
- 335: 'while_stmt',
- 336: 'with_stmt',
- 337: 'with_var',
- 338: 'xor_expr',
- 339: 'yield_expr',
- 340: 'yield_stmt'},
+ 315: 'raise_stmt',
+ 316: 'return_stmt',
+ 317: 'shift_expr',
+ 318: 'simple_stmt',
+ 319: 'sliceop',
+ 320: 'small_stmt',
+ 321: 'stmt',
+ 322: 'subscript',
+ 323: 'subscriptlist',
+ 324: 'suite',
+ 325: 'term',
+ 326: 'test',
+ 327: 'testlist',
+ 328: 'testlist1',
+ 329: 'testlist_gexp',
+ 330: 'testlist_safe',
+ 331: 'trailer',
+ 332: 'try_stmt',
+ 333: 'varargslist',
+ 334: 'while_stmt',
+ 335: 'with_stmt',
+ 336: 'with_var',
+ 337: 'xor_expr',
+ 338: 'yield_expr',
+ 339: 'yield_stmt'},
 dfas:
 {256: [[[[1, 1], [2, 1], [3, 2]], [[0, 1]], [[2, 1]]],
        {2: 1,
@@ -15501,74 +16250,74 @@ dfas:
         32: 1,
         33: 1,
         34: 1,
-        35: 1,
-        36: 1}],
- 257: [[[[37, 1]], [[38, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 258: [[[[39, 1]], [[40, 0], [0, 1]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
         35: 1}],
- 259: [[[[41, 1], [42, 2], [43, 3]],
-        [[44, 4]],
-        [[45, 5], [0, 2]],
-        [[44, 6]],
-        [[45, 7], [0, 4]],
-        [[41, 1], [42, 2], [43, 3], [0, 5]],
+ 257: [[[[36, 1]], [[37, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 258: [[[[38, 1]], [[39, 0], [0, 1]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1}],
+ 259: [[[[40, 1], [41, 2], [42, 3]],
+        [[43, 4]],
+        [[44, 5], [0, 2]],
+        [[43, 6]],
+        [[44, 7], [0, 4]],
+        [[40, 1], [41, 2], [42, 3], [0, 5]],
         [[0, 6]],
-        [[42, 4], [43, 3]]],
+        [[41, 4], [42, 3]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1,
-        36: 1,
-        41: 1,
-        43: 1}],
- 260: [[[[44, 1]], [[46, 2], [47, 3], [0, 1]], [[0, 2]], [[44, 2]]],
+        40: 1,
+        42: 1}],
+ 260: [[[[43, 1]], [[45, 2], [46, 3], [0, 1]], [[0, 2]], [[43, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 261: [[[[48, 1]], [[24, 0], [35, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 262: [[[[19, 1]], [[44, 2]], [[45, 3], [0, 2]], [[44, 4]], [[0, 4]]],
-       {19: 1}],
- 263: [[[[17, 1], [8, 2], [9, 5], [28, 4], [11, 3], [13, 6], [20, 2]],
-        [[17, 1], [0, 1]],
-        [[0, 2]],
-        [[49, 7], [50, 2]],
-        [[51, 2], [52, 8], [53, 8]],
-        [[54, 9], [55, 2]],
-        [[56, 10]],
-        [[50, 2]],
-        [[51, 2]],
-        [[55, 2]],
-        [[13, 2]]],
-       {8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 28: 1}],
- 264: [[[[57, 1],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 261: [[[[47, 1]], [[23, 0], [34, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 262: [[[[18, 1]], [[43, 2]], [[44, 3], [0, 2]], [[43, 4]], [[0, 4]]],
+       {18: 1}],
+ 263: [[[[19, 1], [8, 1], [9, 4], [27, 3], [11, 2], [12, 5], [16, 6]],
+        [[0, 1]],
+        [[48, 7], [49, 1]],
+        [[50, 1], [51, 8], [52, 8]],
+        [[53, 9], [54, 1]],
+        [[55, 10]],
+        [[16, 6], [0, 6]],
+        [[49, 1]],
+        [[50, 1]],
+        [[54, 1]],
+        [[12, 1]]],
+       {8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 27: 1}],
+ 264: [[[[56, 1],
+         [57, 1],
          [58, 1],
          [59, 1],
          [60, 1],
@@ -15578,10 +16327,10 @@ dfas:
          [64, 1],
          [65, 1],
          [66, 1],
-         [67, 1],
-         [68, 1]],
+         [67, 1]],
         [[0, 1]]],
-       {57: 1,
+       {56: 1,
+        57: 1,
         58: 1,
         59: 1,
         60: 1,
@@ -15591,129 +16340,128 @@ dfas:
         64: 1,
         65: 1,
         66: 1,
-        67: 1,
-        68: 1}],
- 265: [[[[31, 1]], [[0, 1]]], {31: 1}],
+        67: 1}],
+ 265: [[[[30, 1]], [[0, 1]]], {30: 1}],
  266: [[[[10, 1]],
-        [[20, 2]],
-        [[69, 3], [28, 4]],
-        [[70, 5]],
-        [[51, 6], [71, 7]],
+        [[19, 2]],
+        [[68, 3], [27, 4]],
+        [[69, 5]],
+        [[50, 6], [70, 7]],
         [[0, 5]],
-        [[69, 3]],
-        [[51, 6]]],
+        [[68, 3]],
+        [[50, 6]]],
        {10: 1}],
- 267: [[[[72, 1],
-         [73, 1],
-         [7, 2],
-         [74, 1],
+ 267: [[[[71, 1],
          [72, 1],
+         [7, 2],
+         [73, 1],
+         [71, 1],
+         [74, 1],
          [75, 1],
-         [76, 1],
-         [77, 3],
-         [78, 1],
-         [79, 1]],
+         [76, 3],
+         [77, 1],
+         [78, 1]],
         [[0, 1]],
-        [[75, 1]],
+        [[74, 1]],
         [[7, 1], [0, 3]]],
-       {7: 1, 72: 1, 73: 1, 74: 1, 75: 1, 76: 1, 77: 1, 78: 1, 79: 1}],
- 268: [[[[80, 1]], [[81, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 269: [[[[82, 1],
+       {7: 1, 71: 1, 72: 1, 73: 1, 74: 1, 75: 1, 76: 1, 77: 1, 78: 1}],
+ 268: [[[[79, 1]], [[80, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 269: [[[[81, 1],
+         [82, 1],
          [83, 1],
          [84, 1],
          [85, 1],
          [86, 1],
          [87, 1],
-         [88, 1],
-         [89, 1]],
+         [88, 1]],
         [[0, 1]]],
-       {4: 1, 10: 1, 14: 1, 16: 1, 27: 1, 30: 1, 33: 1, 34: 1}],
- 270: [[[[32, 1]], [[0, 1]]], {32: 1}],
- 271: [[[[90, 1]], [[88, 2], [85, 2]], [[0, 2]]], {33: 1}],
- 272: [[[[33, 1]],
-        [[91, 2]],
-        [[28, 4], [2, 3]],
-        [[0, 3]],
-        [[51, 5], [92, 6]],
-        [[2, 3]],
-        [[51, 5]]],
-       {33: 1}],
- 273: [[[[93, 1]], [[93, 1], [0, 1]]], {33: 1}],
- 274: [[[[21, 1]], [[94, 2]], [[0, 2]]], {21: 1}],
- 275: [[[[44, 1]],
-        [[69, 2]],
-        [[44, 3]],
-        [[45, 4], [0, 3]],
-        [[44, 1], [0, 4]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 276: [[[[91, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]], {20: 1}],
- 277: [[[[96, 1]], [[45, 0], [0, 1]]], {20: 1}],
- 278: [[[[20, 1]], [[97, 0], [0, 1]]], {20: 1}],
- 279: [[[[20, 1]], [[0, 1]]], {20: 1}],
- 280: [[[[71, 1]], [[2, 1], [98, 2]], [[0, 2]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 281: [[[[99, 1]],
-        [[44, 2], [0, 1]],
-        [[95, 3], [45, 3], [0, 2]],
-        [[44, 4]],
-        [[0, 4]]],
-       {99: 1}],
- 282: [[[[15, 1]],
-        [[80, 2]],
-        [[75, 3], [0, 2]],
-        [[44, 4]],
-        [[45, 5], [0, 4]],
-        [[44, 6]],
-        [[0, 6]]],
-       {15: 1}],
- 283: [[[[100, 1]], [[101, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 284: [[[[71, 1]],
-        [[102, 2], [47, 3], [0, 1]],
-        [[71, 4], [53, 4]],
-        [[71, 5], [53, 5]],
+       {4: 1, 10: 1, 13: 1, 15: 1, 26: 1, 29: 1, 32: 1, 33: 1}],
+ 270: [[[[31, 1]], [[0, 1]]], {31: 1}],
+ 271: [[[[89, 1]], [[87, 2], [84, 2]], [[0, 2]]], {32: 1}],
+ 272: [[[[32, 1]],
+        [[90, 2]],
+        [[2, 4], [27, 3]],
+        [[50, 5], [91, 6]],
         [[0, 4]],
-        [[47, 3], [0, 5]]],
+        [[2, 4]],
+        [[50, 5]]],
+       {32: 1}],
+ 273: [[[[92, 1]], [[92, 1], [0, 1]]], {32: 1}],
+ 274: [[[[20, 1]], [[93, 2]], [[0, 2]]], {20: 1}],
+ 275: [[[[43, 1]],
+        [[68, 2]],
+        [[43, 3]],
+        [[44, 4], [0, 3]],
+        [[43, 1], [0, 4]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 285: [[[[80, 1]], [[45, 2], [0, 1]], [[80, 1], [0, 2]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 286: [[[[103, 2], [24, 1], [6, 1], [35, 1]], [[104, 2]], [[0, 2]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 287: [[[[2, 0], [98, 1], [105, 0]], [[0, 1]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 276: [[[[90, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]], {19: 1}],
+ 277: [[[[95, 1]], [[44, 0], [0, 1]]], {19: 1}],
+ 278: [[[[19, 1]], [[96, 0], [0, 1]]], {19: 1}],
+ 279: [[[[19, 1]], [[0, 1]]], {19: 1}],
+ 280: [[[[70, 1]], [[2, 1], [97, 2]], [[0, 2]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 281: [[[[98, 1]],
+        [[43, 2], [0, 1]],
+        [[94, 3], [44, 3], [0, 2]],
+        [[43, 4]],
+        [[0, 4]]],
+       {98: 1}],
+ 282: [[[[14, 1]],
+        [[79, 2]],
+        [[74, 3], [0, 2]],
+        [[43, 4]],
+        [[44, 5], [0, 4]],
+        [[43, 6]],
+        [[0, 6]]],
+       {14: 1}],
+ 283: [[[[99, 1]], [[100, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 284: [[[[70, 1]],
+        [[101, 2], [46, 3], [0, 1]],
+        [[70, 4], [52, 4]],
+        [[70, 5], [52, 5]],
+        [[0, 4]],
+        [[46, 3], [0, 5]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 285: [[[[79, 1]], [[44, 2], [0, 1]], [[79, 1], [0, 2]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 286: [[[[102, 2], [23, 1], [6, 1], [34, 1]], [[103, 2]], [[0, 2]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 287: [[[[2, 0], [97, 1], [104, 0]], [[0, 1]]],
        {2: 1,
         4: 1,
         5: 1,
@@ -15747,150 +16495,139 @@ dfas:
         33: 1,
         34: 1,
         35: 1,
-        36: 1,
-        98: 1}],
- 288: [[[[106, 1], [107, 1], [108, 1], [109, 1], [110, 1]], [[0, 1]]],
-       {5: 1, 18: 1, 25: 1, 31: 1, 32: 1}],
- 289: [[[[27, 1]],
-        [[94, 2]],
-        [[75, 3]],
-        [[71, 4]],
-        [[69, 5]],
-        [[70, 6]],
-        [[111, 7], [0, 6]],
-        [[69, 8]],
-        [[70, 9]],
-        [[0, 9]]],
-       {27: 1}],
- 290: [[[[28, 1], [20, 2]], [[112, 3]], [[0, 2]], [[51, 2]]], {20: 1, 28: 1}],
- 291: [[[[113, 1]], [[45, 2], [0, 1]], [[113, 1], [0, 2]]], {20: 1, 28: 1}],
- 292: [[[[4, 1]], [[20, 2]], [[114, 3]], [[69, 4]], [[70, 5]], [[0, 5]]],
-       {4: 1}],
- 293: [[[[27, 1]],
-        [[94, 2]],
-        [[75, 3]],
-        [[115, 4]],
-        [[116, 5], [0, 4]],
-        [[0, 5]]],
-       {27: 1}],
- 294: [[[[30, 1]], [[117, 2]], [[116, 3], [0, 2]], [[0, 3]]], {30: 1}],
- 295: [[[[46, 1], [118, 1]], [[0, 1]]], {27: 1, 30: 1}],
- 296: [[[[26, 1]], [[20, 2]], [[45, 1], [0, 2]]], {26: 1}],
- 297: [[[[30, 1]],
-        [[44, 2]],
-        [[69, 3]],
+        97: 1}],
+ 288: [[[[105, 1], [106, 1], [107, 1], [108, 1], [109, 1]], [[0, 1]]],
+       {5: 1, 17: 1, 24: 1, 30: 1, 31: 1}],
+ 289: [[[[26, 1]],
+        [[93, 2]],
+        [[74, 3]],
         [[70, 4]],
-        [[111, 5], [119, 1], [0, 4]],
+        [[68, 5]],
         [[69, 6]],
-        [[70, 7]],
-        [[0, 7]]],
-       {30: 1}],
- 298: [[[[20, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]], {20: 1}],
- 299: [[[[120, 1]], [[45, 2], [0, 1]], [[120, 1], [0, 2]]], {20: 1}],
- 300: [[[[29, 1]],
-        [[91, 2], [97, 3]],
-        [[23, 4]],
-        [[91, 2], [23, 4], [97, 3]],
-        [[121, 5], [41, 5], [28, 6]],
-        [[0, 5]],
-        [[121, 7]],
-        [[51, 5]]],
-       {29: 1}],
- 301: [[[[23, 1]], [[122, 2]], [[0, 2]]], {23: 1}],
- 302: [[[[123, 1], [124, 1]], [[0, 1]]], {23: 1, 29: 1}],
- 303: [[[[36, 1]], [[69, 2], [125, 3]], [[44, 4]], [[69, 2]], [[0, 4]]],
-       {36: 1}],
- 304: [[[[27, 1]],
-        [[94, 2]],
-        [[75, 3]],
-        [[126, 4]],
-        [[127, 5], [0, 4]],
+        [[110, 7], [0, 6]],
+        [[68, 8]],
+        [[69, 9]],
+        [[0, 9]]],
+       {26: 1}],
+ 290: [[[[27, 1], [19, 2]], [[111, 3]], [[0, 2]], [[50, 2]]], {19: 1, 27: 1}],
+ 291: [[[[112, 1]], [[44, 2], [0, 1]], [[112, 1], [0, 2]]], {19: 1, 27: 1}],
+ 292: [[[[4, 1]], [[19, 2]], [[113, 3]], [[68, 4]], [[69, 5]], [[0, 5]]],
+       {4: 1}],
+ 293: [[[[26, 1]],
+        [[93, 2]],
+        [[74, 3]],
+        [[114, 4]],
+        [[115, 5], [0, 4]],
         [[0, 5]]],
-       {27: 1}],
- 305: [[[[30, 1]], [[117, 2]], [[127, 3], [0, 2]], [[0, 3]]], {30: 1}],
- 306: [[[[128, 1], [129, 1]], [[0, 1]]], {27: 1, 30: 1}],
- 307: [[[[44, 1]],
-        [[128, 2], [45, 3], [0, 1]],
+       {26: 1}],
+ 294: [[[[29, 1]], [[116, 2]], [[115, 3], [0, 2]], [[0, 3]]], {29: 1}],
+ 295: [[[[45, 1], [117, 1]], [[0, 1]]], {26: 1, 29: 1}],
+ 296: [[[[25, 1]], [[19, 2]], [[44, 1], [0, 2]]], {25: 1}],
+ 297: [[[[29, 1]],
+        [[43, 2]],
+        [[68, 3]],
+        [[69, 4]],
+        [[110, 5], [118, 1], [0, 4]],
+        [[68, 6]],
+        [[69, 7]],
+        [[0, 7]]],
+       {29: 1}],
+ 298: [[[[19, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]], {19: 1}],
+ 299: [[[[119, 1]], [[44, 2], [0, 1]], [[119, 1], [0, 2]]], {19: 1}],
+ 300: [[[[28, 1]],
+        [[90, 2], [96, 3]],
+        [[22, 4]],
+        [[90, 2], [22, 4], [96, 3]],
+        [[120, 5], [40, 5], [27, 6]],
+        [[0, 5]],
+        [[120, 7]],
+        [[50, 5]]],
+       {28: 1}],
+ 301: [[[[22, 1]], [[121, 2]], [[0, 2]]], {22: 1}],
+ 302: [[[[122, 1], [123, 1]], [[0, 1]]], {22: 1, 28: 1}],
+ 303: [[[[35, 1]], [[68, 2], [124, 3]], [[43, 4]], [[68, 2]], [[0, 4]]],
+       {35: 1}],
+ 304: [[[[26, 1]],
+        [[93, 2]],
+        [[74, 3]],
+        [[125, 4]],
+        [[126, 5], [0, 4]],
+        [[0, 5]]],
+       {26: 1}],
+ 305: [[[[29, 1]], [[116, 2]], [[126, 3], [0, 2]], [[0, 3]]], {29: 1}],
+ 306: [[[[127, 1], [128, 1]], [[0, 1]]], {26: 1, 29: 1}],
+ 307: [[[[43, 1]],
+        [[127, 2], [44, 3], [0, 1]],
         [[0, 2]],
-        [[44, 4], [0, 3]],
-        [[45, 3], [0, 4]]],
+        [[43, 4], [0, 3]],
+        [[44, 3], [0, 4]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 308: [[[[7, 1], [130, 2]], [[39, 2]], [[0, 2]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1}],
- 309: [[[[36, 1]], [[69, 2], [125, 3]], [[117, 4]], [[69, 2]], [[0, 4]]],
-       {36: 1}],
- 310: [[[[131, 1], [115, 1]], [[0, 1]]],
+ 308: [[[[7, 1], [129, 2]], [[38, 2]], [[0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 311: [[[[132, 1]], [[133, 0], [0, 1]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1}],
+ 309: [[[[35, 1]], [[68, 2], [124, 3]], [[116, 4]], [[68, 2]], [[0, 4]]],
+       {35: 1}],
+ 310: [[[[130, 1], [114, 1]], [[0, 1]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1}],
- 312: [[[[28, 1]], [[51, 2], [125, 3]], [[0, 2]], [[51, 2]]], {28: 1}],
- 313: [[[[22, 1]], [[0, 1]]], {22: 1}],
- 314: [[[[134, 1]], [[135, 1], [43, 2], [0, 1]], [[104, 3]], [[0, 3]]],
-       {8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 28: 1}],
- 315: [[[[12, 1]],
-        [[44, 2], [136, 3], [0, 1]],
-        [[45, 4], [0, 2]],
-        [[44, 5]],
-        [[44, 2], [0, 4]],
-        [[45, 6], [0, 5]],
-        [[44, 7]],
-        [[45, 8], [0, 7]],
-        [[44, 7], [0, 8]]],
-       {12: 1}],
- 316: [[[[5, 1]],
-        [[44, 2], [0, 1]],
-        [[45, 3], [0, 2]],
-        [[44, 4]],
-        [[45, 5], [0, 4]],
-        [[44, 6]],
+ 311: [[[[131, 1]], [[132, 0], [0, 1]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1}],
+ 312: [[[[27, 1]], [[50, 2], [124, 3]], [[0, 2]], [[50, 2]]], {27: 1}],
+ 313: [[[[21, 1]], [[0, 1]]], {21: 1}],
+ 314: [[[[133, 1]], [[134, 1], [42, 2], [0, 1]], [[103, 3]], [[0, 3]]],
+       {8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 27: 1}],
+ 315: [[[[5, 1]],
+        [[43, 2], [0, 1]],
+        [[44, 3], [0, 2]],
+        [[43, 4]],
+        [[44, 5], [0, 4]],
+        [[43, 6]],
         [[0, 6]]],
        {5: 1}],
- 317: [[[[18, 1]], [[71, 2], [0, 1]], [[0, 2]]], {18: 1}],
- 318: [[[[137, 1]], [[136, 0], [138, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 319: [[[[139, 1]], [[2, 2], [140, 3]], [[0, 2]], [[139, 1], [2, 2]]],
+ 316: [[[[17, 1]], [[70, 2], [0, 1]], [[0, 2]]], {17: 1}],
+ 317: [[[[135, 1]], [[136, 0], [137, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 318: [[[[138, 1]], [[2, 2], [139, 3]], [[0, 2]], [[138, 1], [2, 2]]],
        {5: 1,
         6: 1,
         7: 1,
@@ -15898,8 +16635,8 @@ dfas:
         9: 1,
         11: 1,
         12: 1,
-        13: 1,
-        15: 1,
+        14: 1,
+        16: 1,
         17: 1,
         18: 1,
         19: 1,
@@ -15909,23 +16646,21 @@ dfas:
         23: 1,
         24: 1,
         25: 1,
-        26: 1,
+        27: 1,
         28: 1,
-        29: 1,
+        30: 1,
         31: 1,
-        32: 1,
-        35: 1,
-        36: 1}],
- 320: [[[[69, 1]], [[44, 2], [0, 1]], [[0, 2]]], {69: 1}],
- 321: [[[[141, 1],
+        34: 1,
+        35: 1}],
+ 319: [[[[68, 1]], [[43, 2], [0, 1]], [[0, 2]]], {68: 1}],
+ 320: [[[[140, 1],
+         [141, 1],
          [142, 1],
          [143, 1],
          [144, 1],
          [145, 1],
          [146, 1],
-         [147, 1],
-         [148, 1],
-         [149, 1]],
+         [147, 1]],
         [[0, 1]]],
        {5: 1,
         6: 1,
@@ -15934,8 +16669,8 @@ dfas:
         9: 1,
         11: 1,
         12: 1,
-        13: 1,
-        15: 1,
+        14: 1,
+        16: 1,
         17: 1,
         18: 1,
         19: 1,
@@ -15945,14 +16680,13 @@ dfas:
         23: 1,
         24: 1,
         25: 1,
-        26: 1,
+        27: 1,
         28: 1,
-        29: 1,
+        30: 1,
         31: 1,
-        32: 1,
-        35: 1,
-        36: 1}],
- 322: [[[[1, 1], [3, 1]], [[0, 1]]],
+        34: 1,
+        35: 1}],
+ 321: [[[[1, 1], [3, 1]], [[0, 1]]],
        {4: 1,
         5: 1,
         6: 1,
@@ -15984,49 +16718,48 @@ dfas:
         32: 1,
         33: 1,
         34: 1,
-        35: 1,
-        36: 1}],
- 323: [[[[44, 1], [69, 2], [97, 3]],
-        [[69, 2], [0, 1]],
-        [[44, 4], [150, 5], [0, 2]],
-        [[97, 6]],
-        [[150, 5], [0, 4]],
+        35: 1}],
+ 322: [[[[43, 1], [68, 2], [96, 3]],
+        [[68, 2], [0, 1]],
+        [[43, 4], [148, 5], [0, 2]],
+        [[96, 6]],
+        [[148, 5], [0, 4]],
         [[0, 5]],
-        [[97, 5]]],
+        [[96, 5]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1,
-        36: 1,
-        69: 1,
-        97: 1}],
- 324: [[[[151, 1]], [[45, 2], [0, 1]], [[151, 1], [0, 2]]],
+        68: 1,
+        96: 1}],
+ 323: [[[[149, 1]], [[44, 2], [0, 1]], [[149, 1], [0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1,
-        36: 1,
-        69: 1,
-        97: 1}],
- 325: [[[[1, 1], [2, 2]],
+        68: 1,
+        96: 1}],
+ 324: [[[[1, 1], [2, 2]],
         [[0, 1]],
-        [[152, 3]],
-        [[105, 4]],
-        [[153, 1], [105, 4]]],
+        [[150, 3]],
+        [[104, 4]],
+        [[151, 1], [104, 4]]],
        {2: 1,
         5: 1,
         6: 1,
@@ -16035,8 +16768,8 @@ dfas:
         9: 1,
         11: 1,
         12: 1,
-        13: 1,
-        15: 1,
+        14: 1,
+        16: 1,
         17: 1,
         18: 1,
         19: 1,
@@ -16046,174 +16779,174 @@ dfas:
         23: 1,
         24: 1,
         25: 1,
-        26: 1,
+        27: 1,
         28: 1,
-        29: 1,
+        30: 1,
         31: 1,
-        32: 1,
-        35: 1,
-        36: 1}],
- 326: [[[[104, 1]], [[154, 0], [41, 0], [155, 0], [156, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 327: [[[[115, 1], [157, 2]],
-        [[30, 3], [0, 1]],
+        34: 1,
+        35: 1}],
+ 325: [[[[103, 1]], [[152, 0], [40, 0], [153, 0], [154, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 326: [[[[114, 1], [155, 2]],
+        [[29, 3], [0, 1]],
         [[0, 2]],
-        [[115, 4]],
-        [[111, 5]],
-        [[44, 2]]],
+        [[114, 4]],
+        [[110, 5]],
+        [[43, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 328: [[[[44, 1]], [[45, 2], [0, 1]], [[44, 1], [0, 2]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 327: [[[[43, 1]], [[44, 2], [0, 1]], [[43, 1], [0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 329: [[[[44, 1]], [[45, 0], [0, 1]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 328: [[[[43, 1]], [[44, 0], [0, 1]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 330: [[[[44, 1]],
-        [[46, 2], [45, 3], [0, 1]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 329: [[[[43, 1]],
+        [[45, 2], [44, 3], [0, 1]],
         [[0, 2]],
+        [[43, 4], [0, 3]],
+        [[44, 3], [0, 4]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 330: [[[[116, 1]],
+        [[44, 2], [0, 1]],
+        [[116, 3]],
         [[44, 4], [0, 3]],
-        [[45, 3], [0, 4]]],
+        [[116, 3], [0, 4]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 331: [[[[117, 1]],
-        [[45, 2], [0, 1]],
-        [[117, 3]],
-        [[45, 4], [0, 3]],
-        [[117, 3], [0, 4]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 332: [[[[28, 1], [97, 2], [11, 3]],
-        [[51, 4], [92, 5]],
-        [[20, 4]],
-        [[158, 6]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 331: [[[[27, 1], [96, 2], [11, 3]],
+        [[50, 4], [91, 5]],
+        [[19, 4]],
+        [[156, 6]],
         [[0, 4]],
-        [[51, 4]],
-        [[50, 4]]],
-       {11: 1, 28: 1, 97: 1}],
- 333: [[[[14, 1]],
-        [[69, 2]],
-        [[70, 3]],
-        [[159, 4], [160, 5]],
-        [[69, 6]],
-        [[69, 7]],
-        [[70, 8]],
-        [[70, 9]],
-        [[159, 4], [111, 10], [160, 5], [0, 8]],
+        [[50, 4]],
+        [[49, 4]]],
+       {11: 1, 27: 1, 96: 1}],
+ 332: [[[[13, 1]],
+        [[68, 2]],
+        [[69, 3]],
+        [[157, 4], [158, 5]],
+        [[68, 6]],
+        [[68, 7]],
+        [[69, 8]],
+        [[69, 9]],
+        [[157, 4], [110, 10], [158, 5], [0, 8]],
         [[0, 9]],
-        [[69, 11]],
-        [[70, 12]],
-        [[160, 5], [0, 12]]],
-       {14: 1}],
- 334: [[[[41, 1], [113, 2], [43, 3]],
-        [[20, 4]],
-        [[47, 5], [45, 6], [0, 2]],
-        [[20, 7]],
-        [[45, 8], [0, 4]],
-        [[44, 9]],
-        [[41, 1], [113, 2], [43, 3], [0, 6]],
+        [[68, 11]],
+        [[69, 12]],
+        [[158, 5], [0, 12]]],
+       {13: 1}],
+ 333: [[[[40, 1], [112, 2], [42, 3]],
+        [[19, 4]],
+        [[46, 5], [44, 6], [0, 2]],
+        [[19, 7]],
+        [[44, 8], [0, 4]],
+        [[43, 9]],
+        [[40, 1], [112, 2], [42, 3], [0, 6]],
         [[0, 7]],
-        [[43, 3]],
-        [[45, 6], [0, 9]]],
-       {20: 1, 28: 1, 41: 1, 43: 1}],
- 335: [[[[16, 1]],
-        [[44, 2]],
-        [[69, 3]],
-        [[70, 4]],
-        [[111, 5], [0, 4]],
-        [[69, 6]],
-        [[70, 7]],
+        [[42, 3]],
+        [[44, 6], [0, 9]]],
+       {19: 1, 27: 1, 40: 1, 42: 1}],
+ 334: [[[[15, 1]],
+        [[43, 2]],
+        [[68, 3]],
+        [[69, 4]],
+        [[110, 5], [0, 4]],
+        [[68, 6]],
+        [[69, 7]],
         [[0, 7]]],
-       {16: 1}],
- 336: [[[[34, 1]],
-        [[44, 2]],
-        [[69, 3], [161, 4]],
-        [[70, 5]],
-        [[69, 3]],
+       {15: 1}],
+ 335: [[[[33, 1]],
+        [[43, 2]],
+        [[68, 3], [159, 4]],
+        [[69, 5]],
+        [[68, 3]],
         [[0, 5]]],
-       {34: 1}],
- 337: [[[[95, 1]], [[80, 2]], [[0, 2]]], {95: 1}],
- 338: [[[[162, 1]], [[163, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 339: [[[[25, 1]], [[71, 2], [0, 1]], [[0, 2]]], {25: 1}],
- 340: [[[[53, 1]], [[0, 1]]], {25: 1}]},
+       {33: 1}],
+ 336: [[[[94, 1]], [[79, 2]], [[0, 2]]], {94: 1}],
+ 337: [[[[160, 1]], [[161, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 338: [[[[24, 1]], [[70, 2], [0, 1]], [[0, 2]]], {24: 1}],
+ 339: [[[[52, 1]], [[0, 1]]], {24: 1}]},
 states:
 [[[[1, 1], [2, 1], [3, 2]], [[0, 1]], [[2, 1]]],
- [[[37, 1]], [[38, 0], [0, 1]]],
- [[[39, 1]], [[40, 0], [0, 1]]],
- [[[41, 1], [42, 2], [43, 3]],
-  [[44, 4]],
-  [[45, 5], [0, 2]],
-  [[44, 6]],
-  [[45, 7], [0, 4]],
-  [[41, 1], [42, 2], [43, 3], [0, 5]],
+ [[[36, 1]], [[37, 0], [0, 1]]],
+ [[[38, 1]], [[39, 0], [0, 1]]],
+ [[[40, 1], [41, 2], [42, 3]],
+  [[43, 4]],
+  [[44, 5], [0, 2]],
+  [[43, 6]],
+  [[44, 7], [0, 4]],
+  [[40, 1], [41, 2], [42, 3], [0, 5]],
   [[0, 6]],
-  [[42, 4], [43, 3]]],
- [[[44, 1]], [[46, 2], [47, 3], [0, 1]], [[0, 2]], [[44, 2]]],
- [[[48, 1]], [[24, 0], [35, 0], [0, 1]]],
- [[[19, 1]], [[44, 2]], [[45, 3], [0, 2]], [[44, 4]], [[0, 4]]],
- [[[17, 1], [8, 2], [9, 5], [28, 4], [11, 3], [13, 6], [20, 2]],
-  [[17, 1], [0, 1]],
-  [[0, 2]],
-  [[49, 7], [50, 2]],
-  [[51, 2], [52, 8], [53, 8]],
-  [[54, 9], [55, 2]],
-  [[56, 10]],
-  [[50, 2]],
-  [[51, 2]],
-  [[55, 2]],
-  [[13, 2]]],
- [[[57, 1],
+  [[41, 4], [42, 3]]],
+ [[[43, 1]], [[45, 2], [46, 3], [0, 1]], [[0, 2]], [[43, 2]]],
+ [[[47, 1]], [[23, 0], [34, 0], [0, 1]]],
+ [[[18, 1]], [[43, 2]], [[44, 3], [0, 2]], [[43, 4]], [[0, 4]]],
+ [[[19, 1], [8, 1], [9, 4], [27, 3], [11, 2], [12, 5], [16, 6]],
+  [[0, 1]],
+  [[48, 7], [49, 1]],
+  [[50, 1], [51, 8], [52, 8]],
+  [[53, 9], [54, 1]],
+  [[55, 10]],
+  [[16, 6], [0, 6]],
+  [[49, 1]],
+  [[50, 1]],
+  [[54, 1]],
+  [[12, 1]]],
+ [[[56, 1],
+   [57, 1],
    [58, 1],
    [59, 1],
    [60, 1],
@@ -16223,232 +16956,221 @@ states:
    [64, 1],
    [65, 1],
    [66, 1],
-   [67, 1],
-   [68, 1]],
+   [67, 1]],
+  [[0, 1]]],
+ [[[30, 1]], [[0, 1]]],
+ [[[10, 1]],
+  [[19, 2]],
+  [[68, 3], [27, 4]],
+  [[69, 5]],
+  [[50, 6], [70, 7]],
+  [[0, 5]],
+  [[68, 3]],
+  [[50, 6]]],
+ [[[71, 1],
+   [72, 1],
+   [7, 2],
+   [73, 1],
+   [71, 1],
+   [74, 1],
+   [75, 1],
+   [76, 3],
+   [77, 1],
+   [78, 1]],
+  [[0, 1]],
+  [[74, 1]],
+  [[7, 1], [0, 3]]],
+ [[[79, 1]], [[80, 0], [0, 1]]],
+ [[[81, 1], [82, 1], [83, 1], [84, 1], [85, 1], [86, 1], [87, 1], [88, 1]],
   [[0, 1]]],
  [[[31, 1]], [[0, 1]]],
- [[[10, 1]],
-  [[20, 2]],
-  [[69, 3], [28, 4]],
-  [[70, 5]],
-  [[51, 6], [71, 7]],
-  [[0, 5]],
-  [[69, 3]],
-  [[51, 6]]],
- [[[72, 1],
-   [73, 1],
-   [7, 2],
-   [74, 1],
-   [72, 1],
-   [75, 1],
-   [76, 1],
-   [77, 3],
-   [78, 1],
-   [79, 1]],
-  [[0, 1]],
-  [[75, 1]],
-  [[7, 1], [0, 3]]],
- [[[80, 1]], [[81, 0], [0, 1]]],
- [[[82, 1], [83, 1], [84, 1], [85, 1], [86, 1], [87, 1], [88, 1], [89, 1]],
-  [[0, 1]]],
- [[[32, 1]], [[0, 1]]],
- [[[90, 1]], [[88, 2], [85, 2]], [[0, 2]]],
- [[[33, 1]],
-  [[91, 2]],
-  [[28, 4], [2, 3]],
-  [[0, 3]],
-  [[51, 5], [92, 6]],
-  [[2, 3]],
-  [[51, 5]]],
- [[[93, 1]], [[93, 1], [0, 1]]],
- [[[21, 1]], [[94, 2]], [[0, 2]]],
- [[[44, 1]], [[69, 2]], [[44, 3]], [[45, 4], [0, 3]], [[44, 1], [0, 4]]],
- [[[91, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]],
- [[[96, 1]], [[45, 0], [0, 1]]],
- [[[20, 1]], [[97, 0], [0, 1]]],
- [[[20, 1]], [[0, 1]]],
- [[[71, 1]], [[2, 1], [98, 2]], [[0, 2]]],
- [[[99, 1]],
-  [[44, 2], [0, 1]],
-  [[95, 3], [45, 3], [0, 2]],
-  [[44, 4]],
-  [[0, 4]]],
- [[[15, 1]],
-  [[80, 2]],
-  [[75, 3], [0, 2]],
-  [[44, 4]],
-  [[45, 5], [0, 4]],
-  [[44, 6]],
-  [[0, 6]]],
- [[[100, 1]], [[101, 0], [0, 1]]],
- [[[71, 1]],
-  [[102, 2], [47, 3], [0, 1]],
-  [[71, 4], [53, 4]],
-  [[71, 5], [53, 5]],
+ [[[89, 1]], [[87, 2], [84, 2]], [[0, 2]]],
+ [[[32, 1]],
+  [[90, 2]],
+  [[2, 4], [27, 3]],
+  [[50, 5], [91, 6]],
   [[0, 4]],
-  [[47, 3], [0, 5]]],
- [[[80, 1]], [[45, 2], [0, 1]], [[80, 1], [0, 2]]],
- [[[103, 2], [24, 1], [6, 1], [35, 1]], [[104, 2]], [[0, 2]]],
- [[[2, 0], [98, 1], [105, 0]], [[0, 1]]],
- [[[106, 1], [107, 1], [108, 1], [109, 1], [110, 1]], [[0, 1]]],
- [[[27, 1]],
-  [[94, 2]],
-  [[75, 3]],
-  [[71, 4]],
-  [[69, 5]],
-  [[70, 6]],
-  [[111, 7], [0, 6]],
-  [[69, 8]],
-  [[70, 9]],
-  [[0, 9]]],
- [[[28, 1], [20, 2]], [[112, 3]], [[0, 2]], [[51, 2]]],
- [[[113, 1]], [[45, 2], [0, 1]], [[113, 1], [0, 2]]],
- [[[4, 1]], [[20, 2]], [[114, 3]], [[69, 4]], [[70, 5]], [[0, 5]]],
- [[[27, 1]], [[94, 2]], [[75, 3]], [[115, 4]], [[116, 5], [0, 4]], [[0, 5]]],
- [[[30, 1]], [[117, 2]], [[116, 3], [0, 2]], [[0, 3]]],
- [[[46, 1], [118, 1]], [[0, 1]]],
- [[[26, 1]], [[20, 2]], [[45, 1], [0, 2]]],
- [[[30, 1]],
-  [[44, 2]],
-  [[69, 3]],
-  [[70, 4]],
-  [[111, 5], [119, 1], [0, 4]],
-  [[69, 6]],
-  [[70, 7]],
-  [[0, 7]]],
- [[[20, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]],
- [[[120, 1]], [[45, 2], [0, 1]], [[120, 1], [0, 2]]],
- [[[29, 1]],
-  [[91, 2], [97, 3]],
-  [[23, 4]],
-  [[91, 2], [23, 4], [97, 3]],
-  [[121, 5], [41, 5], [28, 6]],
-  [[0, 5]],
-  [[121, 7]],
-  [[51, 5]]],
- [[[23, 1]], [[122, 2]], [[0, 2]]],
- [[[123, 1], [124, 1]], [[0, 1]]],
- [[[36, 1]], [[69, 2], [125, 3]], [[44, 4]], [[69, 2]], [[0, 4]]],
- [[[27, 1]], [[94, 2]], [[75, 3]], [[126, 4]], [[127, 5], [0, 4]], [[0, 5]]],
- [[[30, 1]], [[117, 2]], [[127, 3], [0, 2]], [[0, 3]]],
- [[[128, 1], [129, 1]], [[0, 1]]],
- [[[44, 1]],
-  [[128, 2], [45, 3], [0, 1]],
-  [[0, 2]],
-  [[44, 4], [0, 3]],
-  [[45, 3], [0, 4]]],
- [[[7, 1], [130, 2]], [[39, 2]], [[0, 2]]],
- [[[36, 1]], [[69, 2], [125, 3]], [[117, 4]], [[69, 2]], [[0, 4]]],
- [[[131, 1], [115, 1]], [[0, 1]]],
- [[[132, 1]], [[133, 0], [0, 1]]],
- [[[28, 1]], [[51, 2], [125, 3]], [[0, 2]], [[51, 2]]],
- [[[22, 1]], [[0, 1]]],
- [[[134, 1]], [[135, 1], [43, 2], [0, 1]], [[104, 3]], [[0, 3]]],
- [[[12, 1]],
-  [[44, 2], [136, 3], [0, 1]],
-  [[45, 4], [0, 2]],
-  [[44, 5]],
-  [[44, 2], [0, 4]],
-  [[45, 6], [0, 5]],
-  [[44, 7]],
-  [[45, 8], [0, 7]],
-  [[44, 7], [0, 8]]],
- [[[5, 1]],
-  [[44, 2], [0, 1]],
-  [[45, 3], [0, 2]],
-  [[44, 4]],
-  [[45, 5], [0, 4]],
-  [[44, 6]],
+  [[2, 4]],
+  [[50, 5]]],
+ [[[92, 1]], [[92, 1], [0, 1]]],
+ [[[20, 1]], [[93, 2]], [[0, 2]]],
+ [[[43, 1]], [[68, 2]], [[43, 3]], [[44, 4], [0, 3]], [[43, 1], [0, 4]]],
+ [[[90, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]],
+ [[[95, 1]], [[44, 0], [0, 1]]],
+ [[[19, 1]], [[96, 0], [0, 1]]],
+ [[[19, 1]], [[0, 1]]],
+ [[[70, 1]], [[2, 1], [97, 2]], [[0, 2]]],
+ [[[98, 1]],
+  [[43, 2], [0, 1]],
+  [[94, 3], [44, 3], [0, 2]],
+  [[43, 4]],
+  [[0, 4]]],
+ [[[14, 1]],
+  [[79, 2]],
+  [[74, 3], [0, 2]],
+  [[43, 4]],
+  [[44, 5], [0, 4]],
+  [[43, 6]],
   [[0, 6]]],
- [[[18, 1]], [[71, 2], [0, 1]], [[0, 2]]],
- [[[137, 1]], [[136, 0], [138, 0], [0, 1]]],
- [[[139, 1]], [[2, 2], [140, 3]], [[0, 2]], [[139, 1], [2, 2]]],
- [[[69, 1]], [[44, 2], [0, 1]], [[0, 2]]],
- [[[141, 1],
+ [[[99, 1]], [[100, 0], [0, 1]]],
+ [[[70, 1]],
+  [[101, 2], [46, 3], [0, 1]],
+  [[70, 4], [52, 4]],
+  [[70, 5], [52, 5]],
+  [[0, 4]],
+  [[46, 3], [0, 5]]],
+ [[[79, 1]], [[44, 2], [0, 1]], [[79, 1], [0, 2]]],
+ [[[102, 2], [23, 1], [6, 1], [34, 1]], [[103, 2]], [[0, 2]]],
+ [[[2, 0], [97, 1], [104, 0]], [[0, 1]]],
+ [[[105, 1], [106, 1], [107, 1], [108, 1], [109, 1]], [[0, 1]]],
+ [[[26, 1]],
+  [[93, 2]],
+  [[74, 3]],
+  [[70, 4]],
+  [[68, 5]],
+  [[69, 6]],
+  [[110, 7], [0, 6]],
+  [[68, 8]],
+  [[69, 9]],
+  [[0, 9]]],
+ [[[27, 1], [19, 2]], [[111, 3]], [[0, 2]], [[50, 2]]],
+ [[[112, 1]], [[44, 2], [0, 1]], [[112, 1], [0, 2]]],
+ [[[4, 1]], [[19, 2]], [[113, 3]], [[68, 4]], [[69, 5]], [[0, 5]]],
+ [[[26, 1]], [[93, 2]], [[74, 3]], [[114, 4]], [[115, 5], [0, 4]], [[0, 5]]],
+ [[[29, 1]], [[116, 2]], [[115, 3], [0, 2]], [[0, 3]]],
+ [[[45, 1], [117, 1]], [[0, 1]]],
+ [[[25, 1]], [[19, 2]], [[44, 1], [0, 2]]],
+ [[[29, 1]],
+  [[43, 2]],
+  [[68, 3]],
+  [[69, 4]],
+  [[110, 5], [118, 1], [0, 4]],
+  [[68, 6]],
+  [[69, 7]],
+  [[0, 7]]],
+ [[[19, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]],
+ [[[119, 1]], [[44, 2], [0, 1]], [[119, 1], [0, 2]]],
+ [[[28, 1]],
+  [[90, 2], [96, 3]],
+  [[22, 4]],
+  [[90, 2], [22, 4], [96, 3]],
+  [[120, 5], [40, 5], [27, 6]],
+  [[0, 5]],
+  [[120, 7]],
+  [[50, 5]]],
+ [[[22, 1]], [[121, 2]], [[0, 2]]],
+ [[[122, 1], [123, 1]], [[0, 1]]],
+ [[[35, 1]], [[68, 2], [124, 3]], [[43, 4]], [[68, 2]], [[0, 4]]],
+ [[[26, 1]], [[93, 2]], [[74, 3]], [[125, 4]], [[126, 5], [0, 4]], [[0, 5]]],
+ [[[29, 1]], [[116, 2]], [[126, 3], [0, 2]], [[0, 3]]],
+ [[[127, 1], [128, 1]], [[0, 1]]],
+ [[[43, 1]],
+  [[127, 2], [44, 3], [0, 1]],
+  [[0, 2]],
+  [[43, 4], [0, 3]],
+  [[44, 3], [0, 4]]],
+ [[[7, 1], [129, 2]], [[38, 2]], [[0, 2]]],
+ [[[35, 1]], [[68, 2], [124, 3]], [[116, 4]], [[68, 2]], [[0, 4]]],
+ [[[130, 1], [114, 1]], [[0, 1]]],
+ [[[131, 1]], [[132, 0], [0, 1]]],
+ [[[27, 1]], [[50, 2], [124, 3]], [[0, 2]], [[50, 2]]],
+ [[[21, 1]], [[0, 1]]],
+ [[[133, 1]], [[134, 1], [42, 2], [0, 1]], [[103, 3]], [[0, 3]]],
+ [[[5, 1]],
+  [[43, 2], [0, 1]],
+  [[44, 3], [0, 2]],
+  [[43, 4]],
+  [[44, 5], [0, 4]],
+  [[43, 6]],
+  [[0, 6]]],
+ [[[17, 1]], [[70, 2], [0, 1]], [[0, 2]]],
+ [[[135, 1]], [[136, 0], [137, 0], [0, 1]]],
+ [[[138, 1]], [[2, 2], [139, 3]], [[0, 2]], [[138, 1], [2, 2]]],
+ [[[68, 1]], [[43, 2], [0, 1]], [[0, 2]]],
+ [[[140, 1],
+   [141, 1],
    [142, 1],
    [143, 1],
    [144, 1],
    [145, 1],
    [146, 1],
-   [147, 1],
-   [148, 1],
-   [149, 1]],
+   [147, 1]],
   [[0, 1]]],
  [[[1, 1], [3, 1]], [[0, 1]]],
- [[[44, 1], [69, 2], [97, 3]],
-  [[69, 2], [0, 1]],
-  [[44, 4], [150, 5], [0, 2]],
-  [[97, 6]],
-  [[150, 5], [0, 4]],
+ [[[43, 1], [68, 2], [96, 3]],
+  [[68, 2], [0, 1]],
+  [[43, 4], [148, 5], [0, 2]],
+  [[96, 6]],
+  [[148, 5], [0, 4]],
   [[0, 5]],
-  [[97, 5]]],
- [[[151, 1]], [[45, 2], [0, 1]], [[151, 1], [0, 2]]],
- [[[1, 1], [2, 2]], [[0, 1]], [[152, 3]], [[105, 4]], [[153, 1], [105, 4]]],
- [[[104, 1]], [[154, 0], [41, 0], [155, 0], [156, 0], [0, 1]]],
- [[[115, 1], [157, 2]],
-  [[30, 3], [0, 1]],
+  [[96, 5]]],
+ [[[149, 1]], [[44, 2], [0, 1]], [[149, 1], [0, 2]]],
+ [[[1, 1], [2, 2]], [[0, 1]], [[150, 3]], [[104, 4]], [[151, 1], [104, 4]]],
+ [[[103, 1]], [[152, 0], [40, 0], [153, 0], [154, 0], [0, 1]]],
+ [[[114, 1], [155, 2]],
+  [[29, 3], [0, 1]],
   [[0, 2]],
-  [[115, 4]],
-  [[111, 5]],
-  [[44, 2]]],
- [[[44, 1]], [[45, 2], [0, 1]], [[44, 1], [0, 2]]],
- [[[44, 1]], [[45, 0], [0, 1]]],
- [[[44, 1]],
-  [[46, 2], [45, 3], [0, 1]],
+  [[114, 4]],
+  [[110, 5]],
+  [[43, 2]]],
+ [[[43, 1]], [[44, 2], [0, 1]], [[43, 1], [0, 2]]],
+ [[[43, 1]], [[44, 0], [0, 1]]],
+ [[[43, 1]],
+  [[45, 2], [44, 3], [0, 1]],
   [[0, 2]],
+  [[43, 4], [0, 3]],
+  [[44, 3], [0, 4]]],
+ [[[116, 1]],
+  [[44, 2], [0, 1]],
+  [[116, 3]],
   [[44, 4], [0, 3]],
-  [[45, 3], [0, 4]]],
- [[[117, 1]],
-  [[45, 2], [0, 1]],
-  [[117, 3]],
-  [[45, 4], [0, 3]],
-  [[117, 3], [0, 4]]],
- [[[28, 1], [97, 2], [11, 3]],
-  [[51, 4], [92, 5]],
-  [[20, 4]],
-  [[158, 6]],
+  [[116, 3], [0, 4]]],
+ [[[27, 1], [96, 2], [11, 3]],
+  [[50, 4], [91, 5]],
+  [[19, 4]],
+  [[156, 6]],
   [[0, 4]],
-  [[51, 4]],
-  [[50, 4]]],
- [[[14, 1]],
-  [[69, 2]],
-  [[70, 3]],
-  [[159, 4], [160, 5]],
-  [[69, 6]],
-  [[69, 7]],
-  [[70, 8]],
-  [[70, 9]],
-  [[159, 4], [111, 10], [160, 5], [0, 8]],
-  [[0, 9]],
-  [[69, 11]],
-  [[70, 12]],
-  [[160, 5], [0, 12]]],
- [[[41, 1], [113, 2], [43, 3]],
-  [[20, 4]],
-  [[47, 5], [45, 6], [0, 2]],
-  [[20, 7]],
-  [[45, 8], [0, 4]],
-  [[44, 9]],
-  [[41, 1], [113, 2], [43, 3], [0, 6]],
-  [[0, 7]],
-  [[43, 3]],
-  [[45, 6], [0, 9]]],
- [[[16, 1]],
-  [[44, 2]],
+  [[50, 4]],
+  [[49, 4]]],
+ [[[13, 1]],
+  [[68, 2]],
   [[69, 3]],
-  [[70, 4]],
-  [[111, 5], [0, 4]],
-  [[69, 6]],
-  [[70, 7]],
+  [[157, 4], [158, 5]],
+  [[68, 6]],
+  [[68, 7]],
+  [[69, 8]],
+  [[69, 9]],
+  [[157, 4], [110, 10], [158, 5], [0, 8]],
+  [[0, 9]],
+  [[68, 11]],
+  [[69, 12]],
+  [[158, 5], [0, 12]]],
+ [[[40, 1], [112, 2], [42, 3]],
+  [[19, 4]],
+  [[46, 5], [44, 6], [0, 2]],
+  [[19, 7]],
+  [[44, 8], [0, 4]],
+  [[43, 9]],
+  [[40, 1], [112, 2], [42, 3], [0, 6]],
+  [[0, 7]],
+  [[42, 3]],
+  [[44, 6], [0, 9]]],
+ [[[15, 1]],
+  [[43, 2]],
+  [[68, 3]],
+  [[69, 4]],
+  [[110, 5], [0, 4]],
+  [[68, 6]],
+  [[69, 7]],
   [[0, 7]]],
- [[[34, 1]], [[44, 2]], [[69, 3], [161, 4]], [[70, 5]], [[69, 3]], [[0, 5]]],
- [[[95, 1]], [[80, 2]], [[0, 2]]],
- [[[162, 1]], [[163, 0], [0, 1]]],
- [[[25, 1]], [[71, 2], [0, 1]], [[0, 2]]],
- [[[53, 1]], [[0, 1]]]],
+ [[[33, 1]], [[43, 2]], [[68, 3], [159, 4]], [[69, 5]], [[68, 3]], [[0, 5]]],
+ [[[94, 1]], [[79, 2]], [[0, 2]]],
+ [[[160, 1]], [[161, 0], [0, 1]]],
+ [[[24, 1]], [[70, 2], [0, 1]], [[0, 2]]],
+ [[[52, 1]], [[0, 1]]]],
 labels:
 [[0, 'EMPTY'],
- [319, null],
+ [318, null],
  [4, null],
  [269, null],
  [1, 'def'],
@@ -16459,7 +17181,6 @@ labels:
  [26, null],
  [1, 'class'],
  [9, null],
- [1, 'print'],
  [25, null],
  [1, 'try'],
  [1, 'exec'],
@@ -16484,26 +17205,26 @@ labels:
  [1, 'with'],
  [14, null],
  [1, 'lambda'],
- [318, null],
+ [317, null],
  [19, null],
  [308, null],
  [1, 'and'],
  [16, null],
  [260, null],
  [36, null],
- [327, null],
+ [326, null],
  [12, null],
  [293, null],
  [22, null],
- [326, null],
+ [325, null],
  [307, null],
  [10, null],
  [8, null],
- [330, null],
- [339, null],
+ [329, null],
+ [338, null],
  [275, null],
  [27, null],
- [329, null],
+ [328, null],
  [46, null],
  [39, null],
  [41, null],
@@ -16517,8 +17238,8 @@ labels:
  [38, null],
  [45, null],
  [11, null],
- [325, null],
- [328, null],
+ [324, null],
+ [327, null],
  [29, null],
  [21, null],
  [28, null],
@@ -16529,12 +17250,12 @@ labels:
  [20, null],
  [283, null],
  [267, null],
- [333, null],
+ [332, null],
  [297, null],
  [289, null],
  [266, null],
- [336, null],
  [335, null],
+ [334, null],
  [292, null],
  [271, null],
  [273, null],
@@ -16547,17 +17268,17 @@ labels:
  [23, null],
  [0, null],
  [1, 'except'],
- [338, null],
+ [337, null],
  [18, null],
  [264, null],
  [314, null],
  [286, null],
- [322, null],
+ [321, null],
  [265, null],
  [270, null],
+ [315, null],
  [316, null],
- [317, null],
- [340, null],
+ [339, null],
  [1, 'else'],
  [291, null],
  [290, null],
@@ -16572,8 +17293,8 @@ labels:
  [277, null],
  [301, null],
  [300, null],
- [334, null],
- [331, null],
+ [333, null],
+ [330, null],
  [306, null],
  [304, null],
  [305, null],
@@ -16582,119 +17303,117 @@ labels:
  [258, null],
  [1, 'or'],
  [263, null],
- [332, null],
- [35, null],
+ [331, null],
  [261, null],
+ [35, null],
  [34, null],
- [321, null],
+ [320, null],
  [13, null],
  [288, null],
  [262, null],
  [284, null],
  [313, null],
- [315, null],
  [274, null],
  [282, null],
  [296, null],
  [302, null],
- [320, null],
- [323, null],
+ [319, null],
+ [322, null],
  [5, null],
  [6, null],
  [48, null],
  [17, null],
  [24, null],
  [303, null],
- [324, null],
+ [323, null],
  [281, null],
  [1, 'finally'],
- [337, null],
+ [336, null],
  [257, null],
  [33, null]],
 keywords:
-{'and': 40,
- 'as': 95,
- 'assert': 19,
- 'break': 31,
+{'and': 39,
+ 'as': 94,
+ 'assert': 18,
+ 'break': 30,
  'class': 10,
- 'continue': 32,
+ 'continue': 31,
  'def': 4,
- 'del': 21,
- 'elif': 119,
- 'else': 111,
- 'except': 99,
- 'exec': 15,
- 'finally': 160,
- 'for': 27,
- 'from': 29,
- 'global': 26,
- 'if': 30,
- 'import': 23,
- 'in': 75,
- 'is': 77,
- 'lambda': 36,
+ 'del': 20,
+ 'elif': 118,
+ 'else': 110,
+ 'except': 98,
+ 'exec': 14,
+ 'finally': 158,
+ 'for': 26,
+ 'from': 28,
+ 'global': 25,
+ 'if': 29,
+ 'import': 22,
+ 'in': 74,
+ 'is': 76,
+ 'lambda': 35,
  'not': 7,
- 'or': 133,
- 'pass': 22,
- 'print': 12,
+ 'or': 132,
+ 'pass': 21,
  'raise': 5,
- 'return': 18,
- 'try': 14,
- 'while': 16,
- 'with': 34,
- 'yield': 25},
+ 'return': 17,
+ 'try': 13,
+ 'while': 15,
+ 'with': 33,
+ 'yield': 24},
 tokens:
-{0: 98,
- 1: 20,
+{0: 97,
+ 1: 19,
  2: 8,
- 3: 17,
+ 3: 16,
  4: 2,
- 5: 152,
- 6: 153,
- 7: 28,
- 8: 51,
+ 5: 150,
+ 6: 151,
+ 7: 27,
+ 8: 50,
  9: 11,
- 10: 50,
- 11: 69,
- 12: 45,
- 13: 140,
- 14: 35,
- 15: 24,
- 16: 41,
- 17: 155,
- 18: 101,
- 19: 38,
- 20: 79,
- 21: 73,
- 22: 47,
- 23: 97,
- 24: 156,
- 25: 13,
+ 10: 49,
+ 11: 68,
+ 12: 44,
+ 13: 139,
+ 14: 34,
+ 15: 23,
+ 16: 40,
+ 17: 153,
+ 18: 100,
+ 19: 37,
+ 20: 78,
+ 21: 72,
+ 22: 46,
+ 23: 96,
+ 24: 154,
+ 25: 12,
  26: 9,
- 27: 55,
- 28: 74,
- 29: 72,
- 30: 76,
- 31: 78,
+ 27: 54,
+ 28: 73,
+ 29: 71,
+ 30: 75,
+ 31: 77,
  32: 6,
- 33: 163,
- 34: 138,
+ 33: 161,
+ 34: 137,
  35: 136,
- 36: 43,
- 37: 63,
- 38: 67,
- 39: 58,
- 40: 66,
- 41: 59,
- 42: 61,
- 43: 62,
- 44: 64,
- 45: 68,
- 46: 57,
- 47: 60,
- 48: 154,
- 49: 65,
- 50: 33},
+ 36: 42,
+ 37: 62,
+ 38: 66,
+ 39: 57,
+ 40: 65,
+ 41: 58,
+ 42: 60,
+ 43: 61,
+ 44: 63,
+ 45: 67,
+ 46: 56,
+ 47: 59,
+ 48: 152,
+ 49: 64,
+ 50: 32},
 start: 256
 };
 // low level parser to a concrete syntax tree, derived from cpython's lib2to3
@@ -17258,18 +17977,6 @@ function AugAssign(/* {expr_ty} */ target, /* {operator_ty} */ op, /* {expr_ty}
 }
 
 /** @constructor */
-function Print(/* {expr_ty} */ dest, /* {asdl_seq *} */ values, /* {bool} */
-                    nl, /* {int} */ lineno, /* {int} */ col_offset)
-{
-    this.dest = dest;
-    this.values = values;
-    this.nl = nl;
-    this.lineno = lineno;
-    this.col_offset = col_offset;
-    return this;
-}
-
-/** @constructor */
 function For_(/* {expr_ty} */ target, /* {expr_ty} */ iter, /* {asdl_seq *} */
                    body, /* {asdl_seq *} */ orelse, /* {int} */ lineno, /*
                    {int} */ col_offset)
@@ -17821,12 +18528,6 @@ AugAssign.prototype._fields = [
     "target", function(n) { return n.target; },
     "op", function(n) { return n.op; },
     "value", function(n) { return n.value; }
-];
-Print.prototype._astname = "Print";
-Print.prototype._fields = [
-    "dest", function(n) { return n.dest; },
-    "values", function(n) { return n.values; },
-    "nl", function(n) { return n.nl; }
 ];
 For_.prototype._astname = "For";
 For_.prototype._fields = [
@@ -19979,28 +20680,6 @@ function astForExpr(c, n)
     break; }
 }
 
-function astForPrintStmt(c, n)
-{
-    /* print_stmt: 'print' ( [ test (',' test)* [','] ]
-                             | '>>' test [ (',' test)+ [','] ] )
-     */
-    var start = 1;
-    var dest = null;
-    REQ(n, SYM.print_stmt);
-    if (NCH(n) >= 2 && CHILD(n, 1).type === TOK.T_RIGHTSHIFT)
-    {
-        dest = astForExpr(c, CHILD(n, 2));
-        start = 4;
-    }
-    var seq = [];
-    for (var i = start, j = 0; i < NCH(n); i += 2, ++j)
-    {
-        seq[j] = astForExpr(c, CHILD(n, i));
-    }
-    var nl = (CHILD(n, NCH(n) - 1)).type === TOK.T_COMMA ? false : true;
-    return new Print(dest, seq, nl, n.lineno, n.col_offset);
-}
-
 function astForStmt(c, n)
 {
     if (n.type === SYM.stmt)
@@ -20017,14 +20696,13 @@ function astForStmt(c, n)
     {
         REQ(n, SYM.small_stmt);
         n = CHILD(n, 0);
-        /* small_stmt: expr_stmt | print_stmt  | del_stmt | pass_stmt
+        /* small_stmt: expr_stmt | del_stmt | pass_stmt
                      | flow_stmt | import_stmt | global_stmt | exec_stmt
                      | assert_stmt
         */
         switch (n.type)
         {
             case SYM.expr_stmt: return astForExprStmt(c, n);
-            case SYM.print_stmt: return astForPrintStmt(c, n);
             case SYM.del_stmt: return astForDelStmt(c, n);
             case SYM.pass_stmt: return new Pass(n.lineno, n.col_offset);
             case SYM.flow_stmt: return astForFlowStmt(c, n);
@@ -20595,10 +21273,6 @@ SymbolTable.prototype.visitStmt = function(s)
         case AugAssign:
             this.visitExpr(s.target);
             this.visitExpr(s.value);
-            break;
-        case Print:
-            if (s.dest) this.visitExpr(s.dest);
-            this.SEQExpr(s.values);
             break;
         case For_:
             this.visitExpr(s.target);
@@ -22719,9 +23393,6 @@ Compiler.prototype.vstmt = function(s)
             break;
         case AugAssign:
             return this.caugassign(s);
-        case Print:
-            this.cprint(s);
-            break;
         case For_:
             return this.cfor(s);
         case While_:
@@ -22973,20 +23644,6 @@ Compiler.prototype.cbody = function(stmts)
         this.vstmt(stmts[i]);
 };
 
-Compiler.prototype.cprint = function(s)
-{
-    goog.asserts.assert(s instanceof Print);
-    var dest = 'null';
-    if (s.dest)
-        dest = this.vexpr(s.dest);
-
-    var n = s.values.length;
-    // todo; dest disabled
-    for (var i = 0; i < n; ++i)
-        out('Sk.misceval.print_(', /*dest, ',',*/ "new Sk.builtins['str'](", this.vexpr(s.values[i]), ').v);');
-    if (s.nl)
-        out('Sk.misceval.print_(', /*dest, ',*/ '"\\n");');
-};
 Compiler.prototype.cmod = function(mod)
 {
     //print("-----");
@@ -24433,6 +25090,7 @@ Sk.builtins = {
 'globals' : Sk.builtin.globals,
 'issubclass' : Sk.builtin.issubclass,
 'super': Sk.builtin.superbi,
+'print': Sk.builtin.print,
 
 // Functions below are not implemented
 'bytearray': Sk.builtin.bytearray,
