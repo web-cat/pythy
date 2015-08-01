@@ -9908,6 +9908,12 @@ Sk.builtin.list.prototype['sort'] = new Sk.builtin.func(Sk.builtin.list.prototyp
 // why this was chosen - csev
 Sk.builtin.list.prototype['sort'].func_code['co_varnames']=['__self__','cmp', 'key', 'reverse'];
 goog.exportSymbol("Sk.builtin.list", Sk.builtin.list);
+// This is to prevent type checking of this file
+// Without it, closure compiler has a problem with line 1056
+/**
+  * @fileoverview
+  * @suppress {checkTypes}
+  */
 var interned = {};
 
 /**
@@ -10957,7 +10963,7 @@ sprintf.parse = function(fmt) {
 					else {
 						throw('[sprintf] huh?');
 					}
-					match[2] = field_list[0]; //Fix for closure compiler
+					match[2] = field_list;
 				}
 				else {
 					arg_names |= 2;
