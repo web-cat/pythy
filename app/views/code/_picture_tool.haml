@@ -1,0 +1,24 @@
+#mediacomp-colorpicker.modal.hide#Sk-canvasModal
+  .modal-header
+    = close_button_tag dismiss: 'modal'
+    %h3
+      Picture Tool
+
+  .modal-body
+
+  .modal-footer
+    %form.form-inline.pull-left
+      = label_tag 'canvas-x', 'X:'
+      %input.input-mini#canvas-x{type: 'number'}
+      = label_tag 'canvas-y', 'Y:'
+      %input.input-mini#canvas-y{type: 'number'}
+    %table.pull-right
+      %tbody
+        %tr
+          %td.canvas-color-label R:
+          %td#canvas-red 0
+          %td.canvas-color-label G:
+          %td#canvas-green 0
+          %td.canvas-color-label B:
+          %td#canvas-blue 0
+          %td#canvas-color-swatch

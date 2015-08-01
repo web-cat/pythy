@@ -34,5 +34,7 @@ erd.pdf
 # Ignore test coverage reports
 /coverage/
 
-# node modules
+# Ignore node modules
 node_modules
+
+*.pyc

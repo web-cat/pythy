@@ -275,3 +275,48 @@ body.code {
 .outcomes-header {
   margin-bottom: 6px;
 }
+
+#mediacomp-color-swatch {
+  border: 1px solid black;
+  width: 64px;
+  height: 64px;
+}
+
+#mediacomp-colorpicker-sidebar {
+  margin-left: 10px;
+}
+
+#mediacomp-soundtool {
+
+  width: 1000px;
+
+  #container {
+    overflow: scroll;
+    position: relative;
+    cursor: pointer;
+  }
+
+  #line-overlay {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+  }
+
+  #selection {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+  }
+
+  #soundtool {
+    width: 800;
+  }
+
+  .modal-footer{
+    text-align: center;
+  }
+
+  .modal-header {
+    cursor: move;
+  }
+}

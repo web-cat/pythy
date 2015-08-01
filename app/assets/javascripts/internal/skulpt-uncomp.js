@@ -19,9 +19,10 @@
  * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to
  * include their own deps file(s) from different locations.
  *
-*
-*
+ *
+ * @provideGoog
  */
+
 
 /**
  * @define {boolean} Overridden to true by the compiler when --closure_pass
@@ -31,17 +32,99 @@ var COMPILED = false;
 
 
 /**
- * Base namespace for the Closure library.  Checks to see goog is
- * already defined in the current scope before assigning to prevent
- * clobbering if base.js is loaded more than once.
+ * Base namespace for the Closure library.  Checks to see goog is already
+ * defined in the current scope before assigning to prevent clobbering if
+ * base.js is loaded more than once.
+ *
+ * @const
  */
-var goog = goog || {}; // Check to see if already defined in current scope
+var goog = goog || {};
 
 
 /**
  * Reference to the global context.  In most cases this will be 'window'.
  */
 goog.global = this;
+
+/**
+ * A hook for overriding the define values in uncompiled mode.
+ *
+ * In uncompiled mode, {@code CLOSURE_DEFINES} may be defined before loading
+ * base.js.  If a key is defined in {@code CLOSURE_DEFINES}, {@code goog.define}
+ * will use the value instead of the default value.  This allows flags to be
+ * overwritten without compilation (this is normally accomplished with the
+ * compiler's "define" flag).
+ *
+ * Example:
+ * <pre>
+ *   var CLOSURE_DEFINES = {'goog.DEBUG', false};
+ * </pre>
+ *
+ * @type {Object.<string, (string|number|boolean)>|undefined}
+ */
+goog.global.CLOSURE_DEFINES;
+
+
+/**
+ * Builds an object structure for the provided namespace path, ensuring that
+ * names that already exist are not overwritten. For example:
+ * "a.b.c" -> a = {};a.b={};a.b.c={};
+ * Used by goog.provide and goog.exportSymbol.
+ * @param {string} name name of the object that this file defines.
+ * @param {*=} opt_object the object to expose at the end of the path.
+ * @param {Object=} opt_objectToExportTo The object to add the path to; default
+ *     is |goog.global|.
+ * @private
+ */
+goog.exportPath_ = function(name, opt_object, opt_objectToExportTo) {
+  var parts = name.split('.');
+  var cur = opt_objectToExportTo || goog.global;
+
+  // Internet Explorer exhibits strange behavior when throwing errors from
+  // methods externed in this manner.  See the testExportSymbolExceptions in
+  // base_test.html for an example.
+  if (!(parts[0] in cur) && cur.execScript) {
+    cur.execScript('var ' + parts[0]);
+  }
+
+  // Certain browsers cannot parse code in the form for((a in b); c;);
+  // This pattern is produced by the JSCompiler when it collapses the
+  // statement above into the conditional loop below. To prevent this from
+  // happening, use a for-loop and reserve the init logic as below.
+
+  // Parentheses added to eliminate strict JS warning in Firefox.
+  for (var part; parts.length && (part = parts.shift());) {
+    if (!parts.length && opt_object !== undefined) {
+      // last part and we have an object; use it
+      cur[part] = opt_object;
+    } else if (cur[part]) {
+      cur = cur[part];
+    } else {
+      cur = cur[part] = {};
+    }
+  }
+};
+
+
+/**
+ * Defines a named value. In uncompiled mode, the value is retreived from
+ * CLOSURE_DEFINES if the object is defined and has the property specified,
+ * and otherwise used the defined defaultValue. When compiled, the default
+ * can be overridden using compiler command-line options.
+ *
+ * @param {string} name The distinguished name to provide.
+ * @param {string|number|boolean} defaultValue
+ */
+goog.define = function(name, defaultValue) {
+  var value = defaultValue;
+  if (!COMPILED) {
+    if (goog.global.CLOSURE_DEFINES && Object.prototype.hasOwnProperty.call(
+        goog.global.CLOSURE_DEFINES, name)) {
+      value = goog.global.CLOSURE_DEFINES[name];
+    }
+  }
+  goog.exportPath_(name, value);
+};
 
 
 /**
@@ -74,24 +157,31 @@ goog.DEBUG = true;
  * this rule: the Hebrew language. For legacy reasons the old code (iw) should
  * be used instead of the new code (he), see http://wiki/Main/IIISynonyms.
  */
-goog.LOCALE = 'en';  // default to en
+goog.define('goog.LOCALE', 'en');  // default to en
 
 
 /**
- * Indicates whether or not we can call 'eval' directly to eval code in the
- * global scope. Set to a Boolean by the first call to goog.globalEval (which
- * empirically tests whether eval works for globals). @see goog.globalEval
- * @type {?boolean}
- * @private
+ * @define {boolean} Whether this code is running on trusted sites.
+ *
+ * On untrusted sites, several native functions can be defined or overridden by
+ * external libraries like Prototype, Datejs, and JQuery and setting this flag
+ * to false forces closure to use its own implementations when possible.
+ *
+ * If your JavaScript can be loaded by a third party site and you are wary about
+ * relying on non-standard implementations, specify
+ * "--define goog.TRUSTED_SITE=false" to the JSCompiler.
  */
-goog.evalWorksForGlobals_ = null;
+goog.define('goog.TRUSTED_SITE', true);
 
 
 /**
- * Creates object stubs for a namespace. When present in a file, goog.provide
- * also indicates that the file defines the indicated object. Calls to
- * goog.provide are resolved by the compiler if --closure_pass is set.
- * @param {string} name name of the object that this file defines.
+ * Creates object stubs for a namespace.  The presence of one or more
+ * goog.provide() calls indicate that the file defines the given
+ * objects/namespaces.  Build tools also scan for provide/require statements
+ * to discern dependencies, build dependency files (see deps.js), etc.
+ * @see goog.require
+ * @param {string} name Namespace provided by this file in the form
+ *     "goog.package.part".
  */
 goog.provide = function(name) {
   if (!COMPILED) {
@@ -100,12 +190,16 @@ goog.provide = function(name) {
     // declaration. And when JSCompiler transforms goog.provide into a real
     // variable declaration, the compiled JS should work the same as the raw
     // JS--even when the raw JS uses goog.provide incorrectly.
-    if (goog.getObjectByName(name) && !goog.implicitNamespaces_[name]) {
+    if (goog.isProvided_(name)) {
       throw Error('Namespace "' + name + '" already declared.');
     }
+    delete goog.implicitNamespaces_[name];
 
     var namespace = name;
     while ((namespace = namespace.substring(0, namespace.lastIndexOf('.')))) {
+      if (goog.getObjectByName(namespace)) {
+        break;
+      }
       goog.implicitNamespaces_[namespace] = true;
     }
   }
@@ -114,59 +208,49 @@ goog.provide = function(name) {
 };
 
 
+/**
+ * Marks that the current file should only be used for testing, and never for
+ * live code in production.
+ *
+ * In the case of unit tests, the message may optionally be an exact namespace
+ * for the test (e.g. 'goog.stringTest'). The linter will then ignore the extra
+ * provide (if not explicitly defined in the code).
+ *
+ * @param {string=} opt_message Optional message to add to the error that's
+ *     raised when used in production code.
+ */
+goog.setTestOnly = function(opt_message) {
+  if (COMPILED && !goog.DEBUG) {
+    opt_message = opt_message || '';
+    throw Error('Importing test-only code into non-debug environment' +
+                opt_message ? ': ' + opt_message : '.');
+  }
+};
+
+
 if (!COMPILED) {
+
+  /**
+   * Check if the given name has been goog.provided. This will return false for
+   * names that are available only as implicit namespaces.
+   * @param {string} name name of the object to look for.
+   * @return {boolean} Whether the name has been provided.
+   * @private
+   */
+  goog.isProvided_ = function(name) {
+    return !goog.implicitNamespaces_[name] && !!goog.getObjectByName(name);
+  };
+
   /**
    * Namespaces implicitly defined by goog.provide. For example,
-   * goog.provide('goog.events.Event') implicitly declares
-   * that 'goog' and 'goog.events' must be namespaces.
+   * goog.provide('goog.events.Event') implicitly declares that 'goog' and
+   * 'goog.events' must be namespaces.
    *
    * @type {Object}
    * @private
    */
   goog.implicitNamespaces_ = {};
 }
-
-
-/**
- * Builds an object structure for the provided namespace path,
- * ensuring that names that already exist are not overwritten. For
- * example:
- * "a.b.c" -> a = {};a.b={};a.b.c={};
- * Used by goog.provide and goog.exportSymbol.
- * @param {string} name name of the object that this file defines.
- * @param {*=} opt_object the object to expose at the end of the path.
- * @param {Object=} opt_objectToExportTo The object to add the path to; default
- *     is |goog.global|.
- * @private
- */
-goog.exportPath_ = function(name, opt_object, opt_objectToExportTo) {
-  var parts = name.split('.');
-  var cur = opt_objectToExportTo || goog.global;
-
-  // Internet Explorer exhibits strange behavior when throwing errors from
-  // methods externed in this manner.  See the testExportSymbolExceptions in
-  // base_test.html for an example.
-  if (!(parts[0] in cur) && cur.execScript) {
-    cur.execScript('var ' + parts[0]);
-  }
-
-  // Certain browsers cannot parse code in the form for((a in b); c;);
-  // This pattern is produced by the JSCompiler when it collapses the
-  // statement above into the conditional loop below. To prevent this from
-  // happening, use a for-loop and reserve the init logic as below.
-
-  // Parentheses added to eliminate strict JS warning in Firefox.
-  for (var part; parts.length && (part = parts.shift());) {
-    if (!parts.length && goog.isDef(opt_object)) {
-      // last part and we have an object; use it
-      cur[part] = opt_object;
-    } else if (cur[part]) {
-      cur = cur[part];
-    } else {
-      cur = cur[part] = {};
-    }
-  }
-};
 
 
 /**
@@ -177,13 +261,13 @@ goog.exportPath_ = function(name, opt_object, opt_objectToExportTo) {
  * @param {string} name The fully qualified name.
  * @param {Object=} opt_obj The object within which to look; default is
  *     |goog.global|.
- * @return {Object} The object or, if not found, null.
+ * @return {?} The value (object or primitive) or, if not found, null.
  */
 goog.getObjectByName = function(name, opt_obj) {
   var parts = name.split('.');
   var cur = opt_obj || goog.global;
   for (var part; part = parts.shift(); ) {
-    if (cur[part]) {
+    if (goog.isDefAndNotNull(cur[part])) {
       cur = cur[part];
     } else {
       return null;
@@ -218,7 +302,7 @@ goog.globalize = function(obj, opt_global) {
  *                         this file requires.
  */
 goog.addDependency = function(relPath, provides, requires) {
-  if (!COMPILED) {
+  if (goog.DEPENDENCIES_ENABLED) {
     var provide, require;
     var path = relPath.replace(/\\/g, '/');
     var deps = goog.dependencies_;
@@ -240,45 +324,82 @@ goog.addDependency = function(relPath, provides, requires) {
 
 
 
-/**
- * Implements a system for the dynamic resolution of dependencies
- * that works in parallel with the BUILD system. Note that all calls
- * to goog.require will be stripped by the JSCompiler when the
- * --closure_pass option is used.
- * @param {string} rule Rule to include, in the form goog.package.part.
- */
-goog.require = function(rule) {
 
-  // if the object already exists we do not need do do anything
-  // TODO(user): If we start to support require based on file name this has
-  //            to change
-  // TODO(user): If we allow goog.foo.* this has to change
-  // TODO(user): If we implement dynamic load after page load we should probably
-  //            not remove this code for the compiled output
+// NOTE(nnaze): The debug DOM loader was included in base.js as an original way
+// to do "debug-mode" development.  The dependency system can sometimes be
+// confusing, as can the debug DOM loader's asynchronous nature.
+//
+// With the DOM loader, a call to goog.require() is not blocking -- the script
+// will not load until some point after the current script.  If a namespace is
+// needed at runtime, it needs to be defined in a previous script, or loaded via
+// require() with its registered dependencies.
+// User-defined namespaces may need their own deps file.  See http://go/js_deps,
+// http://go/genjsdeps, or, externally, DepsWriter.
+// http://code.google.com/closure/library/docs/depswriter.html
+//
+// Because of legacy clients, the DOM loader can't be easily removed from
+// base.js.  Work is being done to make it disableable or replaceable for
+// different environments (DOM-less JavaScript interpreters like Rhino or V8,
+// for example). See bootstrap/ for more information.
+
+
+/**
+ * @define {boolean} Whether to enable the debug loader.
+ *
+ * If enabled, a call to goog.require() will attempt to load the namespace by
+ * appending a script tag to the DOM (if the namespace has been registered).
+ *
+ * If disabled, goog.require() will simply assert that the namespace has been
+ * provided (and depend on the fact that some outside tool correctly ordered
+ * the script).
+ */
+goog.define('goog.ENABLE_DEBUG_LOADER', true);
+
+
+/**
+ * Implements a system for the dynamic resolution of dependencies that works in
+ * parallel with the BUILD system. Note that all calls to goog.require will be
+ * stripped by the JSCompiler when the --closure_pass option is used.
+ * @see goog.provide
+ * @param {string} name Namespace to include (as was given in goog.provide()) in
+ *     the form "goog.package.part".
+ */
+goog.require = function(name) {
+
+  // If the object already exists we do not need do do anything.
+  // TODO(arv): If we start to support require based on file name this has to
+  //            change.
+  // TODO(arv): If we allow goog.foo.* this has to change.
+  // TODO(arv): If we implement dynamic load after page load we should probably
+  //            not remove this code for the compiled output.
   if (!COMPILED) {
-    if (goog.getObjectByName(rule)) {
+    if (goog.isProvided_(name)) {
       return;
     }
-    var path = goog.getPathFromDeps_(rule);
-    if (path) {
-      goog.included_[path] = true;
-      goog.writeScripts_();
-    } else {
-      var errorMessage = 'goog.require could not find: ' + rule;
-      if (goog.global.console) {
-        goog.global.console['error'](errorMessage);
-      }
 
-      
-        throw Error(errorMessage);
-        
+    if (goog.ENABLE_DEBUG_LOADER) {
+      var path = goog.getPathFromDeps_(name);
+      if (path) {
+        goog.included_[path] = true;
+        goog.writeScripts_();
+        return;
+      }
     }
+
+    var errorMessage = 'goog.require could not find: ' + name;
+    if (goog.global.console) {
+      goog.global.console['error'](errorMessage);
+    }
+
+
+      throw Error(errorMessage);
+
   }
 };
 
 
 /**
- * Path for included scripts
+ * Path for included scripts.
  * @type {string}
  */
 goog.basePath = '';
@@ -292,16 +413,27 @@ goog.global.CLOSURE_BASE_PATH;
 
 
 /**
- * Whether to write out Closure's deps file. By default,
- * the deps are written.
+ * Whether to write out Closure's deps file. By default, the deps are written.
  * @type {boolean|undefined}
  */
 goog.global.CLOSURE_NO_DEPS;
 
 
 /**
+ * A function to import a single script. This is meant to be overridden when
+ * Closure is being run in non-HTML contexts, such as web workers. It's defined
+ * in the global scope so that it can be set before base.js is loaded, which
+ * allows deps.js to be imported properly.
+ *
+ * The function is passed the script source, which is a relative URI. It should
+ * return true if the script was imported, false otherwise.
+ */
+goog.global.CLOSURE_IMPORT_SCRIPT;
+
+
+/**
  * Null function used for default values of callbacks, etc.
- * @return {void}
+ * @return {void} Nothing.
  */
 goog.nullFunction = function() {};
 
@@ -309,30 +441,29 @@ goog.nullFunction = function() {};
 /**
  * The identity function. Returns its first argument.
  *
- * @param {...*} var_args The arguments of the function.
- * @return {*} The first argument.
+ * @param {*=} opt_returnValue The single value that will be returned.
+ * @param {...*} var_args Optional trailing arguments. These are ignored.
+ * @return {?} The first argument. We can't know the type -- just pass it along
+ *      without type.
  * @deprecated Use goog.functions.identity instead.
  */
-goog.identityFunction = function(var_args) {
-  return arguments[0];
+goog.identityFunction = function(opt_returnValue, var_args) {
+  return opt_returnValue;
 };
 
 
 /**
  * When defining a class Foo with an abstract method bar(), you can do:
- *
  * Foo.prototype.bar = goog.abstractMethod
  *
- * Now if a subclass of Foo fails to override bar(), an error
- * will be thrown when bar() is invoked.
+ * Now if a subclass of Foo fails to override bar(), an error will be thrown
+ * when bar() is invoked.
  *
- * Note: This does not take the name of the function to override as
- * an argument because that would make it more difficult to obfuscate
- * our JavaScript code.
+ * Note: This does not take the name of the function to override as an argument
+ * because that would make it more difficult to obfuscate our JavaScript code.
  *
  * @type {!Function}
- * @throws {Error} when invoked to indicate the method should be
- *   overridden.
+ * @throws {Error} when invoked to indicate the method should be overridden.
  */
 goog.abstractMethod = function() {
   throw Error('unimplemented abstract method');
@@ -340,22 +471,46 @@ goog.abstractMethod = function() {
 
 
 /**
- * Adds a {@code getInstance} static method that always return the same instance
- * object.
+ * Adds a {@code getInstance} static method that always returns the same
+ * instance object.
  * @param {!Function} ctor The constructor for the class to add the static
  *     method to.
  */
 goog.addSingletonGetter = function(ctor) {
   ctor.getInstance = function() {
-    return ctor.instance_ || (ctor.instance_ = new ctor());
+    if (ctor.instance_) {
+      return ctor.instance_;
+    }
+    if (goog.DEBUG) {
+      // NOTE: JSCompiler can't optimize away Array#push.
+      goog.instantiatedSingletons_[goog.instantiatedSingletons_.length] = ctor;
+    }
+    return ctor.instance_ = new ctor;
   };
 };
 
 
-if (!COMPILED) {
+/**
+ * All singleton classes that have been instantiated, for testing. Don't read
+ * it directly, use the {@code goog.testing.singleton} module. The compiler
+ * removes this variable if unused.
+ * @type {!Array.<!Function>}
+ * @private
+ */
+goog.instantiatedSingletons_ = [];
+
+
+/**
+ * True if goog.dependencies_ is available.
+ * @const {boolean}
+ */
+goog.DEPENDENCIES_ENABLED = !COMPILED && goog.ENABLE_DEBUG_LOADER;
+
+
+if (goog.DEPENDENCIES_ENABLED) {
   /**
-   * Object used to keep track of urls that have already been added. This
-   * record allows the prevention of circular dependencies.
+   * Object used to keep track of urls that have already been added. This record
+   * allows the prevention of circular dependencies.
    * @type {Object}
    * @private
    */
@@ -364,7 +519,7 @@ if (!COMPILED) {
 
   /**
    * This object is used to keep track of dependencies and other data that is
-   * used for loading scripts
+   * used for loading scripts.
    * @private
    * @type {Object}
    */
@@ -372,9 +527,9 @@ if (!COMPILED) {
     pathToNames: {}, // 1 to many
     nameToPath: {}, // 1 to 1
     requires: {}, // 1 to many
-    visited: {}, // used when resolving dependencies to prevent us from
-                 // visiting the file twice
-    written: {} // used to keep track of script files we have written
+    // Used when resolving dependencies to prevent us from visiting file twice.
+    visited: {},
+    written: {} // Used to keep track of script files we have written.
   };
 
 
@@ -391,25 +546,25 @@ if (!COMPILED) {
 
 
   /**
-   * Tries to detect the base path of the base.js script that bootstraps Closure
+   * Tries to detect the base path of base.js script that bootstraps Closure.
    * @private
    */
   goog.findBasePath_ = function() {
-    if (!goog.inHtmlDocument_()) {
-      return;
-    }
-    var doc = goog.global.document;
     if (goog.global.CLOSURE_BASE_PATH) {
       goog.basePath = goog.global.CLOSURE_BASE_PATH;
       return;
+    } else if (!goog.inHtmlDocument_()) {
+      return;
     }
+    var doc = goog.global.document;
     var scripts = doc.getElementsByTagName('script');
     // Search backwards since the current script is in almost all cases the one
     // that has base.js.
     for (var i = scripts.length - 1; i >= 0; --i) {
       var src = scripts[i].src;
-      var l = src.length;
-      if (src.substr(l - 7) == 'base.js') {
+      var qmark = src.lastIndexOf('?');
+      var l = qmark == -1 ? src.length : qmark;
+      if (src.substr(l - 7, 7) == 'base.js') {
         goog.basePath = src.substr(0, l - 7);
         return;
       }
@@ -418,29 +573,63 @@ if (!COMPILED) {
 
 
   /**
-   * Writes a script tag if, and only if, that script hasn't already been added
-   * to the document.  (Must be called at execution time)
+   * Imports a script if, and only if, that script hasn't already been imported.
+   * (Must be called at execution time)
    * @param {string} src Script source.
+   */
+  goog.importScript_ = function(src) {
+    var importScript = goog.global.CLOSURE_IMPORT_SCRIPT ||
+        goog.writeScriptTag_;
+    if (!goog.dependencies_.written[src] && importScript(src)) {
+      goog.dependencies_.written[src] = true;
+    }
+  };
+
+
+  /**
+   * The default implementation of the import function. Writes a script tag to
+   * import the script.
+   *
+   * @param {string} src The script source.
+   * @return {boolean} True if the script was imported, false otherwise.   
    * @private
    */
   goog.writeScriptTag_ = function(src) {
-    if (goog.inHtmlDocument_() &&
-        !goog.dependencies_.written[src]) {
-      goog.dependencies_.written[src] = true;
+    if (goog.inHtmlDocument_()) {
       var doc = goog.global.document;
-      doc.write('<script type="text/javascript" src="' +
-                src + '"></' + 'script>');
+
+      // If the user tries to require a new symbol after document load,
+      // something has gone terribly wrong. Doing a document.write would
+      // wipe out the page.
+      if (doc.readyState == 'complete') {
+        // Certain test frameworks load base.js multiple times, which tries
+        // to write deps.js each time. If that happens, just fail silently.
+        // These frameworks wipe the page between each load of base.js, so this
+        // is OK.
+        var isDeps = /\bdeps.js$/.test(src);
+        if (isDeps) {
+          return false;
+        } else {
+          throw Error('Cannot write "' + src + '" after document load');
+        }
+      }
+
+      doc.write(
+          '<script type="text/javascript" src="' + src + '"></' + 'script>');
+      return true;
+    } else {
+      return false;
     }
   };
 
 
   /**
    * Resolves dependencies based on the dependencies added using addDependency
-   * and calls writeScriptTag_ in the correct order.
+   * and calls importScript_ in the correct order.
    * @private
    */
   goog.writeScripts_ = function() {
-    // the scripts we need to write this time
+    // The scripts we need to write this time.
     var scripts = [];
     var seenScript = {};
     var deps = goog.dependencies_;
@@ -450,8 +639,8 @@ if (!COMPILED) {
         return;
       }
 
-      // we have already visited this one. We can get here if we have cyclic
-      // dependencies
+      // We have already visited this one. We can get here if we have cyclic
+      // dependencies.
       if (path in deps.visited) {
         if (!(path in seenScript)) {
           seenScript[path] = true;
@@ -464,13 +653,14 @@ if (!COMPILED) {
 
       if (path in deps.requires) {
         for (var requireName in deps.requires[path]) {
-          if (requireName in deps.nameToPath) {
-            visitNode(deps.nameToPath[requireName]);
-          } else if (!goog.getObjectByName(requireName)) {
-            // If the required name is defined, we assume that this
-            // dependency was bootstapped by other means. Otherwise,
-            // throw an exception.
-            throw Error('Undefined nameToPath for ' + requireName);
+          // If the required name is defined, we assume that it was already
+          // bootstrapped by other means.
+          if (!goog.isProvided_(requireName)) {
+            if (requireName in deps.nameToPath) {
+              visitNode(deps.nameToPath[requireName]);
+            } else {
+              throw Error('Undefined nameToPath for ' + requireName);
+            }
           }
         }
       }
@@ -489,7 +679,7 @@ if (!COMPILED) {
 
     for (var i = 0; i < scripts.length; i++) {
       if (scripts[i]) {
-        goog.writeScriptTag_(goog.basePath + scripts[i]);
+        goog.importScript_(goog.basePath + scripts[i]);
       } else {
         throw Error('Undefined script input');
       }
@@ -516,7 +706,7 @@ if (!COMPILED) {
 
   // Allow projects to manage the deps files themselves.
   if (!goog.global.CLOSURE_NO_DEPS) {
-    goog.writeScriptTag_(goog.basePath + 'deps.js');
+    goog.importScript_(goog.basePath + 'deps.js');
   }
 }
 
@@ -537,7 +727,30 @@ goog.typeOf = function(value) {
   var s = typeof value;
   if (s == 'object') {
     if (value) {
-      // We cannot use constructor == Array or instanceof Array because
+      // Check these first, so we can avoid calling Object.prototype.toString if
+      // possible.
+      //
+      // IE improperly marshals tyepof across execution contexts, but a
+      // cross-context object will still return false for "instanceof Object".
+      if (value instanceof Array) {
+        return 'array';
+      } else if (value instanceof Object) {
+        return s;
+      }
+
+      // HACK: In order to use an Object prototype method on the arbitrary
+      //   value, the compiler requires the value be cast to type Object,
+      //   even though the ECMA spec explicitly allows it.
+      var className = Object.prototype.toString.call(
+          /** @type {Object} */ (value));
+      // In Firefox 3.6, attempting to access iframe window objects' length
+      // property throws an NS_ERROR_FAILURE, so we need to special-case it
+      // here.
+      if (className == '[object Window]') {
+        return 'object';
+      }
+
+      // We cannot always use constructor == Array or instanceof Array because
       // different frames have different Array objects. In IE6, if the iframe
       // where the array was created is destroyed, the array loses its
       // prototype. Then dereferencing val.splice here throws an exception, so
@@ -555,23 +768,10 @@ goog.typeOf = function(value) {
       //         "[object ", Result(1), and "]".
       //      3. Return Result(2).
       // and this behavior survives the destruction of the execution context.
-      if (value instanceof Array ||  // Works quickly in same execution context.
-          // If value is from a different execution context then
-          // !(value instanceof Object), which lets us early out in the common
-          // case when value is from the same context but not an array.
-          // The {if (value)} check above means we don't have to worry about
-          // undefined behavior of Object.prototype.toString on null/undefined.
-          //
-          // HACK: In order to use an Object prototype method on the arbitrary
-          //   value, the compiler requires the value be cast to type Object,
-          //   even though the ECMA spec explicitly allows it.
-          (!(value instanceof Object) &&
-           (Object.prototype.toString.call(
-               /** @type {Object} */ (value)) == '[object Array]') ||
-
+      if ((className == '[object Array]' ||
            // In IE all non value types are wrapped as objects across window
            // boundaries (not iframe though) so we have to do object detection
-           // for this edge case
+           // for this edge case.
            typeof value.length == 'number' &&
            typeof value.splice != 'undefined' &&
            typeof value.propertyIsEnumerable != 'undefined' &&
@@ -594,26 +794,22 @@ goog.typeOf = function(value) {
       // (it appears just as an object) so we cannot use just typeof val ==
       // 'function'. However, if the object has a call property, it is a
       // function.
-      if (!(value instanceof Object) &&
-          (Object.prototype.toString.call(
-              /** @type {Object} */ (value)) == '[object Function]' ||
+      if ((className == '[object Function]' ||
           typeof value.call != 'undefined' &&
           typeof value.propertyIsEnumerable != 'undefined' &&
           !value.propertyIsEnumerable('call'))) {
         return 'function';
       }
 
-
     } else {
       return 'null';
     }
 
-  // In Safari typeof nodeList returns 'function', and on Firefox
-  // typeof behaves similarly for HTML{Applet,Embed,Object}Elements
-  // and RegExps.  We would like to return object for those and we can
-  // detect an invalid function by making sure that the function
-  // object has a call method.
   } else if (s == 'function' && typeof value.call == 'undefined') {
+    // In Safari typeof nodeList returns 'function', and on Firefox typeof
+    // behaves similarly for HTML{Applet,Embed,Object}, Elements and RegExps. We
+    // would like to return object for those and we can detect an invalid
+    // function by making sure that the function object has a call method.
     return 'object';
   }
   return s;
@@ -621,53 +817,7 @@ goog.typeOf = function(value) {
 
 
 /**
- * Safe way to test whether a property is enumarable.  It allows testing
- * for enumerable on objects where 'propertyIsEnumerable' is overridden or
- * does not exist (like DOM nodes in IE). Does not use browser native
- * Object.propertyIsEnumerable.
- * @param {Object} object The object to test if the property is enumerable.
- * @param {string} propName The property name to check for.
- * @return {boolean} True if the property is enumarable.
- * @private
- */
-goog.propertyIsEnumerableCustom_ = function(object, propName) {
-  // KJS in Safari 2 is not ECMAScript compatible and lacks crucial methods
-  // such as propertyIsEnumerable.  We therefore use a workaround.
-  // Does anyone know a more efficient work around?
-  if (propName in object) {
-    for (var key in object) {
-      if (key == propName &&
-          Object.prototype.hasOwnProperty.call(object, propName)) {
-        return true;
-      }
-    }
-  }
-  return false;
-};
-
-
-/**
- * Safe way to test whether a property is enumarable.  It allows testing
- * for enumerable on objects where 'propertyIsEnumerable' is overridden or
- * does not exist (like DOM nodes in IE).
- * @param {Object} object The object to test if the property is enumerable.
- * @param {string} propName The property name to check for.
- * @return {boolean} True if the property is enumarable.
- * @private
- */
-goog.propertyIsEnumerable_ = function(object, propName) {
-  // In IE if object is from another window, cannot use propertyIsEnumerable
-  // from this window's Object. Will raise a 'JScript object expected' error.
-  if (object instanceof Object) {
-    return Object.prototype.propertyIsEnumerable.call(object, propName);
-  } else {
-    return goog.propertyIsEnumerableCustom_(object, propName);
-  }
-};
-
-
-/**
- * Returns true if the specified value is not |undefined|.
+ * Returns true if the specified value is not undefined.
  * WARNING: Do not use this to test if an object has a property. Use the in
  * operator instead.  Additionally, this function assumes that the global
  * undefined variable has not been redefined.
@@ -680,7 +830,7 @@ goog.isDef = function(val) {
 
 
 /**
- * Returns true if the specified value is |null|
+ * Returns true if the specified value is null.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is null.
  */
@@ -690,7 +840,7 @@ goog.isNull = function(val) {
 
 
 /**
- * Returns true if the specified value is defined and not null
+ * Returns true if the specified value is defined and not null.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is defined and not null.
  */
@@ -701,7 +851,7 @@ goog.isDefAndNotNull = function(val) {
 
 
 /**
- * Returns true if the specified value is an array
+ * Returns true if the specified value is an array.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is an array.
  */
@@ -724,8 +874,8 @@ goog.isArrayLike = function(val) {
 
 
 /**
- * Returns true if the object looks like a Date. To qualify as Date-like
- * the value needs to be an object and have a getFullYear() function.
+ * Returns true if the object looks like a Date. To qualify as Date-like the
+ * value needs to be an object and have a getFullYear() function.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is a like a Date.
  */
@@ -735,7 +885,7 @@ goog.isDateLike = function(val) {
 
 
 /**
- * Returns true if the specified value is a string
+ * Returns true if the specified value is a string.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is a string.
  */
@@ -745,7 +895,7 @@ goog.isString = function(val) {
 
 
 /**
- * Returns true if the specified value is a boolean
+ * Returns true if the specified value is a boolean.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is boolean.
  */
@@ -755,7 +905,7 @@ goog.isBoolean = function(val) {
 
 
 /**
- * Returns true if the specified value is a number
+ * Returns true if the specified value is a number.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is a number.
  */
@@ -765,7 +915,7 @@ goog.isNumber = function(val) {
 
 
 /**
- * Returns true if the specified value is a function
+ * Returns true if the specified value is a function.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is a function.
  */
@@ -775,39 +925,38 @@ goog.isFunction = function(val) {
 
 
 /**
- * Returns true if the specified value is an object.  This includes arrays
- * and functions.
+ * Returns true if the specified value is an object.  This includes arrays and
+ * functions.
  * @param {*} val Variable to test.
  * @return {boolean} Whether variable is an object.
  */
 goog.isObject = function(val) {
-  var type = goog.typeOf(val);
-  return type == 'object' || type == 'array' || type == 'function';
+  var type = typeof val;
+  return type == 'object' && val != null || type == 'function';
+  // return Object(val) === val also works, but is slower, especially if val is
+  // not an object.
 };
 
 
 /**
- * Gets a unique ID for an object. This mutates the object so that further
- * calls with the same object as a parameter returns the same value. The unique
- * ID is guaranteed to be unique across the current session amongst objects that
- * are passed into {@code getUid}. There is no guarantee that the ID is unique
- * or consistent across sessions.
+ * Gets a unique ID for an object. This mutates the object so that further calls
+ * with the same object as a parameter returns the same value. The unique ID is
+ * guaranteed to be unique across the current session amongst objects that are
+ * passed into {@code getUid}. There is no guarantee that the ID is unique or
+ * consistent across sessions. It is unsafe to generate unique ID for function
+ * prototypes.
  *
  * @param {Object} obj The object to get the unique ID for.
  * @return {number} The unique ID for the object.
  */
 goog.getUid = function(obj) {
-  // TODO(user): Make the type stricter, do not accept null.
+  // TODO(arv): Make the type stricter, do not accept null.
 
-  // In IE, DOM nodes do not extend Object so they do not have this method.
-  // we need to check hasOwnProperty because the proto might have this set.
-  if (obj.hasOwnProperty && obj.hasOwnProperty(goog.UID_PROPERTY_)) {
-    return obj[goog.UID_PROPERTY_];
-  }
-  if (!obj[goog.UID_PROPERTY_]) {
-    obj[goog.UID_PROPERTY_] = ++goog.uidCounter_;
-  }
-  return obj[goog.UID_PROPERTY_];
+  // In Opera window.hasOwnProperty exists but always returns false so we avoid
+  // using it. As a consequence the unique ID generated for BaseClass.prototype
+  // and SubClass.prototype will be the same.
+  return obj[goog.UID_PROPERTY_] ||
+      (obj[goog.UID_PROPERTY_] = ++goog.uidCounter_);
 };
 
 
@@ -818,10 +967,10 @@ goog.getUid = function(obj) {
  * @param {Object} obj The object to remove the unique ID field from.
  */
 goog.removeUid = function(obj) {
-  // TODO(user): Make the type stricter, do not accept null.
+  // TODO(arv): Make the type stricter, do not accept null.
 
-  // DOM nodes in IE are not instance of Object and throws exception
-  // for delete. Instead we try to use removeAttribute
+  // In IE, DOM nodes are not instances of Object and throw an exception if we
+  // try to delete.  Instead we try to use removeAttribute.
   if ('removeAttribute' in obj) {
     obj.removeAttribute(goog.UID_PROPERTY_);
   }
@@ -835,12 +984,11 @@ goog.removeUid = function(obj) {
 
 /**
  * Name for unique ID property. Initialized in a way to help avoid collisions
- * with other closure javascript on the same page.
+ * with other closure JavaScript on the same page.
  * @type {string}
  * @private
  */
-goog.UID_PROPERTY_ = 'closure_uid_' +
-    Math.floor(Math.random() * 2147483648).toString(36);
+goog.UID_PROPERTY_ = 'closure_uid_' + ((Math.random() * 1e9) >>> 0);
 
 
 /**
@@ -902,44 +1050,39 @@ goog.cloneObject = function(obj) {
 
 
 /**
- * Forward declaration for the clone method. This is necessary until the
- * compiler can better support duck-typing constructs as used in
- * goog.cloneObject.
- *
- * TODO(user): Remove once the JSCompiler can infer that the check for
- * proto.clone is safe in goog.cloneObject.
- *
- * @type {Function}
+ * A native implementation of goog.bind.
+ * @param {Function} fn A function to partially apply.
+ * @param {Object|undefined} selfObj Specifies the object which this should
+ *     point to when the function is run.
+ * @param {...*} var_args Additional arguments that are partially applied to the
+ *     function.
+ * @return {!Function} A partially-applied form of the function bind() was
+ *     invoked as a method of.
+ * @private
+ * @suppress {deprecated} The compiler thinks that Function.prototype.bind is
+ *     deprecated because some people have declared a pure-JS version.
+ *     Only the pure-JS version is truly deprecated.
  */
-Object.prototype.clone;
+goog.bindNative_ = function(fn, selfObj, var_args) {
+  return /** @type {!Function} */ (fn.call.apply(fn.bind, arguments));
+};
 
 
 /**
- * Partially applies this function to a particular 'this object' and zero or
- * more arguments. The result is a new function with some arguments of the first
- * function pre-filled and the value of |this| 'pre-specified'.<br><br>
- *
- * Remaining arguments specified at call-time are appended to the pre-
- * specified ones.<br><br>
- *
- * Also see: {@link #partial}.<br><br>
- *
- * Usage:
- * <pre>var barMethBound = bind(myFunction, myObj, 'arg1', 'arg2');
- * barMethBound('arg3', 'arg4');</pre>
- *
+ * A pure-JS implementation of goog.bind.
  * @param {Function} fn A function to partially apply.
- * @param {Object|undefined} selfObj Specifies the object which |this| should
- *     point to when the function is run. If the value is null or undefined, it
- *     will default to the global object.
- * @param {...*} var_args Additional arguments that are partially
- *     applied to the function.
- *
+ * @param {Object|undefined} selfObj Specifies the object which this should
+ *     point to when the function is run.
+ * @param {...*} var_args Additional arguments that are partially applied to the
+ *     function.
  * @return {!Function} A partially-applied form of the function bind() was
  *     invoked as a method of.
+ * @private
  */
-goog.bind = function(fn, selfObj, var_args) {
-  var context = selfObj || goog.global;
+goog.bindJs_ = function(fn, selfObj, var_args) {
+  if (!fn) {
+    throw new Error();
+  }
 
   if (arguments.length > 2) {
     var boundArgs = Array.prototype.slice.call(arguments, 2);
@@ -947,14 +1090,56 @@ goog.bind = function(fn, selfObj, var_args) {
       // Prepend the bound arguments to the current arguments.
       var newArgs = Array.prototype.slice.call(arguments);
       Array.prototype.unshift.apply(newArgs, boundArgs);
-      return fn.apply(context, newArgs);
+      return fn.apply(selfObj, newArgs);
     };
 
   } else {
     return function() {
-      return fn.apply(context, arguments);
+      return fn.apply(selfObj, arguments);
     };
   }
+};
+
+
+/**
+ * Partially applies this function to a particular 'this object' and zero or
+ * more arguments. The result is a new function with some arguments of the first
+ * function pre-filled and the value of this 'pre-specified'.
+ *
+ * Remaining arguments specified at call-time are appended to the pre-specified
+ * ones.
+ *
+ * Also see: {@link #partial}.
+ *
+ * Usage:
+ * <pre>var barMethBound = bind(myFunction, myObj, 'arg1', 'arg2');
+ * barMethBound('arg3', 'arg4');</pre>
+ *
+ * @param {?function(this:T, ...)} fn A function to partially apply.
+ * @param {T} selfObj Specifies the object which this should point to when the
+ *     function is run.
+ * @param {...*} var_args Additional arguments that are partially applied to the
+ *     function.
+ * @return {!Function} A partially-applied form of the function bind() was
+ *     invoked as a method of.
+ * @template T
+ * @suppress {deprecated} See above.
+ */
+goog.bind = function(fn, selfObj, var_args) {
+  // TODO(nicksantos): narrow the type signature.
+  if (Function.prototype.bind &&
+      // NOTE(nicksantos): Somebody pulled base.js into the default Chrome
+      // extension environment. This means that for Chrome extensions, they get
+      // the implementation of Function.prototype.bind that calls goog.bind
+      // instead of the native one. Even worse, we don't want to introduce a
+      // circular dependency between goog.bind and Function.prototype.bind, so
+      // we have to hack this to make sure it works correctly.
+      Function.prototype.bind.toString().indexOf('native code') != -1) {
+    goog.bind = goog.bindNative_;
+  } else {
+    goog.bind = goog.bindJs_;
+  }
+  return goog.bind.apply(null, arguments);
 };
 
 
@@ -967,8 +1152,7 @@ goog.bind = function(fn, selfObj, var_args) {
  * g(arg3, arg4);
  *
  * @param {Function} fn A function to partially apply.
- * @param {...*} var_args Additional arguments that are partially
- *     applied to fn.
+ * @param {...*} var_args Additional arguments that are partially applied to fn.
  * @return {!Function} A partially-applied form of the function bind() was
  *     invoked as a method of.
  */
@@ -1007,7 +1191,7 @@ goog.mixin = function(target, source) {
  * @return {number} An integer value representing the number of milliseconds
  *     between midnight, January 1, 1970 and the current time.
  */
-goog.now = Date.now || (function() {
+goog.now = (goog.TRUSTED_SITE && Date.now) || (function() {
   // Unary plus operator converts its operand to a number which in the case of
   // a date is done by calling getTime().
   return +new Date();
@@ -1015,7 +1199,7 @@ goog.now = Date.now || (function() {
 
 
 /**
- * Evals javascript in the global scope.  In IE this uses execScript, other
+ * Evals JavaScript in the global scope.  In IE this uses execScript, other
  * browsers use goog.global.eval. If goog.global.eval does not evaluate in the
  * global scope (for example, in Safari), appends a script tag instead.
  * Throws an exception if neither execScript or eval is defined.
@@ -1056,21 +1240,13 @@ goog.globalEval = function(script) {
 
 
 /**
- * A macro for defining composite types.
- *
- * By assigning goog.typedef to a name, this tells JSCompiler that this is not
- * the name of a class, but rather it's the name of a composite type.
- *
- * For example,
- * /** @type {Array|NodeList} / goog.ArrayLike = goog.typedef;
- * will tell JSCompiler to replace all appearances of goog.ArrayLike in type
- * definitions with the union of Array and NodeList.
- *
- * Does nothing in uncompiled code.
- *
- * @deprecated Please use the {@code @typedef} annotation.
+ * Indicates whether or not we can call 'eval' directly to eval code in the
+ * global scope. Set to a Boolean by the first call to goog.globalEval (which
+ * empirically tests whether eval works for globals). @see goog.globalEval
+ * @type {?boolean}
+ * @private
  */
-goog.typedef = true;
+goog.evalWorksForGlobals_ = null;
 
 
 /**
@@ -1084,31 +1260,40 @@ goog.cssNameMapping_;
 
 
 /**
+ * Optional obfuscation style for CSS class names. Should be set to either
+ * 'BY_WHOLE' or 'BY_PART' if defined.
+ * @type {string|undefined}
+ * @private
+ * @see goog.setCssNameMapping
+ */
+goog.cssNameMappingStyle_;
+
+
+/**
  * Handles strings that are intended to be used as CSS class names.
  *
- * Without JS Compiler the arguments are simple joined with a hyphen and passed
- * through unaltered.
+ * This function works in tandem with @see goog.setCssNameMapping.
  *
- * With the JS Compiler the arguments are inlined, e.g:
+ * Without any mapping set, the arguments are simple joined with a hyphen and
+ * passed through unaltered.
+ *
+ * When there is a mapping, there are two possible styles in which these
+ * mappings are used. In the BY_PART style, each part (i.e. in between hyphens)
+ * of the passed in css name is rewritten according to the map. In the BY_WHOLE
+ * style, the full css name is looked up in the map directly. If a rewrite is
+ * not specified by the map, the compiler will output a warning.
+ *
+ * When the mapping is passed to the compiler, it will replace calls to
+ * goog.getCssName with the strings from the mapping, e.g.
  *     var x = goog.getCssName('foo');
  *     var y = goog.getCssName(this.baseClass, 'active');
  *  becomes:
  *     var x= 'foo';
  *     var y = this.baseClass + '-active';
  *
- * If a CSS renaming map is passed to the compiler it will replace symbols in
- * the classname.  If one argument is passed it will be processed, if two are
- * passed only the modifier will be processed, as it is assumed the first
- * argument was generated as a result of calling goog.getCssName.
- *
- * Names are split on 'hyphen' and processed in parts such that the following
- * are equivalent:
- *   var base = goog.getCssName('baseclass');
- *   goog.getCssName(base, 'modifier');
- *   goog.getCSsName('baseclass-modifier');
- *
- * If any part does not appear in the renaming map a warning is logged and the
- * original, unobfuscated class name is inlined.
+ * If one argument is passed it will be processed, if two are passed only the
+ * modifier will be processed, as it is assumed the first argument was generated
+ * as a result of calling goog.getCssName.
  *
  * @param {string} className The class name.
  * @param {string=} opt_modifier A modifier to be appended to the class name.
@@ -1116,9 +1301,35 @@ goog.cssNameMapping_;
  *     the modifier.
  */
 goog.getCssName = function(className, opt_modifier) {
-  var cssName = className + (opt_modifier ? '-' + opt_modifier : '');
-  return (goog.cssNameMapping_ && (cssName in goog.cssNameMapping_)) ?
-      goog.cssNameMapping_[cssName] : cssName;
+  var getMapping = function(cssName) {
+    return goog.cssNameMapping_[cssName] || cssName;
+  };
+
+  var renameByParts = function(cssName) {
+    // Remap all the parts individually.
+    var parts = cssName.split('-');
+    var mapped = [];
+    for (var i = 0; i < parts.length; i++) {
+      mapped.push(getMapping(parts[i]));
+    }
+    return mapped.join('-');
+  };
+
+  var rename;
+  if (goog.cssNameMapping_) {
+    rename = goog.cssNameMappingStyle_ == 'BY_WHOLE' ?
+        getMapping : renameByParts;
+  } else {
+    rename = function(a) {
+      return a;
+    };
+  }
+
+  if (opt_modifier) {
+    return className + '-' + rename(opt_modifier);
+  } else {
+    return rename(className);
+  }
 };
 
 
@@ -1126,14 +1337,13 @@ goog.getCssName = function(className, opt_modifier) {
  * Sets the map to check when returning a value from goog.getCssName(). Example:
  * <pre>
  * goog.setCssNameMapping({
- *   "goog-menu": "a",
- *   "goog-menu-disabled": "a-b",
- *   "CSS_LOGO": "b",
- *   "hidden": "c"
+ *   "goog": "a",
+ *   "disabled": "b",
  * });
  *
+ * var x = goog.getCssName('goog');
  * // The following evaluates to: "a a-b".
- * goog.getCssName('goog-menu') + ' ' + goog.getCssName('goog-menu', 'disabled')
+ * goog.getCssName('goog') + ' ' + goog.getCssName(x, 'disabled')
  * </pre>
  * When declared as a map of string literals to string literals, the JSCompiler
  * will replace all calls to goog.getCssName() using the supplied map if the
@@ -1142,14 +1352,50 @@ goog.getCssName = function(className, opt_modifier) {
  * @param {!Object} mapping A map of strings to strings where keys are possible
  *     arguments to goog.getCssName() and values are the corresponding values
  *     that should be returned.
+ * @param {string=} opt_style The style of css name mapping. There are two valid
+ *     options: 'BY_PART', and 'BY_WHOLE'.
+ * @see goog.getCssName for a description.
  */
-goog.setCssNameMapping = function(mapping) {
+goog.setCssNameMapping = function(mapping, opt_style) {
   goog.cssNameMapping_ = mapping;
+  goog.cssNameMappingStyle_ = opt_style;
 };
 
 
 /**
- * Abstract implementation of goog.getMsg for use with localized messages.
+ * To use CSS renaming in compiled mode, one of the input files should have a
+ * call to goog.setCssNameMapping() with an object literal that the JSCompiler
+ * can extract and use to replace all calls to goog.getCssName(). In uncompiled
+ * mode, JavaScript code should be loaded before this base.js file that declares
+ * a global variable, CLOSURE_CSS_NAME_MAPPING, which is used below. This is
+ * to ensure that the mapping is loaded before any calls to goog.getCssName()
+ * are made in uncompiled mode.
+ *
+ * A hook for overriding the CSS name mapping.
+ * @type {Object|undefined}
+ */
+goog.global.CLOSURE_CSS_NAME_MAPPING;
+
+
+if (!COMPILED && goog.global.CLOSURE_CSS_NAME_MAPPING) {
+  // This does not call goog.setCssNameMapping() because the JSCompiler
+  // requires that goog.setCssNameMapping() be called with an object literal.
+  goog.cssNameMapping_ = goog.global.CLOSURE_CSS_NAME_MAPPING;
+}
+
+
+/**
+ * Gets a localized message.
+ *
+ * This function is a compiler primitive. If you give the compiler a localized
+ * message bundle, it will replace the string at compile-time with a localized
+ * version, and expand goog.getMsg call to a concatenated string.
+ *
+ * Messages must be initialized in the form:
+ * <code>
+ * var MSG_NAME = goog.getMsg('Hello {$placeholder}', {'placeholder': 'world'});
+ * </code>
+ *
  * @param {string} str Translatable string, places holders in the form {$foo}.
  * @param {Object=} opt_values Map of place holder name to value.
  * @return {string} message with placeholders filled.
@@ -1165,18 +1411,35 @@ goog.getMsg = function(str, opt_values) {
 
 
 /**
+ * Gets a localized message. If the message does not have a translation, gives a
+ * fallback message.
+ *
+ * This is useful when introducing a new message that has not yet been
+ * translated into all languages.
+ *
+ * This function is a compiler primtive. Must be used in the form:
+ * <code>var x = goog.getMsgWithFallback(MSG_A, MSG_B);</code>
+ * where MSG_A and MSG_B were initialized with goog.getMsg.
+ *
+ * @param {string} a The preferred message.
+ * @param {string} b The fallback message.
+ * @return {string} The best translated message.
+ */
+goog.getMsgWithFallback = function(a, b) {
+  return a;
+};
+
+
+/**
  * Exposes an unobfuscated global namespace path for the given object.
- * Note that fields of the exported object *will* be obfuscated,
- * unless they are exported in turn via this function or
- * goog.exportProperty
+ * Note that fields of the exported object *will* be obfuscated, unless they are
+ * exported in turn via this function or goog.exportProperty.
  *
- * <p>Also handy for making public items that are defined in anonymous
- * closures.
+ * Also handy for making public items that are defined in anonymous closures.
  *
- * ex. goog.exportSymbol('Foo', Foo);
+ * ex. goog.exportSymbol('public.path.Foo', Foo);
  *
- * ex. goog.exportSymbol('public.path.Foo.staticFunction',
- *                       Foo.staticFunction);
+ * ex. goog.exportSymbol('public.path.Foo.staticFunction', Foo.staticFunction);
  *     public.path.Foo.staticFunction();
  *
  * ex. goog.exportSymbol('public.path.Foo.prototype.myMethod',
@@ -1186,7 +1449,7 @@ goog.getMsg = function(str, opt_values) {
  * @param {string} publicPath Unobfuscated name to export.
  * @param {*} object Object the name should point to.
  * @param {Object=} opt_objectToExportTo The object to add the path to; default
- *     is |goog.global|.
+ *     is goog.global.
  */
 goog.exportSymbol = function(publicPath, object, opt_objectToExportTo) {
   goog.exportPath_(publicPath, object, opt_objectToExportTo);
@@ -1215,22 +1478,21 @@ goog.exportProperty = function(object, publicName, symbol) {
  * ParentClass.prototype.foo = function(a) { }
  *
  * function ChildClass(a, b, c) {
- *   ParentClass.call(this, a, b);
+ *   goog.base(this, a, b);
  * }
- *
  * goog.inherits(ChildClass, ParentClass);
  *
  * var child = new ChildClass('a', 'b', 'see');
- * child.foo(); // works
+ * child.foo(); // This works.
  * </pre>
  *
- * In addition, a superclass' implementation of a method can be invoked
- * as follows:
+ * In addition, a superclass' implementation of a method can be invoked as
+ * follows:
  *
  * <pre>
  * ChildClass.prototype.foo = function(a) {
  *   ChildClass.superClass_.foo.call(this, a);
- *   // other code
+ *   // Other code here.
  * };
  * </pre>
  *
@@ -1243,6 +1505,7 @@ goog.inherits = function(childCtor, parentCtor) {
   tempCtor.prototype = parentCtor.prototype;
   childCtor.superClass_ = parentCtor.prototype;
   childCtor.prototype = new tempCtor();
+  /** @override */
   childCtor.prototype.constructor = childCtor;
 };
 
@@ -1251,21 +1514,19 @@ goog.inherits = function(childCtor, parentCtor) {
  * Call up to the superclass.
  *
  * If this is called from a constructor, then this calls the superclass
- * contructor with arguments 1-N.
+ * contsructor with arguments 1-N.
  *
- * If this is called from a prototype method, then you must pass
- * the name of the method as the second argument to this function. If
- * you do not, you will get a runtime error. This calls the superclass'
- * method with arguments 2-N.
+ * If this is called from a prototype method, then you must pass the name of the
+ * method as the second argument to this function. If you do not, you will get a
+ * runtime error. This calls the superclass' method with arguments 2-N.
  *
- * This function only works if you use goog.inherits to express
- * inheritance relationships between your classes.
+ * This function only works if you use goog.inherits to express inheritance
+ * relationships between your classes.
  *
- * This function is a compiler primitive. At compile-time, the
- * compiler will do macro expansion to remove a lot of
- * the extra overhead that this function introduces. The compiler
- * will also enforce a lot of the assumptions that this function
- * makes, and treat it as a compiler error if you break them.
+ * This function is a compiler primitive. At compile-time, the compiler will do
+ * macro expansion to remove a lot of the extra overhead that this function
+ * introduces. The compiler will also enforce a lot of the assumptions that this
+ * function makes, and treat it as a compiler error if you break them.
  *
  * @param {!Object} me Should always be "this".
  * @param {*=} opt_methodName The method name if calling a super method.
@@ -1274,6 +1535,15 @@ goog.inherits = function(childCtor, parentCtor) {
  */
 goog.base = function(me, opt_methodName, var_args) {
   var caller = arguments.callee.caller;
+
+  if (goog.DEBUG) {
+    if (!caller) {
+      throw Error('arguments.caller not defined.  goog.base() expects not ' +
+                  'to be running in strict mode. See ' +
+                  'http://www.ecma-international.org/ecma-262/5.1/#sec-C');
+    }
+  }
+
   if (caller.superClass_) {
     // This is a constructor. Call the superclass constructor.
     return caller.superClass_.constructor.apply(
@@ -1291,8 +1561,8 @@ goog.base = function(me, opt_methodName, var_args) {
     }
   }
 
-  // If we did not find the caller in the prototype chain,
-  // then one of two things happened:
+  // If we did not find the caller in the prototype chain, then one of two
+  // things happened:
   // 1) The caller is an instance method.
   // 2) This method was not called by the right caller.
   if (me[opt_methodName] === caller) {
@@ -1307,20 +1577,19 @@ goog.base = function(me, opt_methodName, var_args) {
 
 /**
  * Allow for aliasing within scope functions.  This function exists for
- * uncompiled code - in compiled code the calls will be inlined and the
- * aliases applied.  In uncompiled code the function is simply run since the
- * aliases as written are valid JavaScript.
+ * uncompiled code - in compiled code the calls will be inlined and the aliases
+ * applied.  In uncompiled code the function is simply run since the aliases as
+ * written are valid JavaScript.
  * @param {function()} fn Function to call.  This function can contain aliases
  *     to namespaces (e.g. "var dom = goog.dom") or classes
- *    (e.g. "var Timer = goog.Timer").
+ *     (e.g. "var Timer = goog.Timer").
  */
 goog.scope = function(fn) {
   fn.call(goog.global);
 };
 
 
-
-// Copyright 2010 The Closure Library Authors. All Rights Reserved.
+// Copyright 2013 The Closure Library Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1336,73 +1605,124 @@ goog.scope = function(fn) {
 //
 // This file has been auto-generated by GenJsDeps, please do not edit.
 
-goog.addDependency('array/array.js', ['goog.array'], ['goog.asserts']);
+goog.addDependency('../../third_party/closure/goog/caja/string/html/htmlparser.js', ['goog.string.html.HtmlParser', 'goog.string.html.HtmlParser.EFlags', 'goog.string.html.HtmlParser.Elements', 'goog.string.html.HtmlParser.Entities', 'goog.string.html.HtmlSaxHandler'], []);
+goog.addDependency('../../third_party/closure/goog/caja/string/html/htmlsanitizer.js', ['goog.string.html.HtmlSanitizer', 'goog.string.html.HtmlSanitizer.AttributeType', 'goog.string.html.HtmlSanitizer.Attributes', 'goog.string.html.htmlSanitize'], ['goog.string.StringBuffer', 'goog.string.html.HtmlParser', 'goog.string.html.HtmlParser.EFlags', 'goog.string.html.HtmlParser.Elements', 'goog.string.html.HtmlSaxHandler']);
+goog.addDependency('../../third_party/closure/goog/dojo/dom/query.js', ['goog.dom.query'], ['goog.array', 'goog.dom', 'goog.functions', 'goog.string', 'goog.userAgent']);
+goog.addDependency('../../third_party/closure/goog/jpeg_encoder/jpeg_encoder_basic.js', ['goog.crypt.JpegEncoder'], ['goog.crypt.base64']);
+goog.addDependency('../../third_party/closure/goog/loremipsum/text/loremipsum.js', ['goog.text.LoremIpsum'], ['goog.array', 'goog.math', 'goog.string', 'goog.structs.Map', 'goog.structs.Set']);
+goog.addDependency('../../third_party/closure/goog/mochikit/async/deferred.js', ['goog.async.Deferred', 'goog.async.Deferred.AlreadyCalledError', 'goog.async.Deferred.CanceledError'], ['goog.array', 'goog.asserts', 'goog.debug.Error', 'goog.functions']);
+goog.addDependency('../../third_party/closure/goog/mochikit/async/deferredlist.js', ['goog.async.DeferredList'], ['goog.async.Deferred']);
+goog.addDependency('../../third_party/closure/goog/osapi/osapi.js', ['goog.osapi'], []);
+goog.addDependency('a11y/aria/announcer.js', ['goog.a11y.aria.Announcer'], ['goog.Disposable', 'goog.a11y.aria', 'goog.a11y.aria.LivePriority', 'goog.a11y.aria.State', 'goog.dom', 'goog.object']);
+goog.addDependency('a11y/aria/aria.js', ['goog.a11y.aria'], ['goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.a11y.aria.datatables', 'goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.TagName', 'goog.object', 'goog.string']);
+goog.addDependency('a11y/aria/attributes.js', ['goog.a11y.aria.AutoCompleteValues', 'goog.a11y.aria.CheckedValues', 'goog.a11y.aria.DropEffectValues', 'goog.a11y.aria.ExpandedValues', 'goog.a11y.aria.GrabbedValues', 'goog.a11y.aria.InvalidValues', 'goog.a11y.aria.LivePriority', 'goog.a11y.aria.OrientationValues', 'goog.a11y.aria.PressedValues', 'goog.a11y.aria.RelevantValues', 'goog.a11y.aria.SelectedValues', 'goog.a11y.aria.SortValues', 'goog.a11y.aria.State'], []);
+goog.addDependency('a11y/aria/datatables.js', ['goog.a11y.aria.datatables'], ['goog.a11y.aria.State', 'goog.object']);
+goog.addDependency('a11y/aria/roles.js', ['goog.a11y.aria.Role'], []);
+goog.addDependency('array/array.js', ['goog.array', 'goog.array.ArrayLike'], ['goog.asserts']);
 goog.addDependency('asserts/asserts.js', ['goog.asserts', 'goog.asserts.AssertionError'], ['goog.debug.Error', 'goog.string']);
+goog.addDependency('async/animationdelay.js', ['goog.async.AnimationDelay'], ['goog.Disposable', 'goog.events', 'goog.functions']);
 goog.addDependency('async/conditionaldelay.js', ['goog.async.ConditionalDelay'], ['goog.Disposable', 'goog.async.Delay']);
 goog.addDependency('async/delay.js', ['goog.Delay', 'goog.async.Delay'], ['goog.Disposable', 'goog.Timer']);
+goog.addDependency('async/nexttick.js', ['goog.async.nextTick'], ['goog.debug.entryPointRegistry', 'goog.functions']);
 goog.addDependency('async/throttle.js', ['goog.Throttle', 'goog.async.Throttle'], ['goog.Disposable', 'goog.Timer']);
 goog.addDependency('base.js', ['goog'], []);
 goog.addDependency('color/alpha.js', ['goog.color.alpha'], ['goog.color']);
 goog.addDependency('color/color.js', ['goog.color'], ['goog.color.names', 'goog.math']);
 goog.addDependency('color/names.js', ['goog.color.names'], []);
-goog.addDependency('crypt/base64.js', ['goog.crypt.base64'], ['goog.crypt']);
+goog.addDependency('crypt/aes.js', ['goog.crypt.Aes'], ['goog.asserts', 'goog.crypt.BlockCipher']);
+goog.addDependency('crypt/arc4.js', ['goog.crypt.Arc4'], ['goog.asserts']);
+goog.addDependency('crypt/base64.js', ['goog.crypt.base64'], ['goog.crypt', 'goog.userAgent']);
 goog.addDependency('crypt/basen.js', ['goog.crypt.baseN'], []);
-goog.addDependency('crypt/crypt.js', ['goog.crypt'], []);
+goog.addDependency('crypt/blobhasher.js', ['goog.crypt.BlobHasher', 'goog.crypt.BlobHasher.EventType'], ['goog.asserts', 'goog.crypt', 'goog.crypt.Hash', 'goog.events.EventTarget', 'goog.fs', 'goog.log']);
+goog.addDependency('crypt/blockcipher.js', ['goog.crypt.BlockCipher'], []);
+goog.addDependency('crypt/cbc.js', ['goog.crypt.Cbc'], ['goog.array', 'goog.crypt']);
+goog.addDependency('crypt/cbc_test.js', ['goog.crypt.CbcTest'], ['goog.crypt', 'goog.crypt.Aes', 'goog.crypt.Cbc', 'goog.testing.jsunit']);
+goog.addDependency('crypt/crypt.js', ['goog.crypt'], ['goog.array']);
+goog.addDependency('crypt/hash.js', ['goog.crypt.Hash'], []);
 goog.addDependency('crypt/hash32.js', ['goog.crypt.hash32'], ['goog.crypt']);
-goog.addDependency('crypt/sha1.js', ['goog.crypt.Sha1'], []);
+goog.addDependency('crypt/hashtester.js', ['goog.crypt.hashTester'], ['goog.array', 'goog.crypt', 'goog.testing.PerformanceTable', 'goog.testing.PseudoRandom', 'goog.testing.asserts']);
+goog.addDependency('crypt/hmac.js', ['goog.crypt.Hmac'], ['goog.asserts', 'goog.crypt.Hash']);
+goog.addDependency('crypt/md5.js', ['goog.crypt.Md5'], ['goog.crypt.Hash']);
+goog.addDependency('crypt/pbkdf2.js', ['goog.crypt.pbkdf2'], ['goog.asserts', 'goog.crypt', 'goog.crypt.Hmac', 'goog.crypt.Sha1']);
+goog.addDependency('crypt/sha1.js', ['goog.crypt.Sha1'], ['goog.crypt.Hash']);
+goog.addDependency('crypt/sha2.js', ['goog.crypt.Sha2'], ['goog.array', 'goog.asserts', 'goog.crypt.Hash']);
+goog.addDependency('crypt/sha224.js', ['goog.crypt.Sha224'], ['goog.crypt.Sha2']);
+goog.addDependency('crypt/sha256.js', ['goog.crypt.Sha256'], ['goog.crypt.Sha2']);
 goog.addDependency('cssom/cssom.js', ['goog.cssom', 'goog.cssom.CssRuleType'], ['goog.array', 'goog.dom']);
-goog.addDependency('cssom/iframe/style.js', ['goog.cssom.iframe.style'], ['goog.cssom', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.style', 'goog.userAgent']);
+goog.addDependency('cssom/iframe/style.js', ['goog.cssom.iframe.style'], ['goog.cssom', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.classes', 'goog.string', 'goog.style', 'goog.userAgent']);
 goog.addDependency('datasource/datamanager.js', ['goog.ds.DataManager'], ['goog.ds.BasicNodeList', 'goog.ds.DataNode', 'goog.ds.Expr', 'goog.string', 'goog.structs', 'goog.structs.Map']);
-goog.addDependency('datasource/datasource.js', ['goog.ds.BaseDataNode', 'goog.ds.BasicNodeList', 'goog.ds.DataNode', 'goog.ds.DataNodeList', 'goog.ds.EmptyNodeList', 'goog.ds.LoadState', 'goog.ds.SortedNodeList', 'goog.ds.Util', 'goog.ds.logger'], ['goog.array', 'goog.debug.Logger']);
+goog.addDependency('datasource/datasource.js', ['goog.ds.BaseDataNode', 'goog.ds.BasicNodeList', 'goog.ds.DataNode', 'goog.ds.DataNodeList', 'goog.ds.EmptyNodeList', 'goog.ds.LoadState', 'goog.ds.SortedNodeList', 'goog.ds.Util', 'goog.ds.logger'], ['goog.array', 'goog.log']);
 goog.addDependency('datasource/expr.js', ['goog.ds.Expr'], ['goog.ds.BasicNodeList', 'goog.ds.EmptyNodeList', 'goog.string']);
 goog.addDependency('datasource/fastdatanode.js', ['goog.ds.AbstractFastDataNode', 'goog.ds.FastDataNode', 'goog.ds.FastListNode', 'goog.ds.PrimitiveFastDataNode'], ['goog.ds.DataManager', 'goog.ds.EmptyNodeList', 'goog.string']);
 goog.addDependency('datasource/jsdatasource.js', ['goog.ds.JsDataSource', 'goog.ds.JsPropertyDataSource'], ['goog.ds.BaseDataNode', 'goog.ds.BasicNodeList', 'goog.ds.DataManager', 'goog.ds.EmptyNodeList', 'goog.ds.LoadState']);
 goog.addDependency('datasource/jsondatasource.js', ['goog.ds.JsonDataSource'], ['goog.Uri', 'goog.dom', 'goog.ds.DataManager', 'goog.ds.JsDataSource', 'goog.ds.LoadState', 'goog.ds.logger']);
-goog.addDependency('datasource/jsxmlhttpdatasource.js', ['goog.ds.JsXmlHttpDataSource'], ['goog.Uri', 'goog.ds.DataManager', 'goog.ds.FastDataNode', 'goog.ds.LoadState', 'goog.ds.logger', 'goog.events', 'goog.net.EventType', 'goog.net.XhrIo']);
+goog.addDependency('datasource/jsxmlhttpdatasource.js', ['goog.ds.JsXmlHttpDataSource'], ['goog.Uri', 'goog.ds.DataManager', 'goog.ds.FastDataNode', 'goog.ds.LoadState', 'goog.ds.logger', 'goog.events', 'goog.log', 'goog.net.EventType', 'goog.net.XhrIo']);
 goog.addDependency('datasource/xmldatasource.js', ['goog.ds.XmlDataSource', 'goog.ds.XmlHttpDataSource'], ['goog.Uri', 'goog.dom.NodeType', 'goog.dom.xml', 'goog.ds.BasicNodeList', 'goog.ds.DataManager', 'goog.ds.LoadState', 'goog.ds.logger', 'goog.net.XhrIo', 'goog.string']);
-goog.addDependency('date/date.js', ['goog.date', 'goog.date.Date', 'goog.date.DateTime', 'goog.date.Interval', 'goog.date.month', 'goog.date.weekDay'], ['goog.asserts', 'goog.string']);
+goog.addDependency('date/date.js', ['goog.date', 'goog.date.Date', 'goog.date.DateTime', 'goog.date.Interval', 'goog.date.month', 'goog.date.weekDay'], ['goog.asserts', 'goog.date.DateLike', 'goog.i18n.DateTimeSymbols', 'goog.string']);
+goog.addDependency('date/datelike.js', ['goog.date.DateLike'], []);
 goog.addDependency('date/daterange.js', ['goog.date.DateRange', 'goog.date.DateRange.Iterator', 'goog.date.DateRange.StandardDateRangeKeys'], ['goog.date.Date', 'goog.date.Interval', 'goog.iter.Iterator', 'goog.iter.StopIteration']);
 goog.addDependency('date/relative.js', ['goog.date.relative'], ['goog.i18n.DateTimeFormat']);
 goog.addDependency('date/utcdatetime.js', ['goog.date.UtcDateTime'], ['goog.date', 'goog.date.Date', 'goog.date.DateTime', 'goog.date.Interval']);
+goog.addDependency('db/cursor.js', ['goog.db.Cursor'], ['goog.async.Deferred', 'goog.db.Error', 'goog.debug', 'goog.events.EventTarget']);
+goog.addDependency('db/db.js', ['goog.db'], ['goog.async.Deferred', 'goog.db.Error', 'goog.db.IndexedDb', 'goog.db.Transaction']);
+goog.addDependency('db/error.js', ['goog.db.Error', 'goog.db.Error.ErrorCode', 'goog.db.Error.ErrorName', 'goog.db.Error.VersionChangeBlockedError'], ['goog.debug.Error']);
+goog.addDependency('db/index.js', ['goog.db.Index'], ['goog.async.Deferred', 'goog.db.Cursor', 'goog.db.Error', 'goog.debug']);
+goog.addDependency('db/indexeddb.js', ['goog.db.IndexedDb'], ['goog.async.Deferred', 'goog.db.Error', 'goog.db.Error.VersionChangeBlockedError', 'goog.db.ObjectStore', 'goog.db.Transaction', 'goog.db.Transaction.TransactionMode', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget']);
+goog.addDependency('db/keyrange.js', ['goog.db.KeyRange'], []);
+goog.addDependency('db/objectstore.js', ['goog.db.ObjectStore'], ['goog.async.Deferred', 'goog.db.Cursor', 'goog.db.Error', 'goog.db.Index', 'goog.debug', 'goog.events']);
+goog.addDependency('db/transaction.js', ['goog.db.Transaction', 'goog.db.Transaction.TransactionMode'], ['goog.async.Deferred', 'goog.db.Error', 'goog.db.ObjectStore', 'goog.events.EventHandler', 'goog.events.EventTarget']);
 goog.addDependency('debug/console.js', ['goog.debug.Console'], ['goog.debug.LogManager', 'goog.debug.Logger.Level', 'goog.debug.TextFormatter']);
-goog.addDependency('debug/debug.js', ['goog.debug'], ['goog.array', 'goog.string', 'goog.structs.Set']);
-goog.addDependency('debug/debugwindow.js', ['goog.debug.DebugWindow'], ['goog.debug.HtmlFormatter', 'goog.debug.LogManager', 'goog.structs.CircularBuffer', 'goog.userAgent']);
+goog.addDependency('debug/debug.js', ['goog.debug'], ['goog.array', 'goog.string', 'goog.structs.Set', 'goog.userAgent']);
+goog.addDependency('debug/debugwindow.js', ['goog.debug.DebugWindow'], ['goog.debug.HtmlFormatter', 'goog.debug.LogManager', 'goog.debug.Logger', 'goog.structs.CircularBuffer', 'goog.userAgent']);
 goog.addDependency('debug/devcss/devcss.js', ['goog.debug.DevCss', 'goog.debug.DevCss.UserAgent'], ['goog.cssom', 'goog.dom.classes', 'goog.events', 'goog.events.EventType', 'goog.string', 'goog.userAgent']);
 goog.addDependency('debug/devcss/devcssrunner.js', ['goog.debug.devCssRunner'], ['goog.debug.DevCss']);
 goog.addDependency('debug/divconsole.js', ['goog.debug.DivConsole'], ['goog.debug.HtmlFormatter', 'goog.debug.LogManager', 'goog.style']);
+goog.addDependency('debug/entrypointregistry.js', ['goog.debug.EntryPointMonitor', 'goog.debug.entryPointRegistry'], ['goog.asserts']);
 goog.addDependency('debug/error.js', ['goog.debug.Error'], []);
-goog.addDependency('debug/errorhandler.js', ['goog.debug.ErrorHandler'], ['goog.debug', 'goog.debug.Trace']);
+goog.addDependency('debug/errorhandler.js', ['goog.debug.ErrorHandler', 'goog.debug.ErrorHandler.ProtectedFunctionError'], ['goog.asserts', 'goog.debug', 'goog.debug.EntryPointMonitor', 'goog.debug.Trace']);
 goog.addDependency('debug/errorhandlerweakdep.js', ['goog.debug.errorHandlerWeakDep'], []);
-goog.addDependency('debug/errorreporter.js', ['goog.debug.ErrorReporter', 'goog.debug.ErrorReporter.ExceptionEvent'], ['goog.debug', 'goog.debug.ErrorHandler', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.net.XhrIo', 'goog.object', 'goog.string', 'goog.uri.utils']);
-goog.addDependency('debug/fancywindow.js', ['goog.debug.FancyWindow'], ['goog.debug.DebugWindow', 'goog.debug.LogManager', 'goog.debug.Logger', 'goog.debug.Logger.Level', 'goog.dom.DomHelper', 'goog.object', 'goog.userAgent']);
+goog.addDependency('debug/errorreporter.js', ['goog.debug.ErrorReporter', 'goog.debug.ErrorReporter.ExceptionEvent'], ['goog.asserts', 'goog.debug', 'goog.debug.ErrorHandler', 'goog.debug.entryPointRegistry', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.log', 'goog.net.XhrIo', 'goog.object', 'goog.string', 'goog.uri.utils', 'goog.userAgent']);
+goog.addDependency('debug/fancywindow.js', ['goog.debug.FancyWindow'], ['goog.debug.DebugWindow', 'goog.debug.LogManager', 'goog.debug.Logger', 'goog.dom.DomHelper', 'goog.object', 'goog.string', 'goog.userAgent']);
 goog.addDependency('debug/formatter.js', ['goog.debug.Formatter', 'goog.debug.HtmlFormatter', 'goog.debug.TextFormatter'], ['goog.debug.RelativeTimeProvider', 'goog.string']);
-goog.addDependency('debug/gcdiagnostics.js', ['goog.debug.GcDiagnostics'], ['goog.debug.Logger', 'goog.debug.Trace', 'goog.userAgent']);
+goog.addDependency('debug/fpsdisplay.js', ['goog.debug.FpsDisplay'], ['goog.asserts', 'goog.async.AnimationDelay', 'goog.ui.Component']);
+goog.addDependency('debug/gcdiagnostics.js', ['goog.debug.GcDiagnostics'], ['goog.debug.Trace', 'goog.log', 'goog.userAgent']);
 goog.addDependency('debug/logbuffer.js', ['goog.debug.LogBuffer'], ['goog.asserts', 'goog.debug.LogRecord']);
 goog.addDependency('debug/logger.js', ['goog.debug.LogManager', 'goog.debug.Logger', 'goog.debug.Logger.Level'], ['goog.array', 'goog.asserts', 'goog.debug', 'goog.debug.LogBuffer', 'goog.debug.LogRecord']);
 goog.addDependency('debug/logrecord.js', ['goog.debug.LogRecord'], []);
+goog.addDependency('debug/logrecordserializer.js', ['goog.debug.logRecordSerializer'], ['goog.debug.LogRecord', 'goog.debug.Logger.Level', 'goog.json', 'goog.object']);
+goog.addDependency('debug/reflect.js', ['goog.debug.reflect'], []);
 goog.addDependency('debug/relativetimeprovider.js', ['goog.debug.RelativeTimeProvider'], []);
-goog.addDependency('debug/tracer.js', ['goog.debug.Trace'], ['goog.array', 'goog.debug.Logger', 'goog.iter', 'goog.structs.Map', 'goog.structs.SimplePool']);
-goog.addDependency('disposable/disposable.js', ['goog.Disposable', 'goog.dispose'], []);
-goog.addDependency('dom/a11y.js', ['goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.dom.a11y.State'], ['goog.dom', 'goog.userAgent']);
+goog.addDependency('debug/tracer.js', ['goog.debug.Trace'], ['goog.array', 'goog.iter', 'goog.log', 'goog.structs.Map', 'goog.structs.SimplePool']);
+goog.addDependency('disposable/disposable.js', ['goog.Disposable', 'goog.dispose'], ['goog.disposable.IDisposable']);
+goog.addDependency('disposable/idisposable.js', ['goog.disposable.IDisposable'], []);
+goog.addDependency('dom/a11y.js', ['goog.dom.a11y', 'goog.dom.a11y.Announcer', 'goog.dom.a11y.LivePriority', 'goog.dom.a11y.Role', 'goog.dom.a11y.State'], ['goog.a11y.aria', 'goog.a11y.aria.Announcer', 'goog.a11y.aria.LivePriority', 'goog.a11y.aria.Role', 'goog.a11y.aria.State']);
 goog.addDependency('dom/abstractmultirange.js', ['goog.dom.AbstractMultiRange'], ['goog.array', 'goog.dom', 'goog.dom.AbstractRange']);
 goog.addDependency('dom/abstractrange.js', ['goog.dom.AbstractRange', 'goog.dom.RangeIterator', 'goog.dom.RangeType'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.SavedCaretRange', 'goog.dom.TagIterator', 'goog.userAgent']);
 goog.addDependency('dom/annotate.js', ['goog.dom.annotate'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.string']);
-goog.addDependency('dom/browserrange/abstractrange.js', ['goog.dom.browserrange.AbstractRange'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.RangeEndpoint', 'goog.dom.TagName', 'goog.dom.TextRangeIterator', 'goog.iter', 'goog.string', 'goog.string.StringBuffer', 'goog.userAgent']);
-goog.addDependency('dom/browserrange/browserrange.js', ['goog.dom.browserrange', 'goog.dom.browserrange.Error'], ['goog.dom', 'goog.dom.browserrange.GeckoRange', 'goog.dom.browserrange.IeRange', 'goog.dom.browserrange.OperaRange', 'goog.dom.browserrange.W3cRange', 'goog.dom.browserrange.WebKitRange', 'goog.userAgent']);
+goog.addDependency('dom/browserfeature.js', ['goog.dom.BrowserFeature'], ['goog.userAgent']);
+goog.addDependency('dom/browserrange/abstractrange.js', ['goog.dom.browserrange.AbstractRange'], ['goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.RangeEndpoint', 'goog.dom.TagName', 'goog.dom.TextRangeIterator', 'goog.iter', 'goog.math.Coordinate', 'goog.string', 'goog.string.StringBuffer', 'goog.userAgent']);
+goog.addDependency('dom/browserrange/browserrange.js', ['goog.dom.browserrange', 'goog.dom.browserrange.Error'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.browserrange.GeckoRange', 'goog.dom.browserrange.IeRange', 'goog.dom.browserrange.OperaRange', 'goog.dom.browserrange.W3cRange', 'goog.dom.browserrange.WebKitRange', 'goog.userAgent']);
 goog.addDependency('dom/browserrange/geckorange.js', ['goog.dom.browserrange.GeckoRange'], ['goog.dom.browserrange.W3cRange']);
-goog.addDependency('dom/browserrange/ierange.js', ['goog.dom.browserrange.IeRange'], ['goog.array', 'goog.debug.Logger', 'goog.dom', 'goog.dom.NodeIterator', 'goog.dom.NodeType', 'goog.dom.RangeEndpoint', 'goog.dom.TagName', 'goog.dom.browserrange.AbstractRange', 'goog.iter', 'goog.iter.StopIteration', 'goog.string']);
+goog.addDependency('dom/browserrange/ierange.js', ['goog.dom.browserrange.IeRange'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.RangeEndpoint', 'goog.dom.TagName', 'goog.dom.browserrange.AbstractRange', 'goog.log', 'goog.string']);
 goog.addDependency('dom/browserrange/operarange.js', ['goog.dom.browserrange.OperaRange'], ['goog.dom.browserrange.W3cRange']);
 goog.addDependency('dom/browserrange/w3crange.js', ['goog.dom.browserrange.W3cRange'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.RangeEndpoint', 'goog.dom.browserrange.AbstractRange', 'goog.string']);
 goog.addDependency('dom/browserrange/webkitrange.js', ['goog.dom.browserrange.WebKitRange'], ['goog.dom.RangeEndpoint', 'goog.dom.browserrange.W3cRange', 'goog.userAgent']);
+goog.addDependency('dom/bufferedviewportsizemonitor.js', ['goog.dom.BufferedViewportSizeMonitor'], ['goog.asserts', 'goog.async.Delay', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType']);
+goog.addDependency('dom/bufferedviewportsizemonitor_test.js', ['goog.dom.BufferedViewportSizeMonitorTest'], ['goog.dom.BufferedViewportSizeMonitor', 'goog.dom.ViewportSizeMonitor', 'goog.events', 'goog.events.EventType', 'goog.math.Size', 'goog.testing.MockClock', 'goog.testing.events', 'goog.testing.events.Event', 'goog.testing.jsunit']);
 goog.addDependency('dom/classes.js', ['goog.dom.classes'], ['goog.array']);
+goog.addDependency('dom/classes_test.js', ['goog.dom.classes_test'], ['goog.dom', 'goog.dom.classes', 'goog.testing.jsunit']);
+goog.addDependency('dom/classlist.js', ['goog.dom.classlist'], ['goog.array', 'goog.asserts']);
+goog.addDependency('dom/classlist_test.js', ['goog.dom.classlist_test'], ['goog.dom', 'goog.dom.classlist', 'goog.testing.jsunit']);
 goog.addDependency('dom/controlrange.js', ['goog.dom.ControlRange', 'goog.dom.ControlRangeIterator'], ['goog.array', 'goog.dom', 'goog.dom.AbstractMultiRange', 'goog.dom.AbstractRange', 'goog.dom.RangeIterator', 'goog.dom.RangeType', 'goog.dom.SavedRange', 'goog.dom.TagWalkType', 'goog.dom.TextRange', 'goog.iter.StopIteration', 'goog.userAgent']);
-goog.addDependency('dom/dom.js', ['goog.dom', 'goog.dom.DomHelper', 'goog.dom.NodeType'], ['goog.array', 'goog.dom.TagName', 'goog.dom.classes', 'goog.math.Coordinate', 'goog.math.Size', 'goog.object', 'goog.string', 'goog.userAgent']);
-goog.addDependency('dom/dom_test.js', ['goog.dom.dom_test'], ['goog.dom', 'goog.dom.DomHelper', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.testing.asserts', 'goog.userAgent']);
+goog.addDependency('dom/dataset.js', ['goog.dom.dataset'], ['goog.string']);
+goog.addDependency('dom/dom.js', ['goog.dom', 'goog.dom.Appendable', 'goog.dom.DomHelper', 'goog.dom.NodeType'], ['goog.array', 'goog.dom.BrowserFeature', 'goog.dom.TagName', 'goog.dom.classes', 'goog.math.Coordinate', 'goog.math.Size', 'goog.object', 'goog.string', 'goog.userAgent']);
+goog.addDependency('dom/dom_test.js', ['goog.dom.dom_test'], ['goog.dom', 'goog.dom.BrowserFeature', 'goog.dom.DomHelper', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.object', 'goog.string.Unicode', 'goog.testing.asserts', 'goog.userAgent', 'goog.userAgent.product', 'goog.userAgent.product.isVersion']);
 goog.addDependency('dom/fontsizemonitor.js', ['goog.dom.FontSizeMonitor', 'goog.dom.FontSizeMonitor.EventType'], ['goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.userAgent']);
 goog.addDependency('dom/forms.js', ['goog.dom.forms'], ['goog.structs.Map']);
-goog.addDependency('dom/iframe.js', ['goog.dom.iframe'], ['goog.dom']);
+goog.addDependency('dom/fullscreen.js', ['goog.dom.fullscreen', 'goog.dom.fullscreen.EventType'], ['goog.dom', 'goog.userAgent', 'goog.userAgent.product']);
+goog.addDependency('dom/iframe.js', ['goog.dom.iframe'], ['goog.dom', 'goog.userAgent']);
 goog.addDependency('dom/iter.js', ['goog.dom.iter.AncestorIterator', 'goog.dom.iter.ChildIterator', 'goog.dom.iter.SiblingIterator'], ['goog.iter.Iterator', 'goog.iter.StopIteration']);
-goog.addDependency('dom/multirange.js', ['goog.dom.MultiRange', 'goog.dom.MultiRangeIterator'], ['goog.array', 'goog.debug.Logger', 'goog.dom.AbstractMultiRange', 'goog.dom.AbstractRange', 'goog.dom.RangeIterator', 'goog.dom.RangeType', 'goog.dom.SavedRange', 'goog.dom.TextRange', 'goog.iter.StopIteration']);
+goog.addDependency('dom/multirange.js', ['goog.dom.MultiRange', 'goog.dom.MultiRangeIterator'], ['goog.array', 'goog.dom.AbstractMultiRange', 'goog.dom.AbstractRange', 'goog.dom.RangeIterator', 'goog.dom.RangeType', 'goog.dom.SavedRange', 'goog.dom.TextRange', 'goog.iter.StopIteration', 'goog.log']);
 goog.addDependency('dom/nodeiterator.js', ['goog.dom.NodeIterator'], ['goog.dom.TagIterator']);
 goog.addDependency('dom/nodeoffset.js', ['goog.dom.NodeOffset'], ['goog.Disposable', 'goog.dom.TagName']);
 goog.addDependency('dom/pattern/abstractpattern.js', ['goog.dom.pattern.AbstractPattern'], ['goog.dom.pattern.MatchType']);
@@ -1424,108 +1744,137 @@ goog.addDependency('dom/pattern/text.js', ['goog.dom.pattern.Text'], ['goog.dom.
 goog.addDependency('dom/range.js', ['goog.dom.Range'], ['goog.dom', 'goog.dom.AbstractRange', 'goog.dom.ControlRange', 'goog.dom.MultiRange', 'goog.dom.NodeType', 'goog.dom.TextRange', 'goog.userAgent']);
 goog.addDependency('dom/rangeendpoint.js', ['goog.dom.RangeEndpoint'], []);
 goog.addDependency('dom/savedcaretrange.js', ['goog.dom.SavedCaretRange'], ['goog.array', 'goog.dom', 'goog.dom.SavedRange', 'goog.dom.TagName', 'goog.string']);
-goog.addDependency('dom/savedrange.js', ['goog.dom.SavedRange'], ['goog.Disposable', 'goog.debug.Logger']);
+goog.addDependency('dom/savedrange.js', ['goog.dom.SavedRange'], ['goog.Disposable', 'goog.log']);
 goog.addDependency('dom/selection.js', ['goog.dom.selection'], ['goog.string', 'goog.userAgent']);
 goog.addDependency('dom/tagiterator.js', ['goog.dom.TagIterator', 'goog.dom.TagWalkType'], ['goog.dom.NodeType', 'goog.iter.Iterator', 'goog.iter.StopIteration']);
 goog.addDependency('dom/tagname.js', ['goog.dom.TagName'], []);
 goog.addDependency('dom/textrange.js', ['goog.dom.TextRange'], ['goog.array', 'goog.dom', 'goog.dom.AbstractRange', 'goog.dom.RangeType', 'goog.dom.SavedRange', 'goog.dom.TagName', 'goog.dom.TextRangeIterator', 'goog.dom.browserrange', 'goog.string', 'goog.userAgent']);
 goog.addDependency('dom/textrangeiterator.js', ['goog.dom.TextRangeIterator'], ['goog.array', 'goog.dom.NodeType', 'goog.dom.RangeIterator', 'goog.dom.TagName', 'goog.iter.StopIteration']);
-goog.addDependency('dom/viewportsizemonitor.js', ['goog.dom.ViewportSizeMonitor'], ['goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.math.Size', 'goog.userAgent']);
+goog.addDependency('dom/vendor.js', ['goog.dom.vendor'], ['goog.userAgent']);
+goog.addDependency('dom/viewportsizemonitor.js', ['goog.dom.ViewportSizeMonitor'], ['goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.math.Size']);
 goog.addDependency('dom/xml.js', ['goog.dom.xml'], ['goog.dom', 'goog.dom.NodeType']);
 goog.addDependency('editor/browserfeature.js', ['goog.editor.BrowserFeature'], ['goog.editor.defines', 'goog.userAgent', 'goog.userAgent.product', 'goog.userAgent.product.isVersion']);
-goog.addDependency('editor/clicktoeditwrapper.js', ['goog.editor.ClickToEditWrapper'], ['goog.Disposable', 'goog.asserts', 'goog.debug.Logger', 'goog.dom', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Field.EventType', 'goog.editor.node', 'goog.editor.range', 'goog.events.BrowserEvent.MouseButton', 'goog.events.EventHandler', 'goog.events.EventType']);
+goog.addDependency('editor/clicktoeditwrapper.js', ['goog.editor.ClickToEditWrapper'], ['goog.Disposable', 'goog.asserts', 'goog.dom', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Field.EventType', 'goog.editor.range', 'goog.events.BrowserEvent.MouseButton', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.log']);
 goog.addDependency('editor/command.js', ['goog.editor.Command'], []);
+goog.addDependency('editor/contenteditablefield.js', ['goog.editor.ContentEditableField'], ['goog.asserts', 'goog.editor.Field', 'goog.log']);
 goog.addDependency('editor/defines.js', ['goog.editor.defines'], []);
-goog.addDependency('editor/field.js', ['goog.editor.Field', 'goog.editor.Field.EventType'], ['goog.array', 'goog.async.Delay', 'goog.debug.Logger', 'goog.dom', 'goog.dom.Range', 'goog.dom.TagName', 'goog.dom.classes', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Plugin', 'goog.editor.icontent', 'goog.editor.icontent.FieldFormatInfo', 'goog.editor.icontent.FieldStyleInfo', 'goog.editor.node', 'goog.editor.range', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.functions', 'goog.string', 'goog.string.Unicode', 'goog.style', 'goog.userAgent']);
+goog.addDependency('editor/field.js', ['goog.editor.Field', 'goog.editor.Field.EventType'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.array', 'goog.asserts', 'goog.async.Delay', 'goog.dom', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Plugin', 'goog.editor.icontent', 'goog.editor.icontent.FieldFormatInfo', 'goog.editor.icontent.FieldStyleInfo', 'goog.editor.node', 'goog.editor.range', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.functions', 'goog.log', 'goog.string', 'goog.string.Unicode', 'goog.style', 'goog.userAgent', 'goog.userAgent.product']);
+goog.addDependency('editor/field_test.js', ['goog.editor.field_test'], ['goog.dom', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.Field', 'goog.editor.Plugin', 'goog.editor.range', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.KeyCodes', 'goog.functions', 'goog.testing.LooseMock', 'goog.testing.MockClock', 'goog.testing.dom', 'goog.testing.events', 'goog.testing.events.Event', 'goog.testing.recordFunction', 'goog.userAgent']);
 goog.addDependency('editor/focus.js', ['goog.editor.focus'], ['goog.dom.selection']);
 goog.addDependency('editor/icontent.js', ['goog.editor.icontent', 'goog.editor.icontent.FieldFormatInfo', 'goog.editor.icontent.FieldStyleInfo'], ['goog.editor.BrowserFeature', 'goog.style', 'goog.userAgent']);
-goog.addDependency('editor/link.js', ['goog.editor.Link'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.node', 'goog.editor.range', 'goog.string.Unicode', 'goog.uri.utils']);
-goog.addDependency('editor/node.js', ['goog.editor.node'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.iter.ChildIterator', 'goog.dom.iter.SiblingIterator', 'goog.iter', 'goog.object', 'goog.string', 'goog.string.Unicode']);
-goog.addDependency('editor/plugin.js', ['goog.editor.Plugin'], ['goog.debug.Logger', 'goog.editor.Command', 'goog.events.EventTarget', 'goog.functions', 'goog.object', 'goog.reflect']);
-goog.addDependency('editor/plugins/abstractbubbleplugin.js', ['goog.editor.plugins.AbstractBubblePlugin'], ['goog.dom', 'goog.dom.TagName', 'goog.editor.Plugin', 'goog.editor.style', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.functions', 'goog.string.Unicode', 'goog.ui.Component.EventType', 'goog.ui.editor.Bubble', 'goog.userAgent']);
+goog.addDependency('editor/link.js', ['goog.editor.Link'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.node', 'goog.editor.range', 'goog.string', 'goog.string.Unicode', 'goog.uri.utils', 'goog.uri.utils.ComponentIndex']);
+goog.addDependency('editor/node.js', ['goog.editor.node'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.iter.ChildIterator', 'goog.dom.iter.SiblingIterator', 'goog.iter', 'goog.object', 'goog.string', 'goog.string.Unicode', 'goog.userAgent']);
+goog.addDependency('editor/plugin.js', ['goog.editor.Plugin'], ['goog.editor.Command', 'goog.events.EventTarget', 'goog.functions', 'goog.log', 'goog.object', 'goog.reflect']);
+goog.addDependency('editor/plugins/abstractbubbleplugin.js', ['goog.editor.plugins.AbstractBubblePlugin'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.Plugin', 'goog.editor.style', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.actionEventWrapper', 'goog.functions', 'goog.string.Unicode', 'goog.ui.Component.EventType', 'goog.ui.editor.Bubble', 'goog.userAgent']);
 goog.addDependency('editor/plugins/abstractdialogplugin.js', ['goog.editor.plugins.AbstractDialogPlugin', 'goog.editor.plugins.AbstractDialogPlugin.EventType'], ['goog.dom', 'goog.dom.Range', 'goog.editor.Field.EventType', 'goog.editor.Plugin', 'goog.editor.range', 'goog.events', 'goog.ui.editor.AbstractDialog.EventType']);
 goog.addDependency('editor/plugins/abstracttabhandler.js', ['goog.editor.plugins.AbstractTabHandler'], ['goog.editor.Plugin', 'goog.events.KeyCodes']);
-goog.addDependency('editor/plugins/basictextformatter.js', ['goog.editor.plugins.BasicTextFormatter', 'goog.editor.plugins.BasicTextFormatter.COMMAND'], ['goog.array', 'goog.debug.Logger', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Link', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.range', 'goog.iter', 'goog.object', 'goog.string', 'goog.string.Unicode', 'goog.style', 'goog.ui.editor.messages', 'goog.userAgent']);
-goog.addDependency('editor/plugins/blockquote.js', ['goog.editor.plugins.Blockquote'], ['goog.debug.Logger', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.classes', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Plugin', 'goog.editor.node', 'goog.functions']);
-goog.addDependency('editor/plugins/emoticons.js', ['goog.editor.plugins.Emoticons'], ['goog.dom.TagName', 'goog.editor.Plugin', 'goog.functions', 'goog.ui.emoji.Emoji']);
-goog.addDependency('editor/plugins/enterhandler.js', ['goog.editor.plugins.EnterHandler'], ['goog.dom', 'goog.dom.AbstractRange', 'goog.dom.NodeOffset', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.plugins.Blockquote', 'goog.editor.range', 'goog.editor.style', 'goog.events.KeyCodes', 'goog.string', 'goog.userAgent']);
+goog.addDependency('editor/plugins/basictextformatter.js', ['goog.editor.plugins.BasicTextFormatter', 'goog.editor.plugins.BasicTextFormatter.COMMAND'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Link', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.range', 'goog.editor.style', 'goog.iter', 'goog.iter.StopIteration', 'goog.log', 'goog.object', 'goog.string', 'goog.string.Unicode', 'goog.style', 'goog.ui.editor.messages', 'goog.userAgent']);
+goog.addDependency('editor/plugins/blockquote.js', ['goog.editor.plugins.Blockquote'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.classes', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Plugin', 'goog.editor.node', 'goog.functions', 'goog.log']);
+goog.addDependency('editor/plugins/emoticons.js', ['goog.editor.plugins.Emoticons'], ['goog.dom.TagName', 'goog.editor.Plugin', 'goog.editor.range', 'goog.functions', 'goog.ui.emoji.Emoji', 'goog.userAgent']);
+goog.addDependency('editor/plugins/enterhandler.js', ['goog.editor.plugins.EnterHandler'], ['goog.dom', 'goog.dom.NodeOffset', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.plugins.Blockquote', 'goog.editor.range', 'goog.editor.style', 'goog.events.KeyCodes', 'goog.functions', 'goog.object', 'goog.string', 'goog.userAgent']);
+goog.addDependency('editor/plugins/equationeditorbubble.js', ['goog.editor.plugins.equation.EquationBubble'], ['goog.dom', 'goog.dom.TagName', 'goog.editor.Command', 'goog.editor.plugins.AbstractBubblePlugin', 'goog.string.Unicode', 'goog.ui.editor.Bubble', 'goog.ui.equation.ImageRenderer']);
+goog.addDependency('editor/plugins/equationeditorplugin.js', ['goog.editor.plugins.EquationEditorPlugin'], ['goog.dom', 'goog.editor.Command', 'goog.editor.plugins.AbstractDialogPlugin', 'goog.editor.range', 'goog.events', 'goog.events.EventType', 'goog.functions', 'goog.log', 'goog.ui.editor.AbstractDialog', 'goog.ui.editor.EquationEditorDialog', 'goog.ui.equation.ImageRenderer', 'goog.ui.equation.PaletteManager']);
+goog.addDependency('editor/plugins/firststrong.js', ['goog.editor.plugins.FirstStrong'], ['goog.dom.NodeType', 'goog.dom.TagIterator', 'goog.dom.TagName', 'goog.editor.Command', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.range', 'goog.i18n.bidi', 'goog.i18n.uChar', 'goog.iter', 'goog.userAgent']);
 goog.addDependency('editor/plugins/headerformatter.js', ['goog.editor.plugins.HeaderFormatter'], ['goog.editor.Command', 'goog.editor.Plugin', 'goog.userAgent']);
-goog.addDependency('editor/plugins/linkbubble.js', ['goog.editor.plugins.LinkBubble', 'goog.editor.plugins.LinkBubble.Action'], ['goog.array', 'goog.dom', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Link', 'goog.editor.plugins.AbstractBubblePlugin', 'goog.editor.range', 'goog.string', 'goog.style', 'goog.ui.editor.messages', 'goog.window']);
-goog.addDependency('editor/plugins/linkdialogplugin.js', ['goog.editor.plugins.LinkDialogPlugin'], ['goog.editor.Command', 'goog.editor.plugins.AbstractDialogPlugin', 'goog.events.EventHandler', 'goog.functions', 'goog.ui.editor.AbstractDialog.EventType', 'goog.ui.editor.LinkDialog', 'goog.ui.editor.LinkDialog.OkEvent']);
+goog.addDependency('editor/plugins/linkbubble.js', ['goog.editor.plugins.LinkBubble', 'goog.editor.plugins.LinkBubble.Action'], ['goog.array', 'goog.dom', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Link', 'goog.editor.plugins.AbstractBubblePlugin', 'goog.editor.range', 'goog.string', 'goog.style', 'goog.ui.editor.messages', 'goog.uri.utils', 'goog.window']);
+goog.addDependency('editor/plugins/linkdialogplugin.js', ['goog.editor.plugins.LinkDialogPlugin'], ['goog.array', 'goog.dom', 'goog.editor.Command', 'goog.editor.plugins.AbstractDialogPlugin', 'goog.events.EventHandler', 'goog.functions', 'goog.ui.editor.AbstractDialog.EventType', 'goog.ui.editor.LinkDialog', 'goog.ui.editor.LinkDialog.EventType', 'goog.ui.editor.LinkDialog.OkEvent', 'goog.uri.utils']);
+goog.addDependency('editor/plugins/linkshortcutplugin.js', ['goog.editor.plugins.LinkShortcutPlugin'], ['goog.editor.Command', 'goog.editor.Link', 'goog.editor.Plugin', 'goog.string']);
 goog.addDependency('editor/plugins/listtabhandler.js', ['goog.editor.plugins.ListTabHandler'], ['goog.dom.TagName', 'goog.editor.Command', 'goog.editor.plugins.AbstractTabHandler']);
 goog.addDependency('editor/plugins/loremipsum.js', ['goog.editor.plugins.LoremIpsum'], ['goog.asserts', 'goog.dom', 'goog.editor.Command', 'goog.editor.Plugin', 'goog.editor.node', 'goog.functions']);
-goog.addDependency('editor/plugins/removeformatting.js', ['goog.editor.plugins.RemoveFormatting'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.range', 'goog.string']);
+goog.addDependency('editor/plugins/removeformatting.js', ['goog.editor.plugins.RemoveFormatting'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.range', 'goog.string', 'goog.userAgent']);
 goog.addDependency('editor/plugins/spacestabhandler.js', ['goog.editor.plugins.SpacesTabHandler'], ['goog.dom', 'goog.dom.TagName', 'goog.editor.plugins.AbstractTabHandler', 'goog.editor.range']);
 goog.addDependency('editor/plugins/tableeditor.js', ['goog.editor.plugins.TableEditor'], ['goog.array', 'goog.dom', 'goog.dom.TagName', 'goog.editor.Plugin', 'goog.editor.Table', 'goog.editor.node', 'goog.editor.range', 'goog.object']);
 goog.addDependency('editor/plugins/tagonenterhandler.js', ['goog.editor.plugins.TagOnEnterHandler'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.Command', 'goog.editor.node', 'goog.editor.plugins.EnterHandler', 'goog.editor.range', 'goog.editor.style', 'goog.events.KeyCodes', 'goog.string', 'goog.style', 'goog.userAgent']);
-goog.addDependency('editor/plugins/undoredo.js', ['goog.editor.plugins.UndoRedo'], ['goog.debug.Logger', 'goog.dom', 'goog.dom.NodeOffset', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Field.EventType', 'goog.editor.Plugin', 'goog.editor.plugins.UndoRedoManager', 'goog.editor.plugins.UndoRedoState', 'goog.events', 'goog.events.EventHandler']);
+goog.addDependency('editor/plugins/undoredo.js', ['goog.editor.plugins.UndoRedo'], ['goog.dom', 'goog.dom.NodeOffset', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.Command', 'goog.editor.Field.EventType', 'goog.editor.Plugin', 'goog.editor.node', 'goog.editor.plugins.UndoRedoManager', 'goog.editor.plugins.UndoRedoState', 'goog.events', 'goog.events.EventHandler', 'goog.log']);
 goog.addDependency('editor/plugins/undoredomanager.js', ['goog.editor.plugins.UndoRedoManager', 'goog.editor.plugins.UndoRedoManager.EventType'], ['goog.editor.plugins.UndoRedoState', 'goog.events.EventTarget']);
 goog.addDependency('editor/plugins/undoredostate.js', ['goog.editor.plugins.UndoRedoState'], ['goog.events.EventTarget']);
-goog.addDependency('editor/range.js', ['goog.editor.range', 'goog.editor.range.Point'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.RangeEndpoint', 'goog.dom.SavedCaretRange', 'goog.editor.BrowserFeature', 'goog.editor.node', 'goog.editor.style', 'goog.iter']);
-goog.addDependency('editor/seamlessfield.js', ['goog.editor.SeamlessField'], ['goog.cssom.iframe.style', 'goog.debug.Logger', 'goog.dom', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Field', 'goog.editor.Field.EventType', 'goog.editor.icontent', 'goog.editor.icontent.FieldFormatInfo', 'goog.editor.icontent.FieldStyleInfo', 'goog.editor.node', 'goog.events', 'goog.events.EventType', 'goog.style']);
-goog.addDependency('editor/seamlessfield_test.js', ['goog.editor.seamlessfield_test'], ['goog.dom', 'goog.editor.BrowserFeature', 'goog.editor.SeamlessField', 'goog.events', 'goog.style', 'goog.testing.MockClock', 'goog.testing.MockRange', 'goog.testing.jsunit']);
+goog.addDependency('editor/range.js', ['goog.editor.range', 'goog.editor.range.Point'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.Range', 'goog.dom.RangeEndpoint', 'goog.dom.SavedCaretRange', 'goog.editor.node', 'goog.editor.style', 'goog.iter', 'goog.userAgent']);
+goog.addDependency('editor/seamlessfield.js', ['goog.editor.SeamlessField'], ['goog.cssom.iframe.style', 'goog.dom', 'goog.dom.Range', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Field', 'goog.editor.icontent', 'goog.editor.icontent.FieldFormatInfo', 'goog.editor.icontent.FieldStyleInfo', 'goog.editor.node', 'goog.events', 'goog.events.EventType', 'goog.log', 'goog.style']);
+goog.addDependency('editor/seamlessfield_test.js', ['goog.editor.seamlessfield_test'], ['goog.dom', 'goog.dom.DomHelper', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.Field', 'goog.editor.SeamlessField', 'goog.events', 'goog.functions', 'goog.style', 'goog.testing.MockClock', 'goog.testing.MockRange', 'goog.testing.jsunit']);
 goog.addDependency('editor/style.js', ['goog.editor.style'], ['goog.dom', 'goog.dom.NodeType', 'goog.editor.BrowserFeature', 'goog.events.EventType', 'goog.object', 'goog.style', 'goog.userAgent']);
-goog.addDependency('editor/table.js', ['goog.editor.Table', 'goog.editor.TableCell', 'goog.editor.TableRow'], ['goog.debug.Logger', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.string.Unicode', 'goog.style']);
+goog.addDependency('editor/table.js', ['goog.editor.Table', 'goog.editor.TableCell', 'goog.editor.TableRow'], ['goog.dom', 'goog.dom.DomHelper', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.log', 'goog.string.Unicode', 'goog.style']);
 goog.addDependency('events/actioneventwrapper.js', ['goog.events.actionEventWrapper'], ['goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.EventWrapper', 'goog.events.KeyCodes']);
 goog.addDependency('events/actionhandler.js', ['goog.events.ActionEvent', 'goog.events.ActionHandler', 'goog.events.ActionHandler.EventType', 'goog.events.BeforeActionEvent'], ['goog.events', 'goog.events.BrowserEvent', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.userAgent']);
-goog.addDependency('events/browserevent.js', ['goog.events.BrowserEvent', 'goog.events.BrowserEvent.MouseButton'], ['goog.events.Event', 'goog.userAgent']);
-goog.addDependency('events/event.js', ['goog.events.Event'], ['goog.Disposable']);
-goog.addDependency('events/eventhandler.js', ['goog.events.EventHandler'], ['goog.Disposable', 'goog.events', 'goog.events.EventWrapper', 'goog.object', 'goog.structs.SimplePool']);
-goog.addDependency('events/events.js', ['goog.events', 'goog.events.EventType'], ['goog.array', 'goog.debug.errorHandlerWeakDep', 'goog.events.BrowserEvent', 'goog.events.Event', 'goog.events.EventWrapper', 'goog.events.pools', 'goog.object', 'goog.userAgent']);
-goog.addDependency('events/eventtarget.js', ['goog.events.EventTarget'], ['goog.Disposable', 'goog.events']);
+goog.addDependency('events/browserevent.js', ['goog.events.BrowserEvent', 'goog.events.BrowserEvent.MouseButton'], ['goog.events.BrowserFeature', 'goog.events.Event', 'goog.events.EventType', 'goog.reflect', 'goog.userAgent']);
+goog.addDependency('events/browserfeature.js', ['goog.events.BrowserFeature'], ['goog.userAgent']);
+goog.addDependency('events/event.js', ['goog.events.Event', 'goog.events.EventLike'], ['goog.Disposable']);
+goog.addDependency('events/eventhandler.js', ['goog.events.EventHandler'], ['goog.Disposable', 'goog.events', 'goog.object']);
+goog.addDependency('events/events.js', ['goog.events', 'goog.events.Key', 'goog.events.ListenableType'], ['goog.array', 'goog.asserts', 'goog.debug.entryPointRegistry', 'goog.events.BrowserEvent', 'goog.events.BrowserFeature', 'goog.events.Listenable', 'goog.events.Listener', 'goog.object']);
+goog.addDependency('events/eventtarget.js', ['goog.events.EventTarget'], ['goog.Disposable', 'goog.array', 'goog.asserts', 'goog.events', 'goog.events.Event', 'goog.events.Listenable', 'goog.events.ListenerMap', 'goog.object']);
+goog.addDependency('events/eventtargettester.js', ['goog.events.eventTargetTester', 'goog.events.eventTargetTester.KeyType', 'goog.events.eventTargetTester.UnlistenReturnType'], ['goog.array', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.testing.asserts', 'goog.testing.recordFunction']);
+goog.addDependency('events/eventtype.js', ['goog.events.EventType'], ['goog.userAgent']);
 goog.addDependency('events/eventwrapper.js', ['goog.events.EventWrapper'], []);
+goog.addDependency('events/filedrophandler.js', ['goog.events.FileDropHandler', 'goog.events.FileDropHandler.EventType'], ['goog.array', 'goog.dom', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.log']);
 goog.addDependency('events/focushandler.js', ['goog.events.FocusHandler', 'goog.events.FocusHandler.EventType'], ['goog.events', 'goog.events.BrowserEvent', 'goog.events.EventTarget', 'goog.userAgent']);
-goog.addDependency('events/imehandler.js', ['goog.events.ImeHandler', 'goog.events.ImeHandler.Event', 'goog.events.ImeHandler.EventType'], ['goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.userAgent', 'goog.userAgent.product']);
-goog.addDependency('events/inputhandler.js', ['goog.events.InputHandler', 'goog.events.InputHandler.EventType'], ['goog.Timer', 'goog.dom', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.KeyCodes', 'goog.userAgent']);
+goog.addDependency('events/imehandler.js', ['goog.events.ImeHandler', 'goog.events.ImeHandler.Event', 'goog.events.ImeHandler.EventType'], ['goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.userAgent']);
+goog.addDependency('events/inputhandler.js', ['goog.events.InputHandler', 'goog.events.InputHandler.EventType'], ['goog.Timer', 'goog.dom', 'goog.events.BrowserEvent', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.KeyCodes', 'goog.userAgent']);
 goog.addDependency('events/keycodes.js', ['goog.events.KeyCodes'], ['goog.userAgent']);
 goog.addDependency('events/keyhandler.js', ['goog.events.KeyEvent', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType'], ['goog.events', 'goog.events.BrowserEvent', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.userAgent']);
 goog.addDependency('events/keynames.js', ['goog.events.KeyNames'], []);
-goog.addDependency('events/listener.js', ['goog.events.Listener'], []);
-goog.addDependency('events/mousewheelhandler.js', ['goog.events.MouseWheelEvent', 'goog.events.MouseWheelHandler', 'goog.events.MouseWheelHandler.EventType'], ['goog.events', 'goog.events.BrowserEvent', 'goog.events.EventTarget', 'goog.math', 'goog.userAgent']);
-goog.addDependency('events/onlinehandler.js', ['goog.events.OnlineHandler', 'goog.events.OnlineHandler.EventType'], ['goog.Timer', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.userAgent']);
-goog.addDependency('events/pastehandler.js', ['goog.events.PasteHandler', 'goog.events.PasteHandler.EventType', 'goog.events.PasteHandler.State'], ['goog.debug.Logger', 'goog.events.BrowserEvent', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.KeyCodes']);
-goog.addDependency('events/pools.js', ['goog.events.pools'], ['goog.events.BrowserEvent', 'goog.events.Listener', 'goog.structs.SimplePool', 'goog.userAgent.jscript']);
+goog.addDependency('events/listenable.js', ['goog.events.Listenable', 'goog.events.ListenableKey'], []);
+goog.addDependency('events/listener.js', ['goog.events.Listener'], ['goog.events.ListenableKey']);
+goog.addDependency('events/listenermap.js', ['goog.events.ListenerMap'], ['goog.array', 'goog.events.Listener', 'goog.object']);
+goog.addDependency('events/listenermap_test.js', ['goog.events.ListenerMapTest'], ['goog.dispose', 'goog.events.EventTarget', 'goog.events.ListenerMap', 'goog.testing.jsunit']);
+goog.addDependency('events/mousewheelhandler.js', ['goog.events.MouseWheelEvent', 'goog.events.MouseWheelHandler', 'goog.events.MouseWheelHandler.EventType'], ['goog.dom', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.EventTarget', 'goog.math', 'goog.style', 'goog.userAgent']);
+goog.addDependency('events/onlinehandler.js', ['goog.events.OnlineHandler', 'goog.events.OnlineHandler.EventType'], ['goog.Timer', 'goog.events.BrowserFeature', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.net.NetworkStatusMonitor', 'goog.userAgent']);
+goog.addDependency('events/pastehandler.js', ['goog.events.PasteHandler', 'goog.events.PasteHandler.EventType', 'goog.events.PasteHandler.State'], ['goog.Timer', 'goog.async.ConditionalDelay', 'goog.events.BrowserEvent', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.log', 'goog.userAgent']);
+goog.addDependency('format/emailaddress.js', ['goog.format.EmailAddress'], ['goog.string']);
 goog.addDependency('format/format.js', ['goog.format'], ['goog.i18n.GraphemeBreak', 'goog.string', 'goog.userAgent']);
 goog.addDependency('format/htmlprettyprinter.js', ['goog.format.HtmlPrettyPrinter', 'goog.format.HtmlPrettyPrinter.Buffer'], ['goog.object', 'goog.string.StringBuffer']);
 goog.addDependency('format/jsonprettyprinter.js', ['goog.format.JsonPrettyPrinter', 'goog.format.JsonPrettyPrinter.HtmlDelimiters', 'goog.format.JsonPrettyPrinter.TextDelimiters'], ['goog.json', 'goog.json.Serializer', 'goog.string', 'goog.string.StringBuffer', 'goog.string.format']);
+goog.addDependency('fs/entry.js', ['goog.fs.DirectoryEntry', 'goog.fs.DirectoryEntry.Behavior', 'goog.fs.Entry', 'goog.fs.FileEntry'], []);
+goog.addDependency('fs/entryimpl.js', ['goog.fs.DirectoryEntryImpl', 'goog.fs.EntryImpl', 'goog.fs.FileEntryImpl'], ['goog.array', 'goog.async.Deferred', 'goog.fs.DirectoryEntry', 'goog.fs.Entry', 'goog.fs.Error', 'goog.fs.FileEntry', 'goog.fs.FileWriter', 'goog.functions', 'goog.string']);
+goog.addDependency('fs/error.js', ['goog.fs.Error', 'goog.fs.Error.ErrorCode'], ['goog.debug.Error', 'goog.string']);
+goog.addDependency('fs/filereader.js', ['goog.fs.FileReader', 'goog.fs.FileReader.EventType', 'goog.fs.FileReader.ReadyState'], ['goog.async.Deferred', 'goog.events.Event', 'goog.events.EventTarget', 'goog.fs.Error', 'goog.fs.ProgressEvent']);
+goog.addDependency('fs/filesaver.js', ['goog.fs.FileSaver', 'goog.fs.FileSaver.EventType', 'goog.fs.FileSaver.ProgressEvent', 'goog.fs.FileSaver.ReadyState'], ['goog.events.Event', 'goog.events.EventTarget', 'goog.fs.Error', 'goog.fs.ProgressEvent']);
+goog.addDependency('fs/filesystem.js', ['goog.fs.FileSystem'], []);
+goog.addDependency('fs/filesystemimpl.js', ['goog.fs.FileSystemImpl'], ['goog.fs.DirectoryEntryImpl', 'goog.fs.FileSystem']);
+goog.addDependency('fs/filewriter.js', ['goog.fs.FileWriter'], ['goog.fs.Error', 'goog.fs.FileSaver']);
+goog.addDependency('fs/fs.js', ['goog.fs'], ['goog.array', 'goog.async.Deferred', 'goog.fs.Error', 'goog.fs.FileReader', 'goog.fs.FileSystemImpl', 'goog.userAgent']);
+goog.addDependency('fs/progressevent.js', ['goog.fs.ProgressEvent'], ['goog.events.Event']);
 goog.addDependency('functions/functions.js', ['goog.functions'], []);
-goog.addDependency('fx/abstractdragdrop.js', ['goog.fx.AbstractDragDrop', 'goog.fx.DragDropEvent', 'goog.fx.DragDropItem'], ['goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType', 'goog.math.Box', 'goog.math.Coordinate', 'goog.style']);
-goog.addDependency('fx/animation.js', ['goog.fx.Animation', 'goog.fx.Animation.EventType', 'goog.fx.Animation.State', 'goog.fx.AnimationEvent'], ['goog.Timer', 'goog.array', 'goog.events.Event', 'goog.events.EventTarget', 'goog.object']);
-goog.addDependency('fx/animationqueue.js', ['goog.fx.AnimationParallelQueue', 'goog.fx.AnimationQueue', 'goog.fx.AnimationSerialQueue'], ['goog.array', 'goog.events.EventHandler', 'goog.fx.Animation', 'goog.fx.Animation.EventType']);
+goog.addDependency('fx/abstractdragdrop.js', ['goog.fx.AbstractDragDrop', 'goog.fx.AbstractDragDrop.EventType', 'goog.fx.DragDropEvent', 'goog.fx.DragDropItem'], ['goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType', 'goog.math.Box', 'goog.math.Coordinate', 'goog.style']);
+goog.addDependency('fx/anim/anim.js', ['goog.fx.anim', 'goog.fx.anim.Animated'], ['goog.async.AnimationDelay', 'goog.async.Delay', 'goog.object']);
+goog.addDependency('fx/animation.js', ['goog.fx.Animation', 'goog.fx.Animation.EventType', 'goog.fx.Animation.State', 'goog.fx.AnimationEvent'], ['goog.array', 'goog.events.Event', 'goog.fx.Transition', 'goog.fx.Transition.EventType', 'goog.fx.TransitionBase.State', 'goog.fx.anim', 'goog.fx.anim.Animated']);
+goog.addDependency('fx/animationqueue.js', ['goog.fx.AnimationParallelQueue', 'goog.fx.AnimationQueue', 'goog.fx.AnimationSerialQueue'], ['goog.array', 'goog.asserts', 'goog.events.EventHandler', 'goog.fx.Transition.EventType', 'goog.fx.TransitionBase', 'goog.fx.TransitionBase.State']);
+goog.addDependency('fx/css3/fx.js', ['goog.fx.css3'], ['goog.fx.css3.Transition']);
+goog.addDependency('fx/css3/transition.js', ['goog.fx.css3.Transition'], ['goog.Timer', 'goog.fx.TransitionBase', 'goog.style', 'goog.style.transition']);
 goog.addDependency('fx/cssspriteanimation.js', ['goog.fx.CssSpriteAnimation'], ['goog.fx.Animation']);
-goog.addDependency('fx/dom.js', ['goog.fx.dom', 'goog.fx.dom.BgColorTransform', 'goog.fx.dom.ColorTransform', 'goog.fx.dom.Fade', 'goog.fx.dom.FadeIn', 'goog.fx.dom.FadeInAndShow', 'goog.fx.dom.FadeOut', 'goog.fx.dom.FadeOutAndHide', 'goog.fx.dom.PredefinedEffect', 'goog.fx.dom.Resize', 'goog.fx.dom.ResizeHeight', 'goog.fx.dom.ResizeWidth', 'goog.fx.dom.Scroll', 'goog.fx.dom.Slide', 'goog.fx.dom.SlideFrom', 'goog.fx.dom.Swipe'], ['goog.color', 'goog.events', 'goog.fx.Animation', 'goog.fx.Animation.EventType', 'goog.style']);
+goog.addDependency('fx/dom.js', ['goog.fx.dom', 'goog.fx.dom.BgColorTransform', 'goog.fx.dom.ColorTransform', 'goog.fx.dom.Fade', 'goog.fx.dom.FadeIn', 'goog.fx.dom.FadeInAndShow', 'goog.fx.dom.FadeOut', 'goog.fx.dom.FadeOutAndHide', 'goog.fx.dom.PredefinedEffect', 'goog.fx.dom.Resize', 'goog.fx.dom.ResizeHeight', 'goog.fx.dom.ResizeWidth', 'goog.fx.dom.Scroll', 'goog.fx.dom.Slide', 'goog.fx.dom.SlideFrom', 'goog.fx.dom.Swipe'], ['goog.color', 'goog.events', 'goog.fx.Animation', 'goog.fx.Transition.EventType', 'goog.style', 'goog.style.bidi']);
 goog.addDependency('fx/dragdrop.js', ['goog.fx.DragDrop'], ['goog.fx.AbstractDragDrop', 'goog.fx.DragDropItem']);
-goog.addDependency('fx/dragdropgroup.js', ['goog.fx.DragDropGroup'], ['goog.fx.AbstractDragDrop', 'goog.fx.DragDropItem']);
-goog.addDependency('fx/dragger.js', ['goog.fx.DragEvent', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType'], ['goog.dom', 'goog.events', 'goog.events.BrowserEvent.MouseButton', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.math.Coordinate', 'goog.math.Rect', 'goog.userAgent']);
-goog.addDependency('fx/draglistgroup.js', ['goog.fx.DragListDirection', 'goog.fx.DragListGroup', 'goog.fx.DragListGroupEvent'], ['goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType', 'goog.math.Coordinate', 'goog.style']);
+goog.addDependency('fx/dragdropgroup.js', ['goog.fx.DragDropGroup'], ['goog.dom', 'goog.fx.AbstractDragDrop', 'goog.fx.DragDropItem']);
+goog.addDependency('fx/dragger.js', ['goog.fx.DragEvent', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType'], ['goog.dom', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.math.Coordinate', 'goog.math.Rect', 'goog.style', 'goog.style.bidi', 'goog.userAgent']);
+goog.addDependency('fx/draglistgroup.js', ['goog.fx.DragListDirection', 'goog.fx.DragListGroup', 'goog.fx.DragListGroup.EventType', 'goog.fx.DragListGroupEvent'], ['goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType', 'goog.math.Coordinate', 'goog.style']);
 goog.addDependency('fx/dragscrollsupport.js', ['goog.fx.DragScrollSupport'], ['goog.Disposable', 'goog.Timer', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.math.Coordinate', 'goog.style']);
 goog.addDependency('fx/easing.js', ['goog.fx.easing'], []);
-goog.addDependency('fx/fx.js', ['goog.fx'], ['goog.asserts', 'goog.fx.Animation', 'goog.fx.Animation.EventType', 'goog.fx.Animation.State', 'goog.fx.AnimationEvent', 'goog.fx.easing']);
+goog.addDependency('fx/fx.js', ['goog.fx'], ['goog.asserts', 'goog.fx.Animation', 'goog.fx.Animation.EventType', 'goog.fx.Animation.State', 'goog.fx.AnimationEvent', 'goog.fx.Transition.EventType', 'goog.fx.easing']);
+goog.addDependency('fx/transition.js', ['goog.fx.Transition', 'goog.fx.Transition.EventType'], []);
+goog.addDependency('fx/transitionbase.js', ['goog.fx.TransitionBase', 'goog.fx.TransitionBase.State'], ['goog.events.EventTarget', 'goog.fx.Transition', 'goog.fx.Transition.EventType']);
 goog.addDependency('gears/basestore.js', ['goog.gears.BaseStore', 'goog.gears.BaseStore.SchemaType'], ['goog.Disposable']);
-goog.addDependency('gears/database.js', ['goog.gears.Database', 'goog.gears.Database.EventType', 'goog.gears.Database.TransactionEvent'], ['goog.array', 'goog.debug', 'goog.debug.Logger', 'goog.events.Event', 'goog.events.EventTarget', 'goog.gears', 'goog.json']);
-goog.addDependency('gears/fakeworkerpool.js', ['goog.gears.FakeWorkerPool'], ['goog.Uri', 'goog.gears', 'goog.gears.WorkerPool', 'goog.net.XmlHttp']);
+goog.addDependency('gears/database.js', ['goog.gears.Database', 'goog.gears.Database.EventType', 'goog.gears.Database.TransactionEvent'], ['goog.array', 'goog.debug', 'goog.events.Event', 'goog.events.EventTarget', 'goog.gears', 'goog.json', 'goog.log']);
 goog.addDependency('gears/gears.js', ['goog.gears'], ['goog.string']);
-goog.addDependency('gears/httprequest.js', ['goog.gears.HttpRequest'], ['goog.Timer', 'goog.gears', 'goog.net.XmlHttp']);
+goog.addDependency('gears/httprequest.js', ['goog.gears.HttpRequest'], ['goog.Timer', 'goog.gears', 'goog.net.WrapperXmlHttpFactory', 'goog.net.XmlHttp']);
 goog.addDependency('gears/loggerclient.js', ['goog.gears.LoggerClient'], ['goog.Disposable', 'goog.debug', 'goog.debug.Logger']);
-goog.addDependency('gears/loggerserver.js', ['goog.gears.LoggerServer'], ['goog.Disposable', 'goog.debug.Logger', 'goog.debug.Logger.Level', 'goog.gears.Worker.EventType']);
-goog.addDependency('gears/logstore.js', ['goog.gears.LogStore', 'goog.gears.LogStore.Query'], ['goog.async.Delay', 'goog.debug.LogManager', 'goog.debug.LogRecord', 'goog.debug.Logger', 'goog.debug.Logger.Level', 'goog.gears.BaseStore', 'goog.gears.BaseStore.SchemaType', 'goog.json']);
-goog.addDependency('gears/managedresourcestore.js', ['goog.gears.ManagedResourceStore', 'goog.gears.ManagedResourceStore.EventType', 'goog.gears.ManagedResourceStore.UpdateStatus', 'goog.gears.ManagedResourceStoreEvent'], ['goog.debug.Logger', 'goog.events.Event', 'goog.events.EventTarget', 'goog.gears', 'goog.string']);
+goog.addDependency('gears/loggerserver.js', ['goog.gears.LoggerServer'], ['goog.Disposable', 'goog.gears.Worker.EventType', 'goog.log', 'goog.log.Level']);
+goog.addDependency('gears/logstore.js', ['goog.gears.LogStore', 'goog.gears.LogStore.Query'], ['goog.async.Delay', 'goog.debug.LogManager', 'goog.gears.BaseStore', 'goog.gears.BaseStore.SchemaType', 'goog.json', 'goog.log', 'goog.log.Level', 'goog.log.LogRecord']);
+goog.addDependency('gears/managedresourcestore.js', ['goog.gears.ManagedResourceStore', 'goog.gears.ManagedResourceStore.EventType', 'goog.gears.ManagedResourceStore.UpdateStatus', 'goog.gears.ManagedResourceStoreEvent'], ['goog.events.Event', 'goog.events.EventTarget', 'goog.gears', 'goog.log', 'goog.string']);
 goog.addDependency('gears/multipartformdata.js', ['goog.gears.MultipartFormData'], ['goog.asserts', 'goog.gears', 'goog.string']);
 goog.addDependency('gears/statustype.js', ['goog.gears.StatusType'], []);
-goog.addDependency('gears/urlcapture.js', ['goog.gears.UrlCapture', 'goog.gears.UrlCapture.Event', 'goog.gears.UrlCapture.EventType'], ['goog.Uri', 'goog.debug.Logger', 'goog.events.Event', 'goog.events.EventTarget', 'goog.gears']);
+goog.addDependency('gears/urlcapture.js', ['goog.gears.UrlCapture', 'goog.gears.UrlCapture.Event', 'goog.gears.UrlCapture.EventType'], ['goog.Uri', 'goog.events.Event', 'goog.events.EventTarget', 'goog.gears', 'goog.log']);
 goog.addDependency('gears/worker.js', ['goog.gears.Worker', 'goog.gears.Worker.EventType', 'goog.gears.WorkerEvent'], ['goog.events.Event', 'goog.events.EventTarget']);
+goog.addDependency('gears/workerchannel.js', ['goog.gears.WorkerChannel'], ['goog.Disposable', 'goog.debug', 'goog.events', 'goog.gears.Worker', 'goog.gears.Worker.EventType', 'goog.gears.WorkerEvent', 'goog.json', 'goog.log', 'goog.messaging.AbstractChannel']);
 goog.addDependency('gears/workerpool.js', ['goog.gears.WorkerPool', 'goog.gears.WorkerPool.Event', 'goog.gears.WorkerPool.EventType'], ['goog.events.Event', 'goog.events.EventTarget', 'goog.gears', 'goog.gears.Worker']);
-goog.addDependency('graphics/abstractgraphics.js', ['goog.graphics.AbstractGraphics'], ['goog.graphics.Path', 'goog.math.Coordinate', 'goog.math.Size', 'goog.style', 'goog.ui.Component']);
+goog.addDependency('graphics/abstractgraphics.js', ['goog.graphics.AbstractGraphics'], ['goog.dom', 'goog.graphics.Path', 'goog.math.Coordinate', 'goog.math.Size', 'goog.style', 'goog.ui.Component']);
 goog.addDependency('graphics/affinetransform.js', ['goog.graphics.AffineTransform'], ['goog.math']);
-goog.addDependency('graphics/canvaselement.js', ['goog.graphics.CanvasEllipseElement', 'goog.graphics.CanvasGroupElement', 'goog.graphics.CanvasImageElement', 'goog.graphics.CanvasPathElement', 'goog.graphics.CanvasRectElement', 'goog.graphics.CanvasTextElement'], ['goog.array', 'goog.dom', 'goog.graphics.EllipseElement', 'goog.graphics.GroupElement', 'goog.graphics.ImageElement', 'goog.graphics.Path', 'goog.graphics.PathElement', 'goog.graphics.RectElement', 'goog.graphics.TextElement']);
-goog.addDependency('graphics/canvasgraphics.js', ['goog.graphics.CanvasGraphics'], ['goog.dom', 'goog.graphics.AbstractGraphics', 'goog.graphics.CanvasEllipseElement', 'goog.graphics.CanvasGroupElement', 'goog.graphics.CanvasImageElement', 'goog.graphics.CanvasPathElement', 'goog.graphics.CanvasRectElement', 'goog.graphics.CanvasTextElement', 'goog.graphics.Font', 'goog.graphics.LinearGradient', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.math.Size']);
-goog.addDependency('graphics/element.js', ['goog.graphics.Element'], ['goog.events', 'goog.events.EventTarget', 'goog.graphics.AffineTransform', 'goog.math']);
+goog.addDependency('graphics/canvaselement.js', ['goog.graphics.CanvasEllipseElement', 'goog.graphics.CanvasGroupElement', 'goog.graphics.CanvasImageElement', 'goog.graphics.CanvasPathElement', 'goog.graphics.CanvasRectElement', 'goog.graphics.CanvasTextElement'], ['goog.array', 'goog.dom', 'goog.dom.TagName', 'goog.graphics.EllipseElement', 'goog.graphics.GroupElement', 'goog.graphics.ImageElement', 'goog.graphics.Path', 'goog.graphics.PathElement', 'goog.graphics.RectElement', 'goog.graphics.TextElement', 'goog.math', 'goog.string']);
+goog.addDependency('graphics/canvasgraphics.js', ['goog.graphics.CanvasGraphics'], ['goog.events.EventType', 'goog.graphics.AbstractGraphics', 'goog.graphics.CanvasEllipseElement', 'goog.graphics.CanvasGroupElement', 'goog.graphics.CanvasImageElement', 'goog.graphics.CanvasPathElement', 'goog.graphics.CanvasRectElement', 'goog.graphics.CanvasTextElement', 'goog.graphics.SolidFill', 'goog.math.Size', 'goog.style']);
+goog.addDependency('graphics/element.js', ['goog.graphics.Element'], ['goog.events', 'goog.events.EventTarget', 'goog.events.Listenable', 'goog.graphics.AffineTransform', 'goog.math']);
 goog.addDependency('graphics/ellipseelement.js', ['goog.graphics.EllipseElement'], ['goog.graphics.StrokeAndFillElement']);
-goog.addDependency('graphics/ext/coordinates.js', ['goog.graphics.ext.coordinates'], []);
+goog.addDependency('graphics/ext/coordinates.js', ['goog.graphics.ext.coordinates'], ['goog.string']);
 goog.addDependency('graphics/ext/element.js', ['goog.graphics.ext.Element'], ['goog.events', 'goog.events.EventTarget', 'goog.functions', 'goog.graphics', 'goog.graphics.ext.coordinates']);
 goog.addDependency('graphics/ext/ellipse.js', ['goog.graphics.ext.Ellipse'], ['goog.graphics.ext.StrokeAndFillElement']);
 goog.addDependency('graphics/ext/ext.js', ['goog.graphics.ext'], ['goog.graphics.ext.Ellipse', 'goog.graphics.ext.Graphics', 'goog.graphics.ext.Group', 'goog.graphics.ext.Image', 'goog.graphics.ext.Rectangle', 'goog.graphics.ext.Shape', 'goog.graphics.ext.coordinates']);
-goog.addDependency('graphics/ext/graphics.js', ['goog.graphics.ext.Graphics'], ['goog.graphics.ext.Group']);
+goog.addDependency('graphics/ext/graphics.js', ['goog.graphics.ext.Graphics'], ['goog.events.EventType', 'goog.graphics.ext.Group']);
 goog.addDependency('graphics/ext/group.js', ['goog.graphics.ext.Group'], ['goog.graphics.ext.Element']);
 goog.addDependency('graphics/ext/image.js', ['goog.graphics.ext.Image'], ['goog.graphics.ext.Element']);
 goog.addDependency('graphics/ext/path.js', ['goog.graphics.ext.Path'], ['goog.graphics.AffineTransform', 'goog.graphics.Path', 'goog.math', 'goog.math.Rect']);
@@ -1537,7 +1886,7 @@ goog.addDependency('graphics/font.js', ['goog.graphics.Font'], []);
 goog.addDependency('graphics/graphics.js', ['goog.graphics'], ['goog.graphics.CanvasGraphics', 'goog.graphics.SvgGraphics', 'goog.graphics.VmlGraphics', 'goog.userAgent']);
 goog.addDependency('graphics/groupelement.js', ['goog.graphics.GroupElement'], ['goog.graphics.Element']);
 goog.addDependency('graphics/imageelement.js', ['goog.graphics.ImageElement'], ['goog.graphics.Element']);
-goog.addDependency('graphics/lineargradient.js', ['goog.graphics.LinearGradient'], ['goog.graphics.Fill']);
+goog.addDependency('graphics/lineargradient.js', ['goog.graphics.LinearGradient'], ['goog.asserts', 'goog.graphics.Fill']);
 goog.addDependency('graphics/path.js', ['goog.graphics.Path', 'goog.graphics.Path.Segment'], ['goog.array', 'goog.math']);
 goog.addDependency('graphics/pathelement.js', ['goog.graphics.PathElement'], ['goog.graphics.StrokeAndFillElement']);
 goog.addDependency('graphics/paths.js', ['goog.graphics.paths'], ['goog.graphics.Path', 'goog.math.Coordinate']);
@@ -1546,381 +1895,578 @@ goog.addDependency('graphics/solidfill.js', ['goog.graphics.SolidFill'], ['goog.
 goog.addDependency('graphics/stroke.js', ['goog.graphics.Stroke'], []);
 goog.addDependency('graphics/strokeandfillelement.js', ['goog.graphics.StrokeAndFillElement'], ['goog.graphics.Element']);
 goog.addDependency('graphics/svgelement.js', ['goog.graphics.SvgEllipseElement', 'goog.graphics.SvgGroupElement', 'goog.graphics.SvgImageElement', 'goog.graphics.SvgPathElement', 'goog.graphics.SvgRectElement', 'goog.graphics.SvgTextElement'], ['goog.dom', 'goog.graphics.EllipseElement', 'goog.graphics.GroupElement', 'goog.graphics.ImageElement', 'goog.graphics.PathElement', 'goog.graphics.RectElement', 'goog.graphics.TextElement']);
-goog.addDependency('graphics/svggraphics.js', ['goog.graphics.SvgGraphics'], ['goog.Timer', 'goog.dom', 'goog.events.EventHandler', 'goog.graphics.AbstractGraphics', 'goog.graphics.Font', 'goog.graphics.LinearGradient', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.graphics.SvgEllipseElement', 'goog.graphics.SvgGroupElement', 'goog.graphics.SvgImageElement', 'goog.graphics.SvgPathElement', 'goog.graphics.SvgRectElement', 'goog.graphics.SvgTextElement', 'goog.math.Size', 'goog.userAgent']);
+goog.addDependency('graphics/svggraphics.js', ['goog.graphics.SvgGraphics'], ['goog.Timer', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.graphics.AbstractGraphics', 'goog.graphics.LinearGradient', 'goog.graphics.Path', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.graphics.SvgEllipseElement', 'goog.graphics.SvgGroupElement', 'goog.graphics.SvgImageElement', 'goog.graphics.SvgPathElement', 'goog.graphics.SvgRectElement', 'goog.graphics.SvgTextElement', 'goog.math', 'goog.math.Size', 'goog.style', 'goog.userAgent']);
 goog.addDependency('graphics/textelement.js', ['goog.graphics.TextElement'], ['goog.graphics.StrokeAndFillElement']);
 goog.addDependency('graphics/vmlelement.js', ['goog.graphics.VmlEllipseElement', 'goog.graphics.VmlGroupElement', 'goog.graphics.VmlImageElement', 'goog.graphics.VmlPathElement', 'goog.graphics.VmlRectElement', 'goog.graphics.VmlTextElement'], ['goog.dom', 'goog.graphics.EllipseElement', 'goog.graphics.GroupElement', 'goog.graphics.ImageElement', 'goog.graphics.PathElement', 'goog.graphics.RectElement', 'goog.graphics.TextElement']);
-goog.addDependency('graphics/vmlgraphics.js', ['goog.graphics.VmlGraphics'], ['goog.array', 'goog.dom', 'goog.events.EventHandler', 'goog.graphics.AbstractGraphics', 'goog.graphics.Font', 'goog.graphics.LinearGradient', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.graphics.VmlEllipseElement', 'goog.graphics.VmlGroupElement', 'goog.graphics.VmlImageElement', 'goog.graphics.VmlPathElement', 'goog.graphics.VmlRectElement', 'goog.graphics.VmlTextElement', 'goog.math.Size', 'goog.string']);
+goog.addDependency('graphics/vmlgraphics.js', ['goog.graphics.VmlGraphics'], ['goog.array', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.graphics.AbstractGraphics', 'goog.graphics.LinearGradient', 'goog.graphics.Path', 'goog.graphics.SolidFill', 'goog.graphics.VmlEllipseElement', 'goog.graphics.VmlGroupElement', 'goog.graphics.VmlImageElement', 'goog.graphics.VmlPathElement', 'goog.graphics.VmlRectElement', 'goog.graphics.VmlTextElement', 'goog.math', 'goog.math.Size', 'goog.string', 'goog.style']);
 goog.addDependency('history/event.js', ['goog.history.Event'], ['goog.events.Event', 'goog.history.EventType']);
 goog.addDependency('history/eventtype.js', ['goog.history.EventType'], []);
-goog.addDependency('history/history.js', ['goog.History', 'goog.History.Event', 'goog.History.EventType'], ['goog.Timer', 'goog.dom', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.history.Event', 'goog.history.EventType', 'goog.string', 'goog.userAgent']);
-goog.addDependency('history/html5history.js', ['goog.history.Html5History'], ['goog.asserts', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.history.Event', 'goog.history.EventType']);
+goog.addDependency('history/history.js', ['goog.History', 'goog.History.Event', 'goog.History.EventType'], ['goog.Timer', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.history.Event', 'goog.history.EventType', 'goog.memoize', 'goog.string', 'goog.userAgent']);
+goog.addDependency('history/history_test.js', ['goog.HistoryTest'], ['goog.History', 'goog.testing.jsunit', 'goog.userAgent']);
+goog.addDependency('history/html5history.js', ['goog.history.Html5History', 'goog.history.Html5History.TokenTransformer'], ['goog.asserts', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.history.Event', 'goog.history.EventType']);
 goog.addDependency('i18n/bidi.js', ['goog.i18n.bidi'], []);
 goog.addDependency('i18n/bidiformatter.js', ['goog.i18n.BidiFormatter'], ['goog.i18n.bidi', 'goog.string']);
 goog.addDependency('i18n/charlistdecompressor.js', ['goog.i18n.CharListDecompressor'], ['goog.array', 'goog.i18n.uChar']);
 goog.addDependency('i18n/charpickerdata.js', ['goog.i18n.CharPickerData'], []);
-goog.addDependency('i18n/currency.js', ['goog.i18n.currency'], []);
-goog.addDependency('i18n/currencycodemap.js', ['goog.i18n.currencyCodeMap'], []);
-goog.addDependency('i18n/datetimeformat.js', ['goog.i18n.DateTimeFormat'], ['goog.asserts', 'goog.i18n.DateTimeSymbols', 'goog.i18n.TimeZone', 'goog.string']);
+goog.addDependency('i18n/collation.js', ['goog.i18n.collation'], []);
+goog.addDependency('i18n/compactnumberformatsymbols.js', ['goog.i18n.CompactNumberFormatSymbols', 'goog.i18n.CompactNumberFormatSymbols_af', 'goog.i18n.CompactNumberFormatSymbols_af_ZA', 'goog.i18n.CompactNumberFormatSymbols_am', 'goog.i18n.CompactNumberFormatSymbols_am_ET', 'goog.i18n.CompactNumberFormatSymbols_ar', 'goog.i18n.CompactNumberFormatSymbols_ar_001', 'goog.i18n.CompactNumberFormatSymbols_ar_EG', 'goog.i18n.CompactNumberFormatSymbols_bg', 'goog.i18n.CompactNumberFormatSymbols_bg_BG', 'goog.i18n.CompactNumberFormatSymbols_bn', 'goog.i18n.CompactNumberFormatSymbols_bn_BD', 'goog.i18n.CompactNumberFormatSymbols_br', 'goog.i18n.CompactNumberFormatSymbols_br_FR', 'goog.i18n.CompactNumberFormatSymbols_ca', 'goog.i18n.CompactNumberFormatSymbols_ca_AD', 'goog.i18n.CompactNumberFormatSymbols_ca_ES', 'goog.i18n.CompactNumberFormatSymbols_chr', 'goog.i18n.CompactNumberFormatSymbols_chr_US', 'goog.i18n.CompactNumberFormatSymbols_cs', 'goog.i18n.CompactNumberFormatSymbols_cs_CZ', 'goog.i18n.CompactNumberFormatSymbols_cy', 'goog.i18n.CompactNumberFormatSymbols_cy_GB', 'goog.i18n.CompactNumberFormatSymbols_da', 'goog.i18n.CompactNumberFormatSymbols_da_DK', 'goog.i18n.CompactNumberFormatSymbols_de', 'goog.i18n.CompactNumberFormatSymbols_de_AT', 'goog.i18n.CompactNumberFormatSymbols_de_BE', 'goog.i18n.CompactNumberFormatSymbols_de_CH', 'goog.i18n.CompactNumberFormatSymbols_de_DE', 'goog.i18n.CompactNumberFormatSymbols_de_LU', 'goog.i18n.CompactNumberFormatSymbols_el', 'goog.i18n.CompactNumberFormatSymbols_el_GR', 'goog.i18n.CompactNumberFormatSymbols_en', 'goog.i18n.CompactNumberFormatSymbols_en_AS', 'goog.i18n.CompactNumberFormatSymbols_en_AU', 'goog.i18n.CompactNumberFormatSymbols_en_Dsrt_US', 'goog.i18n.CompactNumberFormatSymbols_en_FM', 'goog.i18n.CompactNumberFormatSymbols_en_GB', 'goog.i18n.CompactNumberFormatSymbols_en_GU', 'goog.i18n.CompactNumberFormatSymbols_en_IE', 'goog.i18n.CompactNumberFormatSymbols_en_IN', 'goog.i18n.CompactNumberFormatSymbols_en_MH', 'goog.i18n.CompactNumberFormatSymbols_en_MP', 'goog.i18n.CompactNumberFormatSymbols_en_PR', 'goog.i18n.CompactNumberFormatSymbols_en_PW', 'goog.i18n.CompactNumberFormatSymbols_en_SG', 'goog.i18n.CompactNumberFormatSymbols_en_TC', 'goog.i18n.CompactNumberFormatSymbols_en_UM', 'goog.i18n.CompactNumberFormatSymbols_en_US', 'goog.i18n.CompactNumberFormatSymbols_en_VG', 'goog.i18n.CompactNumberFormatSymbols_en_VI', 'goog.i18n.CompactNumberFormatSymbols_en_ZA', 'goog.i18n.CompactNumberFormatSymbols_es', 'goog.i18n.CompactNumberFormatSymbols_es_419', 'goog.i18n.CompactNumberFormatSymbols_es_EA', 'goog.i18n.CompactNumberFormatSymbols_es_ES', 'goog.i18n.CompactNumberFormatSymbols_es_IC', 'goog.i18n.CompactNumberFormatSymbols_et', 'goog.i18n.CompactNumberFormatSymbols_et_EE', 'goog.i18n.CompactNumberFormatSymbols_eu', 'goog.i18n.CompactNumberFormatSymbols_eu_ES', 'goog.i18n.CompactNumberFormatSymbols_fa', 'goog.i18n.CompactNumberFormatSymbols_fa_IR', 'goog.i18n.CompactNumberFormatSymbols_fi', 'goog.i18n.CompactNumberFormatSymbols_fi_FI', 'goog.i18n.CompactNumberFormatSymbols_fil', 'goog.i18n.CompactNumberFormatSymbols_fil_PH', 'goog.i18n.CompactNumberFormatSymbols_fr', 'goog.i18n.CompactNumberFormatSymbols_fr_BL', 'goog.i18n.CompactNumberFormatSymbols_fr_CA', 'goog.i18n.CompactNumberFormatSymbols_fr_FR', 'goog.i18n.CompactNumberFormatSymbols_fr_GF', 'goog.i18n.CompactNumberFormatSymbols_fr_GP', 'goog.i18n.CompactNumberFormatSymbols_fr_MC', 'goog.i18n.CompactNumberFormatSymbols_fr_MF', 'goog.i18n.CompactNumberFormatSymbols_fr_MQ', 'goog.i18n.CompactNumberFormatSymbols_fr_RE', 'goog.i18n.CompactNumberFormatSymbols_fr_YT', 'goog.i18n.CompactNumberFormatSymbols_gl', 'goog.i18n.CompactNumberFormatSymbols_gl_ES', 'goog.i18n.CompactNumberFormatSymbols_gsw', 'goog.i18n.CompactNumberFormatSymbols_gsw_CH', 'goog.i18n.CompactNumberFormatSymbols_gu', 'goog.i18n.CompactNumberFormatSymbols_gu_IN', 'goog.i18n.CompactNumberFormatSymbols_haw', 'goog.i18n.CompactNumberFormatSymbols_haw_US', 'goog.i18n.CompactNumberFormatSymbols_he', 'goog.i18n.CompactNumberFormatSymbols_he_IL', 'goog.i18n.CompactNumberFormatSymbols_hi', 'goog.i18n.CompactNumberFormatSymbols_hi_IN', 'goog.i18n.CompactNumberFormatSymbols_hr', 'goog.i18n.CompactNumberFormatSymbols_hr_HR', 'goog.i18n.CompactNumberFormatSymbols_hu', 'goog.i18n.CompactNumberFormatSymbols_hu_HU', 'goog.i18n.CompactNumberFormatSymbols_id', 'goog.i18n.CompactNumberFormatSymbols_id_ID', 'goog.i18n.CompactNumberFormatSymbols_in', 'goog.i18n.CompactNumberFormatSymbols_is', 'goog.i18n.CompactNumberFormatSymbols_is_IS', 'goog.i18n.CompactNumberFormatSymbols_it', 'goog.i18n.CompactNumberFormatSymbols_it_IT', 'goog.i18n.CompactNumberFormatSymbols_it_SM', 'goog.i18n.CompactNumberFormatSymbols_iw', 'goog.i18n.CompactNumberFormatSymbols_ja', 'goog.i18n.CompactNumberFormatSymbols_ja_JP', 'goog.i18n.CompactNumberFormatSymbols_kn', 'goog.i18n.CompactNumberFormatSymbols_kn_IN', 'goog.i18n.CompactNumberFormatSymbols_ko', 'goog.i18n.CompactNumberFormatSymbols_ko_KR', 'goog.i18n.CompactNumberFormatSymbols_ln', 'goog.i18n.CompactNumberFormatSymbols_ln_CD', 'goog.i18n.CompactNumberFormatSymbols_lt', 'goog.i18n.CompactNumberFormatSymbols_lt_LT', 'goog.i18n.CompactNumberFormatSymbols_lv', 'goog.i18n.CompactNumberFormatSymbols_lv_LV', 'goog.i18n.CompactNumberFormatSymbols_ml', 'goog.i18n.CompactNumberFormatSymbols_ml_IN', 'goog.i18n.CompactNumberFormatSymbols_mr', 'goog.i18n.CompactNumberFormatSymbols_mr_IN', 'goog.i18n.CompactNumberFormatSymbols_ms', 'goog.i18n.CompactNumberFormatSymbols_ms_Latn_MY', 'goog.i18n.CompactNumberFormatSymbols_mt', 'goog.i18n.CompactNumberFormatSymbols_mt_MT', 'goog.i18n.CompactNumberFormatSymbols_nb', 'goog.i18n.CompactNumberFormatSymbols_nb_NO', 'goog.i18n.CompactNumberFormatSymbols_nl', 'goog.i18n.CompactNumberFormatSymbols_nl_NL', 'goog.i18n.CompactNumberFormatSymbols_no', 'goog.i18n.CompactNumberFormatSymbols_or', 'goog.i18n.CompactNumberFormatSymbols_or_IN', 'goog.i18n.CompactNumberFormatSymbols_pl', 'goog.i18n.CompactNumberFormatSymbols_pl_PL', 'goog.i18n.CompactNumberFormatSymbols_pt', 'goog.i18n.CompactNumberFormatSymbols_pt_BR', 'goog.i18n.CompactNumberFormatSymbols_pt_PT', 'goog.i18n.CompactNumberFormatSymbols_ro', 'goog.i18n.CompactNumberFormatSymbols_ro_RO', 'goog.i18n.CompactNumberFormatSymbols_ru', 'goog.i18n.CompactNumberFormatSymbols_ru_RU', 'goog.i18n.CompactNumberFormatSymbols_sk', 'goog.i18n.CompactNumberFormatSymbols_sk_SK', 'goog.i18n.CompactNumberFormatSymbols_sl', 'goog.i18n.CompactNumberFormatSymbols_sl_SI', 'goog.i18n.CompactNumberFormatSymbols_sq', 'goog.i18n.CompactNumberFormatSymbols_sq_AL', 'goog.i18n.CompactNumberFormatSymbols_sr', 'goog.i18n.CompactNumberFormatSymbols_sr_Cyrl_RS', 'goog.i18n.CompactNumberFormatSymbols_sv', 'goog.i18n.CompactNumberFormatSymbols_sv_SE', 'goog.i18n.CompactNumberFormatSymbols_sw', 'goog.i18n.CompactNumberFormatSymbols_sw_TZ', 'goog.i18n.CompactNumberFormatSymbols_ta', 'goog.i18n.CompactNumberFormatSymbols_ta_IN', 'goog.i18n.CompactNumberFormatSymbols_te', 'goog.i18n.CompactNumberFormatSymbols_te_IN', 'goog.i18n.CompactNumberFormatSymbols_th', 'goog.i18n.CompactNumberFormatSymbols_th_TH', 'goog.i18n.CompactNumberFormatSymbols_tl', 'goog.i18n.CompactNumberFormatSymbols_tr', 'goog.i18n.CompactNumberFormatSymbols_tr_TR', 'goog.i18n.CompactNumberFormatSymbols_uk', 'goog.i18n.CompactNumberFormatSymbols_uk_UA', 'goog.i18n.CompactNumberFormatSymbols_ur', 'goog.i18n.CompactNumberFormatSymbols_ur_PK', 'goog.i18n.CompactNumberFormatSymbols_vi', 'goog.i18n.CompactNumberFormatSymbols_vi_VN', 'goog.i18n.CompactNumberFormatSymbols_zh', 'goog.i18n.CompactNumberFormatSymbols_zh_CN', 'goog.i18n.CompactNumberFormatSymbols_zh_HK', 'goog.i18n.CompactNumberFormatSymbols_zh_Hans_CN', 'goog.i18n.CompactNumberFormatSymbols_zh_TW', 'goog.i18n.CompactNumberFormatSymbols_zu', 'goog.i18n.CompactNumberFormatSymbols_zu_ZA'], []);
+goog.addDependency('i18n/compactnumberformatsymbols_ext.js', ['goog.i18n.CompactNumberFormatSymbolsExt', 'goog.i18n.CompactNumberFormatSymbols_aa', 'goog.i18n.CompactNumberFormatSymbols_aa_DJ', 'goog.i18n.CompactNumberFormatSymbols_aa_ER', 'goog.i18n.CompactNumberFormatSymbols_aa_ET', 'goog.i18n.CompactNumberFormatSymbols_af_NA', 'goog.i18n.CompactNumberFormatSymbols_agq', 'goog.i18n.CompactNumberFormatSymbols_agq_CM', 'goog.i18n.CompactNumberFormatSymbols_ak', 'goog.i18n.CompactNumberFormatSymbols_ak_GH', 'goog.i18n.CompactNumberFormatSymbols_ar_AE', 'goog.i18n.CompactNumberFormatSymbols_ar_BH', 'goog.i18n.CompactNumberFormatSymbols_ar_DJ', 'goog.i18n.CompactNumberFormatSymbols_ar_DZ', 'goog.i18n.CompactNumberFormatSymbols_ar_EH', 'goog.i18n.CompactNumberFormatSymbols_ar_ER', 'goog.i18n.CompactNumberFormatSymbols_ar_IL', 'goog.i18n.CompactNumberFormatSymbols_ar_IQ', 'goog.i18n.CompactNumberFormatSymbols_ar_JO', 'goog.i18n.CompactNumberFormatSymbols_ar_KM', 'goog.i18n.CompactNumberFormatSymbols_ar_KW', 'goog.i18n.CompactNumberFormatSymbols_ar_LB', 'goog.i18n.CompactNumberFormatSymbols_ar_LY', 'goog.i18n.CompactNumberFormatSymbols_ar_MA', 'goog.i18n.CompactNumberFormatSymbols_ar_MR', 'goog.i18n.CompactNumberFormatSymbols_ar_OM', 'goog.i18n.CompactNumberFormatSymbols_ar_PS', 'goog.i18n.CompactNumberFormatSymbols_ar_QA', 'goog.i18n.CompactNumberFormatSymbols_ar_SA', 'goog.i18n.CompactNumberFormatSymbols_ar_SD', 'goog.i18n.CompactNumberFormatSymbols_ar_SO', 'goog.i18n.CompactNumberFormatSymbols_ar_SY', 'goog.i18n.CompactNumberFormatSymbols_ar_TD', 'goog.i18n.CompactNumberFormatSymbols_ar_TN', 'goog.i18n.CompactNumberFormatSymbols_ar_YE', 'goog.i18n.CompactNumberFormatSymbols_as', 'goog.i18n.CompactNumberFormatSymbols_as_IN', 'goog.i18n.CompactNumberFormatSymbols_asa', 'goog.i18n.CompactNumberFormatSymbols_asa_TZ', 'goog.i18n.CompactNumberFormatSymbols_ast', 'goog.i18n.CompactNumberFormatSymbols_ast_ES', 'goog.i18n.CompactNumberFormatSymbols_az', 'goog.i18n.CompactNumberFormatSymbols_az_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_az_Cyrl_AZ', 'goog.i18n.CompactNumberFormatSymbols_az_Latn', 'goog.i18n.CompactNumberFormatSymbols_az_Latn_AZ', 'goog.i18n.CompactNumberFormatSymbols_bas', 'goog.i18n.CompactNumberFormatSymbols_bas_CM', 'goog.i18n.CompactNumberFormatSymbols_be', 'goog.i18n.CompactNumberFormatSymbols_be_BY', 'goog.i18n.CompactNumberFormatSymbols_bem', 'goog.i18n.CompactNumberFormatSymbols_bem_ZM', 'goog.i18n.CompactNumberFormatSymbols_bez', 'goog.i18n.CompactNumberFormatSymbols_bez_TZ', 'goog.i18n.CompactNumberFormatSymbols_bm', 'goog.i18n.CompactNumberFormatSymbols_bm_ML', 'goog.i18n.CompactNumberFormatSymbols_bn_IN', 'goog.i18n.CompactNumberFormatSymbols_bo', 'goog.i18n.CompactNumberFormatSymbols_bo_CN', 'goog.i18n.CompactNumberFormatSymbols_bo_IN', 'goog.i18n.CompactNumberFormatSymbols_brx', 'goog.i18n.CompactNumberFormatSymbols_brx_IN', 'goog.i18n.CompactNumberFormatSymbols_bs', 'goog.i18n.CompactNumberFormatSymbols_bs_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_bs_Cyrl_BA', 'goog.i18n.CompactNumberFormatSymbols_bs_Latn', 'goog.i18n.CompactNumberFormatSymbols_bs_Latn_BA', 'goog.i18n.CompactNumberFormatSymbols_byn', 'goog.i18n.CompactNumberFormatSymbols_byn_ER', 'goog.i18n.CompactNumberFormatSymbols_cgg', 'goog.i18n.CompactNumberFormatSymbols_cgg_UG', 'goog.i18n.CompactNumberFormatSymbols_ckb', 'goog.i18n.CompactNumberFormatSymbols_ckb_Arab', 'goog.i18n.CompactNumberFormatSymbols_ckb_Arab_IQ', 'goog.i18n.CompactNumberFormatSymbols_ckb_Arab_IR', 'goog.i18n.CompactNumberFormatSymbols_ckb_IQ', 'goog.i18n.CompactNumberFormatSymbols_ckb_IR', 'goog.i18n.CompactNumberFormatSymbols_ckb_Latn', 'goog.i18n.CompactNumberFormatSymbols_ckb_Latn_IQ', 'goog.i18n.CompactNumberFormatSymbols_dav', 'goog.i18n.CompactNumberFormatSymbols_dav_KE', 'goog.i18n.CompactNumberFormatSymbols_de_LI', 'goog.i18n.CompactNumberFormatSymbols_dje', 'goog.i18n.CompactNumberFormatSymbols_dje_NE', 'goog.i18n.CompactNumberFormatSymbols_dua', 'goog.i18n.CompactNumberFormatSymbols_dua_CM', 'goog.i18n.CompactNumberFormatSymbols_dyo', 'goog.i18n.CompactNumberFormatSymbols_dyo_SN', 'goog.i18n.CompactNumberFormatSymbols_dz', 'goog.i18n.CompactNumberFormatSymbols_dz_BT', 'goog.i18n.CompactNumberFormatSymbols_ebu', 'goog.i18n.CompactNumberFormatSymbols_ebu_KE', 'goog.i18n.CompactNumberFormatSymbols_ee', 'goog.i18n.CompactNumberFormatSymbols_ee_GH', 'goog.i18n.CompactNumberFormatSymbols_ee_TG', 'goog.i18n.CompactNumberFormatSymbols_el_CY', 'goog.i18n.CompactNumberFormatSymbols_en_150', 'goog.i18n.CompactNumberFormatSymbols_en_AG', 'goog.i18n.CompactNumberFormatSymbols_en_BB', 'goog.i18n.CompactNumberFormatSymbols_en_BE', 'goog.i18n.CompactNumberFormatSymbols_en_BM', 'goog.i18n.CompactNumberFormatSymbols_en_BS', 'goog.i18n.CompactNumberFormatSymbols_en_BW', 'goog.i18n.CompactNumberFormatSymbols_en_BZ', 'goog.i18n.CompactNumberFormatSymbols_en_CA', 'goog.i18n.CompactNumberFormatSymbols_en_CM', 'goog.i18n.CompactNumberFormatSymbols_en_DM', 'goog.i18n.CompactNumberFormatSymbols_en_Dsrt', 'goog.i18n.CompactNumberFormatSymbols_en_FJ', 'goog.i18n.CompactNumberFormatSymbols_en_GD', 'goog.i18n.CompactNumberFormatSymbols_en_GG', 'goog.i18n.CompactNumberFormatSymbols_en_GH', 'goog.i18n.CompactNumberFormatSymbols_en_GI', 'goog.i18n.CompactNumberFormatSymbols_en_GM', 'goog.i18n.CompactNumberFormatSymbols_en_GY', 'goog.i18n.CompactNumberFormatSymbols_en_HK', 'goog.i18n.CompactNumberFormatSymbols_en_IM', 'goog.i18n.CompactNumberFormatSymbols_en_JE', 'goog.i18n.CompactNumberFormatSymbols_en_JM', 'goog.i18n.CompactNumberFormatSymbols_en_KE', 'goog.i18n.CompactNumberFormatSymbols_en_KI', 'goog.i18n.CompactNumberFormatSymbols_en_KN', 'goog.i18n.CompactNumberFormatSymbols_en_KY', 'goog.i18n.CompactNumberFormatSymbols_en_LC', 'goog.i18n.CompactNumberFormatSymbols_en_LR', 'goog.i18n.CompactNumberFormatSymbols_en_LS', 'goog.i18n.CompactNumberFormatSymbols_en_MG', 'goog.i18n.CompactNumberFormatSymbols_en_MT', 'goog.i18n.CompactNumberFormatSymbols_en_MU', 'goog.i18n.CompactNumberFormatSymbols_en_MW', 'goog.i18n.CompactNumberFormatSymbols_en_NA', 'goog.i18n.CompactNumberFormatSymbols_en_NG', 'goog.i18n.CompactNumberFormatSymbols_en_NZ', 'goog.i18n.CompactNumberFormatSymbols_en_PG', 'goog.i18n.CompactNumberFormatSymbols_en_PH', 'goog.i18n.CompactNumberFormatSymbols_en_PK', 'goog.i18n.CompactNumberFormatSymbols_en_SB', 'goog.i18n.CompactNumberFormatSymbols_en_SC', 'goog.i18n.CompactNumberFormatSymbols_en_SL', 'goog.i18n.CompactNumberFormatSymbols_en_SS', 'goog.i18n.CompactNumberFormatSymbols_en_SZ', 'goog.i18n.CompactNumberFormatSymbols_en_TO', 'goog.i18n.CompactNumberFormatSymbols_en_TT', 'goog.i18n.CompactNumberFormatSymbols_en_TZ', 'goog.i18n.CompactNumberFormatSymbols_en_UG', 'goog.i18n.CompactNumberFormatSymbols_en_VC', 'goog.i18n.CompactNumberFormatSymbols_en_VU', 'goog.i18n.CompactNumberFormatSymbols_en_WS', 'goog.i18n.CompactNumberFormatSymbols_en_ZM', 'goog.i18n.CompactNumberFormatSymbols_en_ZW', 'goog.i18n.CompactNumberFormatSymbols_eo', 'goog.i18n.CompactNumberFormatSymbols_es_AR', 'goog.i18n.CompactNumberFormatSymbols_es_BO', 'goog.i18n.CompactNumberFormatSymbols_es_CL', 'goog.i18n.CompactNumberFormatSymbols_es_CO', 'goog.i18n.CompactNumberFormatSymbols_es_CR', 'goog.i18n.CompactNumberFormatSymbols_es_CU', 'goog.i18n.CompactNumberFormatSymbols_es_DO', 'goog.i18n.CompactNumberFormatSymbols_es_EC', 'goog.i18n.CompactNumberFormatSymbols_es_GQ', 'goog.i18n.CompactNumberFormatSymbols_es_GT', 'goog.i18n.CompactNumberFormatSymbols_es_HN', 'goog.i18n.CompactNumberFormatSymbols_es_MX', 'goog.i18n.CompactNumberFormatSymbols_es_NI', 'goog.i18n.CompactNumberFormatSymbols_es_PA', 'goog.i18n.CompactNumberFormatSymbols_es_PE', 'goog.i18n.CompactNumberFormatSymbols_es_PH', 'goog.i18n.CompactNumberFormatSymbols_es_PR', 'goog.i18n.CompactNumberFormatSymbols_es_PY', 'goog.i18n.CompactNumberFormatSymbols_es_SV', 'goog.i18n.CompactNumberFormatSymbols_es_US', 'goog.i18n.CompactNumberFormatSymbols_es_UY', 'goog.i18n.CompactNumberFormatSymbols_es_VE', 'goog.i18n.CompactNumberFormatSymbols_ewo', 'goog.i18n.CompactNumberFormatSymbols_ewo_CM', 'goog.i18n.CompactNumberFormatSymbols_fa_AF', 'goog.i18n.CompactNumberFormatSymbols_ff', 'goog.i18n.CompactNumberFormatSymbols_ff_SN', 'goog.i18n.CompactNumberFormatSymbols_fo', 'goog.i18n.CompactNumberFormatSymbols_fo_FO', 'goog.i18n.CompactNumberFormatSymbols_fr_BE', 'goog.i18n.CompactNumberFormatSymbols_fr_BF', 'goog.i18n.CompactNumberFormatSymbols_fr_BI', 'goog.i18n.CompactNumberFormatSymbols_fr_BJ', 'goog.i18n.CompactNumberFormatSymbols_fr_CD', 'goog.i18n.CompactNumberFormatSymbols_fr_CF', 'goog.i18n.CompactNumberFormatSymbols_fr_CG', 'goog.i18n.CompactNumberFormatSymbols_fr_CH', 'goog.i18n.CompactNumberFormatSymbols_fr_CI', 'goog.i18n.CompactNumberFormatSymbols_fr_CM', 'goog.i18n.CompactNumberFormatSymbols_fr_DJ', 'goog.i18n.CompactNumberFormatSymbols_fr_DZ', 'goog.i18n.CompactNumberFormatSymbols_fr_GA', 'goog.i18n.CompactNumberFormatSymbols_fr_GN', 'goog.i18n.CompactNumberFormatSymbols_fr_GQ', 'goog.i18n.CompactNumberFormatSymbols_fr_HT', 'goog.i18n.CompactNumberFormatSymbols_fr_KM', 'goog.i18n.CompactNumberFormatSymbols_fr_LU', 'goog.i18n.CompactNumberFormatSymbols_fr_MA', 'goog.i18n.CompactNumberFormatSymbols_fr_MG', 'goog.i18n.CompactNumberFormatSymbols_fr_ML', 'goog.i18n.CompactNumberFormatSymbols_fr_MR', 'goog.i18n.CompactNumberFormatSymbols_fr_MU', 'goog.i18n.CompactNumberFormatSymbols_fr_NC', 'goog.i18n.CompactNumberFormatSymbols_fr_NE', 'goog.i18n.CompactNumberFormatSymbols_fr_PF', 'goog.i18n.CompactNumberFormatSymbols_fr_RW', 'goog.i18n.CompactNumberFormatSymbols_fr_SC', 'goog.i18n.CompactNumberFormatSymbols_fr_SN', 'goog.i18n.CompactNumberFormatSymbols_fr_SY', 'goog.i18n.CompactNumberFormatSymbols_fr_TD', 'goog.i18n.CompactNumberFormatSymbols_fr_TG', 'goog.i18n.CompactNumberFormatSymbols_fr_TN', 'goog.i18n.CompactNumberFormatSymbols_fr_VU', 'goog.i18n.CompactNumberFormatSymbols_fur', 'goog.i18n.CompactNumberFormatSymbols_fur_IT', 'goog.i18n.CompactNumberFormatSymbols_ga', 'goog.i18n.CompactNumberFormatSymbols_ga_IE', 'goog.i18n.CompactNumberFormatSymbols_gd', 'goog.i18n.CompactNumberFormatSymbols_gd_GB', 'goog.i18n.CompactNumberFormatSymbols_guz', 'goog.i18n.CompactNumberFormatSymbols_guz_KE', 'goog.i18n.CompactNumberFormatSymbols_gv', 'goog.i18n.CompactNumberFormatSymbols_gv_GB', 'goog.i18n.CompactNumberFormatSymbols_ha', 'goog.i18n.CompactNumberFormatSymbols_ha_Latn', 'goog.i18n.CompactNumberFormatSymbols_ha_Latn_GH', 'goog.i18n.CompactNumberFormatSymbols_ha_Latn_NE', 'goog.i18n.CompactNumberFormatSymbols_ha_Latn_NG', 'goog.i18n.CompactNumberFormatSymbols_hr_BA', 'goog.i18n.CompactNumberFormatSymbols_hy', 'goog.i18n.CompactNumberFormatSymbols_hy_AM', 'goog.i18n.CompactNumberFormatSymbols_ia', 'goog.i18n.CompactNumberFormatSymbols_ia_FR', 'goog.i18n.CompactNumberFormatSymbols_ig', 'goog.i18n.CompactNumberFormatSymbols_ig_NG', 'goog.i18n.CompactNumberFormatSymbols_ii', 'goog.i18n.CompactNumberFormatSymbols_ii_CN', 'goog.i18n.CompactNumberFormatSymbols_it_CH', 'goog.i18n.CompactNumberFormatSymbols_jgo', 'goog.i18n.CompactNumberFormatSymbols_jgo_CM', 'goog.i18n.CompactNumberFormatSymbols_jmc', 'goog.i18n.CompactNumberFormatSymbols_jmc_TZ', 'goog.i18n.CompactNumberFormatSymbols_ka', 'goog.i18n.CompactNumberFormatSymbols_ka_GE', 'goog.i18n.CompactNumberFormatSymbols_kab', 'goog.i18n.CompactNumberFormatSymbols_kab_DZ', 'goog.i18n.CompactNumberFormatSymbols_kam', 'goog.i18n.CompactNumberFormatSymbols_kam_KE', 'goog.i18n.CompactNumberFormatSymbols_kde', 'goog.i18n.CompactNumberFormatSymbols_kde_TZ', 'goog.i18n.CompactNumberFormatSymbols_kea', 'goog.i18n.CompactNumberFormatSymbols_kea_CV', 'goog.i18n.CompactNumberFormatSymbols_khq', 'goog.i18n.CompactNumberFormatSymbols_khq_ML', 'goog.i18n.CompactNumberFormatSymbols_ki', 'goog.i18n.CompactNumberFormatSymbols_ki_KE', 'goog.i18n.CompactNumberFormatSymbols_kk', 'goog.i18n.CompactNumberFormatSymbols_kk_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_kk_Cyrl_KZ', 'goog.i18n.CompactNumberFormatSymbols_kkj', 'goog.i18n.CompactNumberFormatSymbols_kkj_CM', 'goog.i18n.CompactNumberFormatSymbols_kl', 'goog.i18n.CompactNumberFormatSymbols_kl_GL', 'goog.i18n.CompactNumberFormatSymbols_kln', 'goog.i18n.CompactNumberFormatSymbols_kln_KE', 'goog.i18n.CompactNumberFormatSymbols_km', 'goog.i18n.CompactNumberFormatSymbols_km_KH', 'goog.i18n.CompactNumberFormatSymbols_ko_KP', 'goog.i18n.CompactNumberFormatSymbols_kok', 'goog.i18n.CompactNumberFormatSymbols_kok_IN', 'goog.i18n.CompactNumberFormatSymbols_ks', 'goog.i18n.CompactNumberFormatSymbols_ks_Arab', 'goog.i18n.CompactNumberFormatSymbols_ks_Arab_IN', 'goog.i18n.CompactNumberFormatSymbols_ksb', 'goog.i18n.CompactNumberFormatSymbols_ksb_TZ', 'goog.i18n.CompactNumberFormatSymbols_ksf', 'goog.i18n.CompactNumberFormatSymbols_ksf_CM', 'goog.i18n.CompactNumberFormatSymbols_ksh', 'goog.i18n.CompactNumberFormatSymbols_ksh_DE', 'goog.i18n.CompactNumberFormatSymbols_kw', 'goog.i18n.CompactNumberFormatSymbols_kw_GB', 'goog.i18n.CompactNumberFormatSymbols_ky', 'goog.i18n.CompactNumberFormatSymbols_ky_KG', 'goog.i18n.CompactNumberFormatSymbols_lag', 'goog.i18n.CompactNumberFormatSymbols_lag_TZ', 'goog.i18n.CompactNumberFormatSymbols_lg', 'goog.i18n.CompactNumberFormatSymbols_lg_UG', 'goog.i18n.CompactNumberFormatSymbols_ln_AO', 'goog.i18n.CompactNumberFormatSymbols_ln_CF', 'goog.i18n.CompactNumberFormatSymbols_ln_CG', 'goog.i18n.CompactNumberFormatSymbols_lo', 'goog.i18n.CompactNumberFormatSymbols_lo_LA', 'goog.i18n.CompactNumberFormatSymbols_lu', 'goog.i18n.CompactNumberFormatSymbols_lu_CD', 'goog.i18n.CompactNumberFormatSymbols_luo', 'goog.i18n.CompactNumberFormatSymbols_luo_KE', 'goog.i18n.CompactNumberFormatSymbols_luy', 'goog.i18n.CompactNumberFormatSymbols_luy_KE', 'goog.i18n.CompactNumberFormatSymbols_mas', 'goog.i18n.CompactNumberFormatSymbols_mas_KE', 'goog.i18n.CompactNumberFormatSymbols_mas_TZ', 'goog.i18n.CompactNumberFormatSymbols_mer', 'goog.i18n.CompactNumberFormatSymbols_mer_KE', 'goog.i18n.CompactNumberFormatSymbols_mfe', 'goog.i18n.CompactNumberFormatSymbols_mfe_MU', 'goog.i18n.CompactNumberFormatSymbols_mg', 'goog.i18n.CompactNumberFormatSymbols_mg_MG', 'goog.i18n.CompactNumberFormatSymbols_mgh', 'goog.i18n.CompactNumberFormatSymbols_mgh_MZ', 'goog.i18n.CompactNumberFormatSymbols_mgo', 'goog.i18n.CompactNumberFormatSymbols_mgo_CM', 'goog.i18n.CompactNumberFormatSymbols_mk', 'goog.i18n.CompactNumberFormatSymbols_mk_MK', 'goog.i18n.CompactNumberFormatSymbols_mn', 'goog.i18n.CompactNumberFormatSymbols_mn_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_mn_Cyrl_MN', 'goog.i18n.CompactNumberFormatSymbols_ms_Latn', 'goog.i18n.CompactNumberFormatSymbols_ms_Latn_BN', 'goog.i18n.CompactNumberFormatSymbols_ms_Latn_SG', 'goog.i18n.CompactNumberFormatSymbols_mua', 'goog.i18n.CompactNumberFormatSymbols_mua_CM', 'goog.i18n.CompactNumberFormatSymbols_my', 'goog.i18n.CompactNumberFormatSymbols_my_MM', 'goog.i18n.CompactNumberFormatSymbols_naq', 'goog.i18n.CompactNumberFormatSymbols_naq_NA', 'goog.i18n.CompactNumberFormatSymbols_nd', 'goog.i18n.CompactNumberFormatSymbols_nd_ZW', 'goog.i18n.CompactNumberFormatSymbols_ne', 'goog.i18n.CompactNumberFormatSymbols_ne_IN', 'goog.i18n.CompactNumberFormatSymbols_ne_NP', 'goog.i18n.CompactNumberFormatSymbols_nl_AW', 'goog.i18n.CompactNumberFormatSymbols_nl_BE', 'goog.i18n.CompactNumberFormatSymbols_nl_CW', 'goog.i18n.CompactNumberFormatSymbols_nl_SR', 'goog.i18n.CompactNumberFormatSymbols_nl_SX', 'goog.i18n.CompactNumberFormatSymbols_nmg', 'goog.i18n.CompactNumberFormatSymbols_nmg_CM', 'goog.i18n.CompactNumberFormatSymbols_nn', 'goog.i18n.CompactNumberFormatSymbols_nn_NO', 'goog.i18n.CompactNumberFormatSymbols_nnh', 'goog.i18n.CompactNumberFormatSymbols_nnh_CM', 'goog.i18n.CompactNumberFormatSymbols_nr', 'goog.i18n.CompactNumberFormatSymbols_nr_ZA', 'goog.i18n.CompactNumberFormatSymbols_nso', 'goog.i18n.CompactNumberFormatSymbols_nso_ZA', 'goog.i18n.CompactNumberFormatSymbols_nus', 'goog.i18n.CompactNumberFormatSymbols_nus_SD', 'goog.i18n.CompactNumberFormatSymbols_nyn', 'goog.i18n.CompactNumberFormatSymbols_nyn_UG', 'goog.i18n.CompactNumberFormatSymbols_om', 'goog.i18n.CompactNumberFormatSymbols_om_ET', 'goog.i18n.CompactNumberFormatSymbols_om_KE', 'goog.i18n.CompactNumberFormatSymbols_os', 'goog.i18n.CompactNumberFormatSymbols_os_GE', 'goog.i18n.CompactNumberFormatSymbols_os_RU', 'goog.i18n.CompactNumberFormatSymbols_pa', 'goog.i18n.CompactNumberFormatSymbols_pa_Arab', 'goog.i18n.CompactNumberFormatSymbols_pa_Arab_PK', 'goog.i18n.CompactNumberFormatSymbols_pa_Guru', 'goog.i18n.CompactNumberFormatSymbols_pa_Guru_IN', 'goog.i18n.CompactNumberFormatSymbols_ps', 'goog.i18n.CompactNumberFormatSymbols_ps_AF', 'goog.i18n.CompactNumberFormatSymbols_pt_AO', 'goog.i18n.CompactNumberFormatSymbols_pt_CV', 'goog.i18n.CompactNumberFormatSymbols_pt_GW', 'goog.i18n.CompactNumberFormatSymbols_pt_MO', 'goog.i18n.CompactNumberFormatSymbols_pt_MZ', 'goog.i18n.CompactNumberFormatSymbols_pt_ST', 'goog.i18n.CompactNumberFormatSymbols_pt_TL', 'goog.i18n.CompactNumberFormatSymbols_rm', 'goog.i18n.CompactNumberFormatSymbols_rm_CH', 'goog.i18n.CompactNumberFormatSymbols_rn', 'goog.i18n.CompactNumberFormatSymbols_rn_BI', 'goog.i18n.CompactNumberFormatSymbols_ro_MD', 'goog.i18n.CompactNumberFormatSymbols_rof', 'goog.i18n.CompactNumberFormatSymbols_rof_TZ', 'goog.i18n.CompactNumberFormatSymbols_ru_BY', 'goog.i18n.CompactNumberFormatSymbols_ru_KG', 'goog.i18n.CompactNumberFormatSymbols_ru_KZ', 'goog.i18n.CompactNumberFormatSymbols_ru_MD', 'goog.i18n.CompactNumberFormatSymbols_ru_UA', 'goog.i18n.CompactNumberFormatSymbols_rw', 'goog.i18n.CompactNumberFormatSymbols_rw_RW', 'goog.i18n.CompactNumberFormatSymbols_rwk', 'goog.i18n.CompactNumberFormatSymbols_rwk_TZ', 'goog.i18n.CompactNumberFormatSymbols_sah', 'goog.i18n.CompactNumberFormatSymbols_sah_RU', 'goog.i18n.CompactNumberFormatSymbols_saq', 'goog.i18n.CompactNumberFormatSymbols_saq_KE', 'goog.i18n.CompactNumberFormatSymbols_sbp', 'goog.i18n.CompactNumberFormatSymbols_sbp_TZ', 'goog.i18n.CompactNumberFormatSymbols_se', 'goog.i18n.CompactNumberFormatSymbols_se_FI', 'goog.i18n.CompactNumberFormatSymbols_se_NO', 'goog.i18n.CompactNumberFormatSymbols_seh', 'goog.i18n.CompactNumberFormatSymbols_seh_MZ', 'goog.i18n.CompactNumberFormatSymbols_ses', 'goog.i18n.CompactNumberFormatSymbols_ses_ML', 'goog.i18n.CompactNumberFormatSymbols_sg', 'goog.i18n.CompactNumberFormatSymbols_sg_CF', 'goog.i18n.CompactNumberFormatSymbols_shi', 'goog.i18n.CompactNumberFormatSymbols_shi_Latn', 'goog.i18n.CompactNumberFormatSymbols_shi_Latn_MA', 'goog.i18n.CompactNumberFormatSymbols_shi_Tfng', 'goog.i18n.CompactNumberFormatSymbols_shi_Tfng_MA', 'goog.i18n.CompactNumberFormatSymbols_si', 'goog.i18n.CompactNumberFormatSymbols_si_LK', 'goog.i18n.CompactNumberFormatSymbols_sn', 'goog.i18n.CompactNumberFormatSymbols_sn_ZW', 'goog.i18n.CompactNumberFormatSymbols_so', 'goog.i18n.CompactNumberFormatSymbols_so_DJ', 'goog.i18n.CompactNumberFormatSymbols_so_ET', 'goog.i18n.CompactNumberFormatSymbols_so_KE', 'goog.i18n.CompactNumberFormatSymbols_so_SO', 'goog.i18n.CompactNumberFormatSymbols_sq_MK', 'goog.i18n.CompactNumberFormatSymbols_sq_XK', 'goog.i18n.CompactNumberFormatSymbols_sr_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_sr_Cyrl_BA', 'goog.i18n.CompactNumberFormatSymbols_sr_Cyrl_ME', 'goog.i18n.CompactNumberFormatSymbols_sr_Cyrl_XK', 'goog.i18n.CompactNumberFormatSymbols_sr_Latn', 'goog.i18n.CompactNumberFormatSymbols_sr_Latn_BA', 'goog.i18n.CompactNumberFormatSymbols_sr_Latn_ME', 'goog.i18n.CompactNumberFormatSymbols_sr_Latn_RS', 'goog.i18n.CompactNumberFormatSymbols_sr_Latn_XK', 'goog.i18n.CompactNumberFormatSymbols_ss', 'goog.i18n.CompactNumberFormatSymbols_ss_SZ', 'goog.i18n.CompactNumberFormatSymbols_ss_ZA', 'goog.i18n.CompactNumberFormatSymbols_ssy', 'goog.i18n.CompactNumberFormatSymbols_ssy_ER', 'goog.i18n.CompactNumberFormatSymbols_st', 'goog.i18n.CompactNumberFormatSymbols_st_LS', 'goog.i18n.CompactNumberFormatSymbols_st_ZA', 'goog.i18n.CompactNumberFormatSymbols_sv_AX', 'goog.i18n.CompactNumberFormatSymbols_sv_FI', 'goog.i18n.CompactNumberFormatSymbols_sw_KE', 'goog.i18n.CompactNumberFormatSymbols_sw_UG', 'goog.i18n.CompactNumberFormatSymbols_swc', 'goog.i18n.CompactNumberFormatSymbols_swc_CD', 'goog.i18n.CompactNumberFormatSymbols_ta_LK', 'goog.i18n.CompactNumberFormatSymbols_ta_MY', 'goog.i18n.CompactNumberFormatSymbols_ta_SG', 'goog.i18n.CompactNumberFormatSymbols_teo', 'goog.i18n.CompactNumberFormatSymbols_teo_KE', 'goog.i18n.CompactNumberFormatSymbols_teo_UG', 'goog.i18n.CompactNumberFormatSymbols_tg', 'goog.i18n.CompactNumberFormatSymbols_tg_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_tg_Cyrl_TJ', 'goog.i18n.CompactNumberFormatSymbols_ti', 'goog.i18n.CompactNumberFormatSymbols_ti_ER', 'goog.i18n.CompactNumberFormatSymbols_ti_ET', 'goog.i18n.CompactNumberFormatSymbols_tig', 'goog.i18n.CompactNumberFormatSymbols_tig_ER', 'goog.i18n.CompactNumberFormatSymbols_tn', 'goog.i18n.CompactNumberFormatSymbols_tn_BW', 'goog.i18n.CompactNumberFormatSymbols_tn_ZA', 'goog.i18n.CompactNumberFormatSymbols_to', 'goog.i18n.CompactNumberFormatSymbols_to_TO', 'goog.i18n.CompactNumberFormatSymbols_tr_CY', 'goog.i18n.CompactNumberFormatSymbols_ts', 'goog.i18n.CompactNumberFormatSymbols_ts_ZA', 'goog.i18n.CompactNumberFormatSymbols_twq', 'goog.i18n.CompactNumberFormatSymbols_twq_NE', 'goog.i18n.CompactNumberFormatSymbols_tzm', 'goog.i18n.CompactNumberFormatSymbols_tzm_Latn', 'goog.i18n.CompactNumberFormatSymbols_tzm_Latn_MA', 'goog.i18n.CompactNumberFormatSymbols_ur_IN', 'goog.i18n.CompactNumberFormatSymbols_uz', 'goog.i18n.CompactNumberFormatSymbols_uz_Arab', 'goog.i18n.CompactNumberFormatSymbols_uz_Arab_AF', 'goog.i18n.CompactNumberFormatSymbols_uz_Cyrl', 'goog.i18n.CompactNumberFormatSymbols_uz_Cyrl_UZ', 'goog.i18n.CompactNumberFormatSymbols_uz_Latn', 'goog.i18n.CompactNumberFormatSymbols_uz_Latn_UZ', 'goog.i18n.CompactNumberFormatSymbols_vai', 'goog.i18n.CompactNumberFormatSymbols_vai_Latn', 'goog.i18n.CompactNumberFormatSymbols_vai_Latn_LR', 'goog.i18n.CompactNumberFormatSymbols_vai_Vaii', 'goog.i18n.CompactNumberFormatSymbols_vai_Vaii_LR', 'goog.i18n.CompactNumberFormatSymbols_ve', 'goog.i18n.CompactNumberFormatSymbols_ve_ZA', 'goog.i18n.CompactNumberFormatSymbols_vo', 'goog.i18n.CompactNumberFormatSymbols_vun', 'goog.i18n.CompactNumberFormatSymbols_vun_TZ', 'goog.i18n.CompactNumberFormatSymbols_wae', 'goog.i18n.CompactNumberFormatSymbols_wae_CH', 'goog.i18n.CompactNumberFormatSymbols_wal', 'goog.i18n.CompactNumberFormatSymbols_wal_ET', 'goog.i18n.CompactNumberFormatSymbols_xh', 'goog.i18n.CompactNumberFormatSymbols_xh_ZA', 'goog.i18n.CompactNumberFormatSymbols_xog', 'goog.i18n.CompactNumberFormatSymbols_xog_UG', 'goog.i18n.CompactNumberFormatSymbols_yav', 'goog.i18n.CompactNumberFormatSymbols_yav_CM', 'goog.i18n.CompactNumberFormatSymbols_yo', 'goog.i18n.CompactNumberFormatSymbols_yo_NG', 'goog.i18n.CompactNumberFormatSymbols_zh_Hans', 'goog.i18n.CompactNumberFormatSymbols_zh_Hans_HK', 'goog.i18n.CompactNumberFormatSymbols_zh_Hans_MO', 'goog.i18n.CompactNumberFormatSymbols_zh_Hans_SG', 'goog.i18n.CompactNumberFormatSymbols_zh_Hant', 'goog.i18n.CompactNumberFormatSymbols_zh_Hant_HK', 'goog.i18n.CompactNumberFormatSymbols_zh_Hant_MO', 'goog.i18n.CompactNumberFormatSymbols_zh_Hant_TW'], []);
+goog.addDependency('i18n/currency.js', ['goog.i18n.currency', 'goog.i18n.currency.CurrencyInfo', 'goog.i18n.currency.CurrencyInfoTier2'], []);
+goog.addDependency('i18n/currencycodemap.js', ['goog.i18n.currencyCodeMap', 'goog.i18n.currencyCodeMapTier2'], []);
+goog.addDependency('i18n/datetimeformat.js', ['goog.i18n.DateTimeFormat', 'goog.i18n.DateTimeFormat.Format'], ['goog.asserts', 'goog.i18n.DateTimeSymbols', 'goog.i18n.TimeZone', 'goog.string']);
 goog.addDependency('i18n/datetimeparse.js', ['goog.i18n.DateTimeParse'], ['goog.i18n.DateTimeFormat', 'goog.i18n.DateTimeSymbols']);
-goog.addDependency('i18n/datetimepatterns.js', ['goog.i18n.DateTimePatterns', 'goog.i18n.DateTimePatterns_am', 'goog.i18n.DateTimePatterns_ar', 'goog.i18n.DateTimePatterns_bg', 'goog.i18n.DateTimePatterns_bn', 'goog.i18n.DateTimePatterns_ca', 'goog.i18n.DateTimePatterns_cs', 'goog.i18n.DateTimePatterns_da', 'goog.i18n.DateTimePatterns_de', 'goog.i18n.DateTimePatterns_de_AT', 'goog.i18n.DateTimePatterns_de_CH', 'goog.i18n.DateTimePatterns_el', 'goog.i18n.DateTimePatterns_en', 'goog.i18n.DateTimePatterns_en_AU', 'goog.i18n.DateTimePatterns_en_GB', 'goog.i18n.DateTimePatterns_en_IE', 'goog.i18n.DateTimePatterns_en_IN', 'goog.i18n.DateTimePatterns_en_SG', 'goog.i18n.DateTimePatterns_en_US', 'goog.i18n.DateTimePatterns_en_ZA', 'goog.i18n.DateTimePatterns_es', 'goog.i18n.DateTimePatterns_et', 'goog.i18n.DateTimePatterns_eu', 'goog.i18n.DateTimePatterns_fa', 'goog.i18n.DateTimePatterns_fi', 'goog.i18n.DateTimePatterns_fil', 'goog.i18n.DateTimePatterns_fr', 'goog.i18n.DateTimePatterns_fr_CA', 'goog.i18n.DateTimePatterns_gl', 'goog.i18n.DateTimePatterns_gsw', 'goog.i18n.DateTimePatterns_gu', 'goog.i18n.DateTimePatterns_he', 'goog.i18n.DateTimePatterns_hi', 'goog.i18n.DateTimePatterns_hr', 'goog.i18n.DateTimePatterns_hu', 'goog.i18n.DateTimePatterns_id', 'goog.i18n.DateTimePatterns_is', 'goog.i18n.DateTimePatterns_it', 'goog.i18n.DateTimePatterns_ja', 'goog.i18n.DateTimePatterns_kn', 'goog.i18n.DateTimePatterns_ko', 'goog.i18n.DateTimePatterns_lt', 'goog.i18n.DateTimePatterns_lv', 'goog.i18n.DateTimePatterns_ml', 'goog.i18n.DateTimePatterns_mr', 'goog.i18n.DateTimePatterns_ms', 'goog.i18n.DateTimePatterns_mt', 'goog.i18n.DateTimePatterns_nl', 'goog.i18n.DateTimePatterns_or', 'goog.i18n.DateTimePatterns_pl', 'goog.i18n.DateTimePatterns_pt', 'goog.i18n.DateTimePatterns_pt_BR', 'goog.i18n.DateTimePatterns_pt_PT', 'goog.i18n.DateTimePatterns_ro', 'goog.i18n.DateTimePatterns_ru', 'goog.i18n.DateTimePatterns_sk', 'goog.i18n.DateTimePatterns_sl', 'goog.i18n.DateTimePatterns_sq', 'goog.i18n.DateTimePatterns_sr', 'goog.i18n.DateTimePatterns_sv', 'goog.i18n.DateTimePatterns_sw', 'goog.i18n.DateTimePatterns_ta', 'goog.i18n.DateTimePatterns_te', 'goog.i18n.DateTimePatterns_th', 'goog.i18n.DateTimePatterns_tr', 'goog.i18n.DateTimePatterns_uk', 'goog.i18n.DateTimePatterns_ur', 'goog.i18n.DateTimePatterns_vi', 'goog.i18n.DateTimePatterns_zh'], []);
-goog.addDependency('i18n/datetimepatternsext.js', ['goog.i18n.DateTimePatternsExt', 'goog.i18n.DateTimePatterns_af', 'goog.i18n.DateTimePatterns_af_NA', 'goog.i18n.DateTimePatterns_af_ZA', 'goog.i18n.DateTimePatterns_ak', 'goog.i18n.DateTimePatterns_ak_GH', 'goog.i18n.DateTimePatterns_am_ET', 'goog.i18n.DateTimePatterns_ar_AE', 'goog.i18n.DateTimePatterns_ar_BH', 'goog.i18n.DateTimePatterns_ar_DZ', 'goog.i18n.DateTimePatterns_ar_EG', 'goog.i18n.DateTimePatterns_ar_IQ', 'goog.i18n.DateTimePatterns_ar_JO', 'goog.i18n.DateTimePatterns_ar_KW', 'goog.i18n.DateTimePatterns_ar_LB', 'goog.i18n.DateTimePatterns_ar_LY', 'goog.i18n.DateTimePatterns_ar_MA', 'goog.i18n.DateTimePatterns_ar_OM', 'goog.i18n.DateTimePatterns_ar_QA', 'goog.i18n.DateTimePatterns_ar_SA', 'goog.i18n.DateTimePatterns_ar_SD', 'goog.i18n.DateTimePatterns_ar_SY', 'goog.i18n.DateTimePatterns_ar_TN', 'goog.i18n.DateTimePatterns_ar_YE', 'goog.i18n.DateTimePatterns_as', 'goog.i18n.DateTimePatterns_as_IN', 'goog.i18n.DateTimePatterns_asa', 'goog.i18n.DateTimePatterns_asa_TZ', 'goog.i18n.DateTimePatterns_az', 'goog.i18n.DateTimePatterns_az_Cyrl', 'goog.i18n.DateTimePatterns_az_Cyrl_AZ', 'goog.i18n.DateTimePatterns_az_Latn', 'goog.i18n.DateTimePatterns_az_Latn_AZ', 'goog.i18n.DateTimePatterns_be', 'goog.i18n.DateTimePatterns_be_BY', 'goog.i18n.DateTimePatterns_bem', 'goog.i18n.DateTimePatterns_bem_ZM', 'goog.i18n.DateTimePatterns_bez', 'goog.i18n.DateTimePatterns_bez_TZ', 'goog.i18n.DateTimePatterns_bg_BG', 'goog.i18n.DateTimePatterns_bm', 'goog.i18n.DateTimePatterns_bm_ML', 'goog.i18n.DateTimePatterns_bn_BD', 'goog.i18n.DateTimePatterns_bn_IN', 'goog.i18n.DateTimePatterns_bo', 'goog.i18n.DateTimePatterns_bo_CN', 'goog.i18n.DateTimePatterns_bo_IN', 'goog.i18n.DateTimePatterns_ca_ES', 'goog.i18n.DateTimePatterns_cgg', 'goog.i18n.DateTimePatterns_cgg_UG', 'goog.i18n.DateTimePatterns_chr', 'goog.i18n.DateTimePatterns_chr_US', 'goog.i18n.DateTimePatterns_cs_CZ', 'goog.i18n.DateTimePatterns_cy', 'goog.i18n.DateTimePatterns_cy_GB', 'goog.i18n.DateTimePatterns_da_DK', 'goog.i18n.DateTimePatterns_dav', 'goog.i18n.DateTimePatterns_dav_KE', 'goog.i18n.DateTimePatterns_de_BE', 'goog.i18n.DateTimePatterns_de_DE', 'goog.i18n.DateTimePatterns_de_LI', 'goog.i18n.DateTimePatterns_de_LU', 'goog.i18n.DateTimePatterns_ebu', 'goog.i18n.DateTimePatterns_ebu_KE', 'goog.i18n.DateTimePatterns_ee', 'goog.i18n.DateTimePatterns_ee_GH', 'goog.i18n.DateTimePatterns_ee_TG', 'goog.i18n.DateTimePatterns_el_CY', 'goog.i18n.DateTimePatterns_el_GR', 'goog.i18n.DateTimePatterns_en_BE', 'goog.i18n.DateTimePatterns_en_BW', 'goog.i18n.DateTimePatterns_en_BZ', 'goog.i18n.DateTimePatterns_en_CA', 'goog.i18n.DateTimePatterns_en_HK', 'goog.i18n.DateTimePatterns_en_JM', 'goog.i18n.DateTimePatterns_en_MH', 'goog.i18n.DateTimePatterns_en_MT', 'goog.i18n.DateTimePatterns_en_MU', 'goog.i18n.DateTimePatterns_en_NA', 'goog.i18n.DateTimePatterns_en_NZ', 'goog.i18n.DateTimePatterns_en_PH', 'goog.i18n.DateTimePatterns_en_PK', 'goog.i18n.DateTimePatterns_en_TT', 'goog.i18n.DateTimePatterns_en_US_POSIX', 'goog.i18n.DateTimePatterns_en_VI', 'goog.i18n.DateTimePatterns_en_ZW', 'goog.i18n.DateTimePatterns_eo', 'goog.i18n.DateTimePatterns_es_AR', 'goog.i18n.DateTimePatterns_es_BO', 'goog.i18n.DateTimePatterns_es_CL', 'goog.i18n.DateTimePatterns_es_CO', 'goog.i18n.DateTimePatterns_es_CR', 'goog.i18n.DateTimePatterns_es_DO', 'goog.i18n.DateTimePatterns_es_EC', 'goog.i18n.DateTimePatterns_es_ES', 'goog.i18n.DateTimePatterns_es_GQ', 'goog.i18n.DateTimePatterns_es_GT', 'goog.i18n.DateTimePatterns_es_HN', 'goog.i18n.DateTimePatterns_es_MX', 'goog.i18n.DateTimePatterns_es_NI', 'goog.i18n.DateTimePatterns_es_PA', 'goog.i18n.DateTimePatterns_es_PE', 'goog.i18n.DateTimePatterns_es_PR', 'goog.i18n.DateTimePatterns_es_PY', 'goog.i18n.DateTimePatterns_es_SV', 'goog.i18n.DateTimePatterns_es_US', 'goog.i18n.DateTimePatterns_es_UY', 'goog.i18n.DateTimePatterns_es_VE', 'goog.i18n.DateTimePatterns_et_EE', 'goog.i18n.DateTimePatterns_eu_ES', 'goog.i18n.DateTimePatterns_fa_AF', 'goog.i18n.DateTimePatterns_fa_IR', 'goog.i18n.DateTimePatterns_ff', 'goog.i18n.DateTimePatterns_ff_SN', 'goog.i18n.DateTimePatterns_fi_FI', 'goog.i18n.DateTimePatterns_fil_PH', 'goog.i18n.DateTimePatterns_fo', 'goog.i18n.DateTimePatterns_fo_FO', 'goog.i18n.DateTimePatterns_fr_BE', 'goog.i18n.DateTimePatterns_fr_BL', 'goog.i18n.DateTimePatterns_fr_CF', 'goog.i18n.DateTimePatterns_fr_CH', 'goog.i18n.DateTimePatterns_fr_CI', 'goog.i18n.DateTimePatterns_fr_CM', 'goog.i18n.DateTimePatterns_fr_FR', 'goog.i18n.DateTimePatterns_fr_GN', 'goog.i18n.DateTimePatterns_fr_GP', 'goog.i18n.DateTimePatterns_fr_LU', 'goog.i18n.DateTimePatterns_fr_MC', 'goog.i18n.DateTimePatterns_fr_MF', 'goog.i18n.DateTimePatterns_fr_MG', 'goog.i18n.DateTimePatterns_fr_ML', 'goog.i18n.DateTimePatterns_fr_MQ', 'goog.i18n.DateTimePatterns_fr_NE', 'goog.i18n.DateTimePatterns_fr_RE', 'goog.i18n.DateTimePatterns_fr_SN', 'goog.i18n.DateTimePatterns_ga', 'goog.i18n.DateTimePatterns_ga_IE', 'goog.i18n.DateTimePatterns_gl_ES', 'goog.i18n.DateTimePatterns_gsw_CH', 'goog.i18n.DateTimePatterns_gu_IN', 'goog.i18n.DateTimePatterns_guz', 'goog.i18n.DateTimePatterns_guz_KE', 'goog.i18n.DateTimePatterns_gv', 'goog.i18n.DateTimePatterns_gv_GB', 'goog.i18n.DateTimePatterns_ha', 'goog.i18n.DateTimePatterns_ha_Latn', 'goog.i18n.DateTimePatterns_ha_Latn_GH', 'goog.i18n.DateTimePatterns_ha_Latn_NE', 'goog.i18n.DateTimePatterns_ha_Latn_NG', 'goog.i18n.DateTimePatterns_haw', 'goog.i18n.DateTimePatterns_haw_US', 'goog.i18n.DateTimePatterns_he_IL', 'goog.i18n.DateTimePatterns_hi_IN', 'goog.i18n.DateTimePatterns_hr_HR', 'goog.i18n.DateTimePatterns_hu_HU', 'goog.i18n.DateTimePatterns_hy', 'goog.i18n.DateTimePatterns_hy_AM', 'goog.i18n.DateTimePatterns_id_ID', 'goog.i18n.DateTimePatterns_ig', 'goog.i18n.DateTimePatterns_ig_NG', 'goog.i18n.DateTimePatterns_ii', 'goog.i18n.DateTimePatterns_ii_CN', 'goog.i18n.DateTimePatterns_is_IS', 'goog.i18n.DateTimePatterns_it_CH', 'goog.i18n.DateTimePatterns_it_IT', 'goog.i18n.DateTimePatterns_ja_JP', 'goog.i18n.DateTimePatterns_jmc', 'goog.i18n.DateTimePatterns_jmc_TZ', 'goog.i18n.DateTimePatterns_ka', 'goog.i18n.DateTimePatterns_ka_GE', 'goog.i18n.DateTimePatterns_kab', 'goog.i18n.DateTimePatterns_kab_DZ', 'goog.i18n.DateTimePatterns_kam', 'goog.i18n.DateTimePatterns_kam_KE', 'goog.i18n.DateTimePatterns_kde', 'goog.i18n.DateTimePatterns_kde_TZ', 'goog.i18n.DateTimePatterns_kea', 'goog.i18n.DateTimePatterns_kea_CV', 'goog.i18n.DateTimePatterns_khq', 'goog.i18n.DateTimePatterns_khq_ML', 'goog.i18n.DateTimePatterns_ki', 'goog.i18n.DateTimePatterns_ki_KE', 'goog.i18n.DateTimePatterns_kk', 'goog.i18n.DateTimePatterns_kk_Cyrl', 'goog.i18n.DateTimePatterns_kk_Cyrl_KZ', 'goog.i18n.DateTimePatterns_kl', 'goog.i18n.DateTimePatterns_kl_GL', 'goog.i18n.DateTimePatterns_kln', 'goog.i18n.DateTimePatterns_kln_KE', 'goog.i18n.DateTimePatterns_km', 'goog.i18n.DateTimePatterns_km_KH', 'goog.i18n.DateTimePatterns_kn_IN', 'goog.i18n.DateTimePatterns_ko_KR', 'goog.i18n.DateTimePatterns_kok', 'goog.i18n.DateTimePatterns_kok_IN', 'goog.i18n.DateTimePatterns_kw', 'goog.i18n.DateTimePatterns_kw_GB', 'goog.i18n.DateTimePatterns_lag', 'goog.i18n.DateTimePatterns_lag_TZ', 'goog.i18n.DateTimePatterns_lg', 'goog.i18n.DateTimePatterns_lg_UG', 'goog.i18n.DateTimePatterns_lt_LT', 'goog.i18n.DateTimePatterns_luo', 'goog.i18n.DateTimePatterns_luo_KE', 'goog.i18n.DateTimePatterns_luy', 'goog.i18n.DateTimePatterns_luy_KE', 'goog.i18n.DateTimePatterns_lv_LV', 'goog.i18n.DateTimePatterns_mas', 'goog.i18n.DateTimePatterns_mas_KE', 'goog.i18n.DateTimePatterns_mas_TZ', 'goog.i18n.DateTimePatterns_mer', 'goog.i18n.DateTimePatterns_mer_KE', 'goog.i18n.DateTimePatterns_mfe', 'goog.i18n.DateTimePatterns_mfe_MU', 'goog.i18n.DateTimePatterns_mg', 'goog.i18n.DateTimePatterns_mg_MG', 'goog.i18n.DateTimePatterns_mk', 'goog.i18n.DateTimePatterns_mk_MK', 'goog.i18n.DateTimePatterns_ml_IN', 'goog.i18n.DateTimePatterns_mr_IN', 'goog.i18n.DateTimePatterns_ms_BN', 'goog.i18n.DateTimePatterns_ms_MY', 'goog.i18n.DateTimePatterns_mt_MT', 'goog.i18n.DateTimePatterns_naq', 'goog.i18n.DateTimePatterns_naq_NA', 'goog.i18n.DateTimePatterns_nb', 'goog.i18n.DateTimePatterns_nb_NO', 'goog.i18n.DateTimePatterns_nd', 'goog.i18n.DateTimePatterns_nd_ZW', 'goog.i18n.DateTimePatterns_ne', 'goog.i18n.DateTimePatterns_ne_IN', 'goog.i18n.DateTimePatterns_ne_NP', 'goog.i18n.DateTimePatterns_nl_BE', 'goog.i18n.DateTimePatterns_nl_NL', 'goog.i18n.DateTimePatterns_nn', 'goog.i18n.DateTimePatterns_nn_NO', 'goog.i18n.DateTimePatterns_nyn', 'goog.i18n.DateTimePatterns_nyn_UG', 'goog.i18n.DateTimePatterns_om', 'goog.i18n.DateTimePatterns_om_ET', 'goog.i18n.DateTimePatterns_om_KE', 'goog.i18n.DateTimePatterns_or_IN', 'goog.i18n.DateTimePatterns_pa', 'goog.i18n.DateTimePatterns_pa_Arab', 'goog.i18n.DateTimePatterns_pa_Arab_PK', 'goog.i18n.DateTimePatterns_pa_Guru', 'goog.i18n.DateTimePatterns_pa_Guru_IN', 'goog.i18n.DateTimePatterns_pl_PL', 'goog.i18n.DateTimePatterns_ps', 'goog.i18n.DateTimePatterns_ps_AF', 'goog.i18n.DateTimePatterns_pt_GW', 'goog.i18n.DateTimePatterns_pt_MZ', 'goog.i18n.DateTimePatterns_rm', 'goog.i18n.DateTimePatterns_rm_CH', 'goog.i18n.DateTimePatterns_ro_MD', 'goog.i18n.DateTimePatterns_ro_RO', 'goog.i18n.DateTimePatterns_rof', 'goog.i18n.DateTimePatterns_rof_TZ', 'goog.i18n.DateTimePatterns_ru_MD', 'goog.i18n.DateTimePatterns_ru_RU', 'goog.i18n.DateTimePatterns_ru_UA', 'goog.i18n.DateTimePatterns_rw', 'goog.i18n.DateTimePatterns_rw_RW', 'goog.i18n.DateTimePatterns_rwk', 'goog.i18n.DateTimePatterns_rwk_TZ', 'goog.i18n.DateTimePatterns_saq', 'goog.i18n.DateTimePatterns_saq_KE', 'goog.i18n.DateTimePatterns_seh', 'goog.i18n.DateTimePatterns_seh_MZ', 'goog.i18n.DateTimePatterns_ses', 'goog.i18n.DateTimePatterns_ses_ML', 'goog.i18n.DateTimePatterns_sg', 'goog.i18n.DateTimePatterns_sg_CF', 'goog.i18n.DateTimePatterns_shi', 'goog.i18n.DateTimePatterns_shi_Latn', 'goog.i18n.DateTimePatterns_shi_Latn_MA', 'goog.i18n.DateTimePatterns_shi_Tfng', 'goog.i18n.DateTimePatterns_shi_Tfng_MA', 'goog.i18n.DateTimePatterns_si', 'goog.i18n.DateTimePatterns_si_LK', 'goog.i18n.DateTimePatterns_sk_SK', 'goog.i18n.DateTimePatterns_sl_SI', 'goog.i18n.DateTimePatterns_sn', 'goog.i18n.DateTimePatterns_sn_ZW', 'goog.i18n.DateTimePatterns_so', 'goog.i18n.DateTimePatterns_so_DJ', 'goog.i18n.DateTimePatterns_so_ET', 'goog.i18n.DateTimePatterns_so_KE', 'goog.i18n.DateTimePatterns_so_SO', 'goog.i18n.DateTimePatterns_sq_AL', 'goog.i18n.DateTimePatterns_sr_Cyrl', 'goog.i18n.DateTimePatterns_sr_Cyrl_BA', 'goog.i18n.DateTimePatterns_sr_Cyrl_ME', 'goog.i18n.DateTimePatterns_sr_Cyrl_RS', 'goog.i18n.DateTimePatterns_sr_Latn', 'goog.i18n.DateTimePatterns_sr_Latn_BA', 'goog.i18n.DateTimePatterns_sr_Latn_ME', 'goog.i18n.DateTimePatterns_sr_Latn_RS', 'goog.i18n.DateTimePatterns_sv_FI', 'goog.i18n.DateTimePatterns_sv_SE', 'goog.i18n.DateTimePatterns_sw_KE', 'goog.i18n.DateTimePatterns_sw_TZ', 'goog.i18n.DateTimePatterns_ta_IN', 'goog.i18n.DateTimePatterns_ta_LK', 'goog.i18n.DateTimePatterns_te_IN', 'goog.i18n.DateTimePatterns_teo', 'goog.i18n.DateTimePatterns_teo_KE', 'goog.i18n.DateTimePatterns_teo_UG', 'goog.i18n.DateTimePatterns_th_TH', 'goog.i18n.DateTimePatterns_ti', 'goog.i18n.DateTimePatterns_ti_ER', 'goog.i18n.DateTimePatterns_ti_ET', 'goog.i18n.DateTimePatterns_tl_PH', 'goog.i18n.DateTimePatterns_to', 'goog.i18n.DateTimePatterns_to_TO', 'goog.i18n.DateTimePatterns_tr_TR', 'goog.i18n.DateTimePatterns_tzm', 'goog.i18n.DateTimePatterns_tzm_Latn', 'goog.i18n.DateTimePatterns_tzm_Latn_MA', 'goog.i18n.DateTimePatterns_uk_UA', 'goog.i18n.DateTimePatterns_ur_IN', 'goog.i18n.DateTimePatterns_ur_PK', 'goog.i18n.DateTimePatterns_uz', 'goog.i18n.DateTimePatterns_uz_Arab', 'goog.i18n.DateTimePatterns_uz_Arab_AF', 'goog.i18n.DateTimePatterns_uz_Cyrl', 'goog.i18n.DateTimePatterns_uz_Cyrl_UZ', 'goog.i18n.DateTimePatterns_uz_Latn', 'goog.i18n.DateTimePatterns_uz_Latn_UZ', 'goog.i18n.DateTimePatterns_vi_VN', 'goog.i18n.DateTimePatterns_vun', 'goog.i18n.DateTimePatterns_vun_TZ', 'goog.i18n.DateTimePatterns_xog', 'goog.i18n.DateTimePatterns_xog_UG', 'goog.i18n.DateTimePatterns_yo', 'goog.i18n.DateTimePatterns_yo_NG', 'goog.i18n.DateTimePatterns_zh_Hans', 'goog.i18n.DateTimePatterns_zh_Hans_CN', 'goog.i18n.DateTimePatterns_zh_Hans_HK', 'goog.i18n.DateTimePatterns_zh_Hans_MO', 'goog.i18n.DateTimePatterns_zh_Hans_SG', 'goog.i18n.DateTimePatterns_zh_Hant', 'goog.i18n.DateTimePatterns_zh_Hant_HK', 'goog.i18n.DateTimePatterns_zh_Hant_MO', 'goog.i18n.DateTimePatterns_zh_Hant_TW', 'goog.i18n.DateTimePatterns_zu', 'goog.i18n.DateTimePatterns_zu_ZA'], ['goog.i18n.DateTimePatterns']);
-goog.addDependency('i18n/datetimesymbols.js', ['goog.i18n.DateTimeSymbols', 'goog.i18n.DateTimeSymbols_am', 'goog.i18n.DateTimeSymbols_ar', 'goog.i18n.DateTimeSymbols_bg', 'goog.i18n.DateTimeSymbols_bn', 'goog.i18n.DateTimeSymbols_ca', 'goog.i18n.DateTimeSymbols_cs', 'goog.i18n.DateTimeSymbols_da', 'goog.i18n.DateTimeSymbols_de', 'goog.i18n.DateTimeSymbols_de_AT', 'goog.i18n.DateTimeSymbols_de_CH', 'goog.i18n.DateTimeSymbols_el', 'goog.i18n.DateTimeSymbols_en', 'goog.i18n.DateTimeSymbols_en_AU', 'goog.i18n.DateTimeSymbols_en_GB', 'goog.i18n.DateTimeSymbols_en_IE', 'goog.i18n.DateTimeSymbols_en_IN', 'goog.i18n.DateTimeSymbols_en_ISO', 'goog.i18n.DateTimeSymbols_en_SG', 'goog.i18n.DateTimeSymbols_en_US', 'goog.i18n.DateTimeSymbols_en_ZA', 'goog.i18n.DateTimeSymbols_es', 'goog.i18n.DateTimeSymbols_et', 'goog.i18n.DateTimeSymbols_eu', 'goog.i18n.DateTimeSymbols_fa', 'goog.i18n.DateTimeSymbols_fi', 'goog.i18n.DateTimeSymbols_fil', 'goog.i18n.DateTimeSymbols_fr', 'goog.i18n.DateTimeSymbols_fr_CA', 'goog.i18n.DateTimeSymbols_gl', 'goog.i18n.DateTimeSymbols_gsw', 'goog.i18n.DateTimeSymbols_gu', 'goog.i18n.DateTimeSymbols_he', 'goog.i18n.DateTimeSymbols_hi', 'goog.i18n.DateTimeSymbols_hr', 'goog.i18n.DateTimeSymbols_hu', 'goog.i18n.DateTimeSymbols_id', 'goog.i18n.DateTimeSymbols_in', 'goog.i18n.DateTimeSymbols_is', 'goog.i18n.DateTimeSymbols_it', 'goog.i18n.DateTimeSymbols_iw', 'goog.i18n.DateTimeSymbols_ja', 'goog.i18n.DateTimeSymbols_kn', 'goog.i18n.DateTimeSymbols_ko', 'goog.i18n.DateTimeSymbols_ln', 'goog.i18n.DateTimeSymbols_lt', 'goog.i18n.DateTimeSymbols_lv', 'goog.i18n.DateTimeSymbols_ml', 'goog.i18n.DateTimeSymbols_mo', 'goog.i18n.DateTimeSymbols_mr', 'goog.i18n.DateTimeSymbols_ms', 'goog.i18n.DateTimeSymbols_mt', 'goog.i18n.DateTimeSymbols_nl', 'goog.i18n.DateTimeSymbols_no', 'goog.i18n.DateTimeSymbols_or', 'goog.i18n.DateTimeSymbols_pl', 'goog.i18n.DateTimeSymbols_pt', 'goog.i18n.DateTimeSymbols_pt_BR', 'goog.i18n.DateTimeSymbols_pt_PT', 'goog.i18n.DateTimeSymbols_ro', 'goog.i18n.DateTimeSymbols_ru', 'goog.i18n.DateTimeSymbols_sk', 'goog.i18n.DateTimeSymbols_sl', 'goog.i18n.DateTimeSymbols_sq', 'goog.i18n.DateTimeSymbols_sr', 'goog.i18n.DateTimeSymbols_sv', 'goog.i18n.DateTimeSymbols_sw', 'goog.i18n.DateTimeSymbols_ta', 'goog.i18n.DateTimeSymbols_te', 'goog.i18n.DateTimeSymbols_th', 'goog.i18n.DateTimeSymbols_tl', 'goog.i18n.DateTimeSymbols_tr', 'goog.i18n.DateTimeSymbols_uk', 'goog.i18n.DateTimeSymbols_ur', 'goog.i18n.DateTimeSymbols_vi', 'goog.i18n.DateTimeSymbols_zh', 'goog.i18n.DateTimeSymbols_zh_CN', 'goog.i18n.DateTimeSymbols_zh_HK', 'goog.i18n.DateTimeSymbols_zh_TW'], []);
-goog.addDependency('i18n/datetimesymbolsext.js', ['goog.i18n.DateTimeSymbolsExt', 'goog.i18n.DateTimeSymbols_aa', 'goog.i18n.DateTimeSymbols_aa_DJ', 'goog.i18n.DateTimeSymbols_aa_ER', 'goog.i18n.DateTimeSymbols_aa_ER_SAAHO', 'goog.i18n.DateTimeSymbols_aa_ET', 'goog.i18n.DateTimeSymbols_af', 'goog.i18n.DateTimeSymbols_af_NA', 'goog.i18n.DateTimeSymbols_af_ZA', 'goog.i18n.DateTimeSymbols_ak', 'goog.i18n.DateTimeSymbols_ak_GH', 'goog.i18n.DateTimeSymbols_am_ET', 'goog.i18n.DateTimeSymbols_ar_AE', 'goog.i18n.DateTimeSymbols_ar_BH', 'goog.i18n.DateTimeSymbols_ar_DZ', 'goog.i18n.DateTimeSymbols_ar_EG', 'goog.i18n.DateTimeSymbols_ar_IQ', 'goog.i18n.DateTimeSymbols_ar_JO', 'goog.i18n.DateTimeSymbols_ar_KW', 'goog.i18n.DateTimeSymbols_ar_LB', 'goog.i18n.DateTimeSymbols_ar_LY', 'goog.i18n.DateTimeSymbols_ar_MA', 'goog.i18n.DateTimeSymbols_ar_OM', 'goog.i18n.DateTimeSymbols_ar_QA', 'goog.i18n.DateTimeSymbols_ar_SA', 'goog.i18n.DateTimeSymbols_ar_SD', 'goog.i18n.DateTimeSymbols_ar_SY', 'goog.i18n.DateTimeSymbols_ar_TN', 'goog.i18n.DateTimeSymbols_ar_YE', 'goog.i18n.DateTimeSymbols_as', 'goog.i18n.DateTimeSymbols_as_IN', 'goog.i18n.DateTimeSymbols_az', 'goog.i18n.DateTimeSymbols_az_AZ', 'goog.i18n.DateTimeSymbols_az_Cyrl', 'goog.i18n.DateTimeSymbols_az_Cyrl_AZ', 'goog.i18n.DateTimeSymbols_az_Latn', 'goog.i18n.DateTimeSymbols_az_Latn_AZ', 'goog.i18n.DateTimeSymbols_be', 'goog.i18n.DateTimeSymbols_be_BY', 'goog.i18n.DateTimeSymbols_bg_BG', 'goog.i18n.DateTimeSymbols_bn_BD', 'goog.i18n.DateTimeSymbols_bn_IN', 'goog.i18n.DateTimeSymbols_bo', 'goog.i18n.DateTimeSymbols_bo_CN', 'goog.i18n.DateTimeSymbols_bo_IN', 'goog.i18n.DateTimeSymbols_bs', 'goog.i18n.DateTimeSymbols_bs_BA', 'goog.i18n.DateTimeSymbols_byn', 'goog.i18n.DateTimeSymbols_byn_ER', 'goog.i18n.DateTimeSymbols_ca_ES', 'goog.i18n.DateTimeSymbols_cch', 'goog.i18n.DateTimeSymbols_cch_NG', 'goog.i18n.DateTimeSymbols_cop', 'goog.i18n.DateTimeSymbols_cs_CZ', 'goog.i18n.DateTimeSymbols_cy', 'goog.i18n.DateTimeSymbols_cy_GB', 'goog.i18n.DateTimeSymbols_da_DK', 'goog.i18n.DateTimeSymbols_de_BE', 'goog.i18n.DateTimeSymbols_de_DE', 'goog.i18n.DateTimeSymbols_de_LI', 'goog.i18n.DateTimeSymbols_de_LU', 'goog.i18n.DateTimeSymbols_dv', 'goog.i18n.DateTimeSymbols_dv_MV', 'goog.i18n.DateTimeSymbols_dz', 'goog.i18n.DateTimeSymbols_dz_BT', 'goog.i18n.DateTimeSymbols_ee', 'goog.i18n.DateTimeSymbols_ee_GH', 'goog.i18n.DateTimeSymbols_ee_TG', 'goog.i18n.DateTimeSymbols_el_CY', 'goog.i18n.DateTimeSymbols_el_GR', 'goog.i18n.DateTimeSymbols_el_POLYTON', 'goog.i18n.DateTimeSymbols_en_AS', 'goog.i18n.DateTimeSymbols_en_BE', 'goog.i18n.DateTimeSymbols_en_BW', 'goog.i18n.DateTimeSymbols_en_BZ', 'goog.i18n.DateTimeSymbols_en_CA', 'goog.i18n.DateTimeSymbols_en_Dsrt', 'goog.i18n.DateTimeSymbols_en_Dsrt_US', 'goog.i18n.DateTimeSymbols_en_GU', 'goog.i18n.DateTimeSymbols_en_HK', 'goog.i18n.DateTimeSymbols_en_JM', 'goog.i18n.DateTimeSymbols_en_MH', 'goog.i18n.DateTimeSymbols_en_MP', 'goog.i18n.DateTimeSymbols_en_MT', 'goog.i18n.DateTimeSymbols_en_NA', 'goog.i18n.DateTimeSymbols_en_NZ', 'goog.i18n.DateTimeSymbols_en_PH', 'goog.i18n.DateTimeSymbols_en_PK', 'goog.i18n.DateTimeSymbols_en_Shaw', 'goog.i18n.DateTimeSymbols_en_TT', 'goog.i18n.DateTimeSymbols_en_UM', 'goog.i18n.DateTimeSymbols_en_VI', 'goog.i18n.DateTimeSymbols_en_ZW', 'goog.i18n.DateTimeSymbols_eo', 'goog.i18n.DateTimeSymbols_es_AR', 'goog.i18n.DateTimeSymbols_es_BO', 'goog.i18n.DateTimeSymbols_es_CL', 'goog.i18n.DateTimeSymbols_es_CO', 'goog.i18n.DateTimeSymbols_es_CR', 'goog.i18n.DateTimeSymbols_es_DO', 'goog.i18n.DateTimeSymbols_es_EC', 'goog.i18n.DateTimeSymbols_es_ES', 'goog.i18n.DateTimeSymbols_es_GT', 'goog.i18n.DateTimeSymbols_es_HN', 'goog.i18n.DateTimeSymbols_es_MX', 'goog.i18n.DateTimeSymbols_es_NI', 'goog.i18n.DateTimeSymbols_es_PA', 'goog.i18n.DateTimeSymbols_es_PE', 'goog.i18n.DateTimeSymbols_es_PR', 'goog.i18n.DateTimeSymbols_es_PY', 'goog.i18n.DateTimeSymbols_es_SV', 'goog.i18n.DateTimeSymbols_es_US', 'goog.i18n.DateTimeSymbols_es_UY', 'goog.i18n.DateTimeSymbols_es_VE', 'goog.i18n.DateTimeSymbols_et_EE', 'goog.i18n.DateTimeSymbols_eu_ES', 'goog.i18n.DateTimeSymbols_fa_AF', 'goog.i18n.DateTimeSymbols_fa_IR', 'goog.i18n.DateTimeSymbols_fi_FI', 'goog.i18n.DateTimeSymbols_fil_PH', 'goog.i18n.DateTimeSymbols_fo', 'goog.i18n.DateTimeSymbols_fo_FO', 'goog.i18n.DateTimeSymbols_fr_BE', 'goog.i18n.DateTimeSymbols_fr_CH', 'goog.i18n.DateTimeSymbols_fr_FR', 'goog.i18n.DateTimeSymbols_fr_LU', 'goog.i18n.DateTimeSymbols_fr_MC', 'goog.i18n.DateTimeSymbols_fr_SN', 'goog.i18n.DateTimeSymbols_fur', 'goog.i18n.DateTimeSymbols_fur_IT', 'goog.i18n.DateTimeSymbols_ga', 'goog.i18n.DateTimeSymbols_ga_IE', 'goog.i18n.DateTimeSymbols_gaa', 'goog.i18n.DateTimeSymbols_gaa_GH', 'goog.i18n.DateTimeSymbols_gez', 'goog.i18n.DateTimeSymbols_gez_ER', 'goog.i18n.DateTimeSymbols_gez_ET', 'goog.i18n.DateTimeSymbols_gl_ES', 'goog.i18n.DateTimeSymbols_gsw_CH', 'goog.i18n.DateTimeSymbols_gu_IN', 'goog.i18n.DateTimeSymbols_gv', 'goog.i18n.DateTimeSymbols_gv_GB', 'goog.i18n.DateTimeSymbols_ha', 'goog.i18n.DateTimeSymbols_ha_Arab', 'goog.i18n.DateTimeSymbols_ha_Arab_NG', 'goog.i18n.DateTimeSymbols_ha_Arab_SD', 'goog.i18n.DateTimeSymbols_ha_GH', 'goog.i18n.DateTimeSymbols_ha_Latn', 'goog.i18n.DateTimeSymbols_ha_Latn_GH', 'goog.i18n.DateTimeSymbols_ha_Latn_NE', 'goog.i18n.DateTimeSymbols_ha_Latn_NG', 'goog.i18n.DateTimeSymbols_ha_NE', 'goog.i18n.DateTimeSymbols_ha_NG', 'goog.i18n.DateTimeSymbols_ha_SD', 'goog.i18n.DateTimeSymbols_haw', 'goog.i18n.DateTimeSymbols_haw_US', 'goog.i18n.DateTimeSymbols_he_IL', 'goog.i18n.DateTimeSymbols_hi_IN', 'goog.i18n.DateTimeSymbols_hr_HR', 'goog.i18n.DateTimeSymbols_hu_HU', 'goog.i18n.DateTimeSymbols_hy', 'goog.i18n.DateTimeSymbols_hy_AM', 'goog.i18n.DateTimeSymbols_ia', 'goog.i18n.DateTimeSymbols_id_ID', 'goog.i18n.DateTimeSymbols_ig', 'goog.i18n.DateTimeSymbols_ig_NG', 'goog.i18n.DateTimeSymbols_ii', 'goog.i18n.DateTimeSymbols_ii_CN', 'goog.i18n.DateTimeSymbols_is_IS', 'goog.i18n.DateTimeSymbols_it_CH', 'goog.i18n.DateTimeSymbols_it_IT', 'goog.i18n.DateTimeSymbols_iu', 'goog.i18n.DateTimeSymbols_ja_JP', 'goog.i18n.DateTimeSymbols_ka', 'goog.i18n.DateTimeSymbols_ka_GE', 'goog.i18n.DateTimeSymbols_kaj', 'goog.i18n.DateTimeSymbols_kaj_NG', 'goog.i18n.DateTimeSymbols_kam', 'goog.i18n.DateTimeSymbols_kam_KE', 'goog.i18n.DateTimeSymbols_kcg', 'goog.i18n.DateTimeSymbols_kcg_NG', 'goog.i18n.DateTimeSymbols_kfo', 'goog.i18n.DateTimeSymbols_kfo_CI', 'goog.i18n.DateTimeSymbols_kk', 'goog.i18n.DateTimeSymbols_kk_Cyrl', 'goog.i18n.DateTimeSymbols_kk_Cyrl_KZ', 'goog.i18n.DateTimeSymbols_kk_KZ', 'goog.i18n.DateTimeSymbols_kl', 'goog.i18n.DateTimeSymbols_kl_GL', 'goog.i18n.DateTimeSymbols_km', 'goog.i18n.DateTimeSymbols_km_KH', 'goog.i18n.DateTimeSymbols_kn_IN', 'goog.i18n.DateTimeSymbols_ko_KR', 'goog.i18n.DateTimeSymbols_kok', 'goog.i18n.DateTimeSymbols_kok_IN', 'goog.i18n.DateTimeSymbols_kpe', 'goog.i18n.DateTimeSymbols_kpe_GN', 'goog.i18n.DateTimeSymbols_kpe_LR', 'goog.i18n.DateTimeSymbols_ku', 'goog.i18n.DateTimeSymbols_ku_Arab', 'goog.i18n.DateTimeSymbols_ku_Arab_IQ', 'goog.i18n.DateTimeSymbols_ku_Arab_IR', 'goog.i18n.DateTimeSymbols_ku_Arab_SY', 'goog.i18n.DateTimeSymbols_ku_IQ', 'goog.i18n.DateTimeSymbols_ku_IR', 'goog.i18n.DateTimeSymbols_ku_Latn', 'goog.i18n.DateTimeSymbols_ku_Latn_TR', 'goog.i18n.DateTimeSymbols_ku_SY', 'goog.i18n.DateTimeSymbols_ku_TR', 'goog.i18n.DateTimeSymbols_kw', 'goog.i18n.DateTimeSymbols_kw_GB', 'goog.i18n.DateTimeSymbols_ky', 'goog.i18n.DateTimeSymbols_ky_KG', 'goog.i18n.DateTimeSymbols_ln_CD', 'goog.i18n.DateTimeSymbols_ln_CG', 'goog.i18n.DateTimeSymbols_lo', 'goog.i18n.DateTimeSymbols_lo_LA', 'goog.i18n.DateTimeSymbols_lt_LT', 'goog.i18n.DateTimeSymbols_lv_LV', 'goog.i18n.DateTimeSymbols_mk', 'goog.i18n.DateTimeSymbols_mk_MK', 'goog.i18n.DateTimeSymbols_ml_IN', 'goog.i18n.DateTimeSymbols_mn', 'goog.i18n.DateTimeSymbols_mn_CN', 'goog.i18n.DateTimeSymbols_mn_Cyrl', 'goog.i18n.DateTimeSymbols_mn_Cyrl_MN', 'goog.i18n.DateTimeSymbols_mn_MN', 'goog.i18n.DateTimeSymbols_mn_Mong', 'goog.i18n.DateTimeSymbols_mn_Mong_CN', 'goog.i18n.DateTimeSymbols_mr_IN', 'goog.i18n.DateTimeSymbols_ms_BN', 'goog.i18n.DateTimeSymbols_ms_MY', 'goog.i18n.DateTimeSymbols_mt_MT', 'goog.i18n.DateTimeSymbols_my', 'goog.i18n.DateTimeSymbols_my_MM', 'goog.i18n.DateTimeSymbols_nb', 'goog.i18n.DateTimeSymbols_nb_NO', 'goog.i18n.DateTimeSymbols_nds', 'goog.i18n.DateTimeSymbols_nds_DE', 'goog.i18n.DateTimeSymbols_ne', 'goog.i18n.DateTimeSymbols_ne_IN', 'goog.i18n.DateTimeSymbols_ne_NP', 'goog.i18n.DateTimeSymbols_nl_BE', 'goog.i18n.DateTimeSymbols_nl_NL', 'goog.i18n.DateTimeSymbols_nn', 'goog.i18n.DateTimeSymbols_nn_NO', 'goog.i18n.DateTimeSymbols_nr', 'goog.i18n.DateTimeSymbols_nr_ZA', 'goog.i18n.DateTimeSymbols_nso', 'goog.i18n.DateTimeSymbols_nso_ZA', 'goog.i18n.DateTimeSymbols_ny', 'goog.i18n.DateTimeSymbols_ny_MW', 'goog.i18n.DateTimeSymbols_oc', 'goog.i18n.DateTimeSymbols_oc_FR', 'goog.i18n.DateTimeSymbols_om', 'goog.i18n.DateTimeSymbols_om_ET', 'goog.i18n.DateTimeSymbols_om_KE', 'goog.i18n.DateTimeSymbols_or_IN', 'goog.i18n.DateTimeSymbols_pa', 'goog.i18n.DateTimeSymbols_pa_Arab', 'goog.i18n.DateTimeSymbols_pa_Arab_PK', 'goog.i18n.DateTimeSymbols_pa_Guru', 'goog.i18n.DateTimeSymbols_pa_Guru_IN', 'goog.i18n.DateTimeSymbols_pa_IN', 'goog.i18n.DateTimeSymbols_pa_PK', 'goog.i18n.DateTimeSymbols_pl_PL', 'goog.i18n.DateTimeSymbols_ps', 'goog.i18n.DateTimeSymbols_ps_AF', 'goog.i18n.DateTimeSymbols_ro_MD', 'goog.i18n.DateTimeSymbols_ro_RO', 'goog.i18n.DateTimeSymbols_ru_RU', 'goog.i18n.DateTimeSymbols_ru_UA', 'goog.i18n.DateTimeSymbols_rw', 'goog.i18n.DateTimeSymbols_rw_RW', 'goog.i18n.DateTimeSymbols_sa', 'goog.i18n.DateTimeSymbols_sa_IN', 'goog.i18n.DateTimeSymbols_se', 'goog.i18n.DateTimeSymbols_se_FI', 'goog.i18n.DateTimeSymbols_se_NO', 'goog.i18n.DateTimeSymbols_sh', 'goog.i18n.DateTimeSymbols_sh_BA', 'goog.i18n.DateTimeSymbols_sh_CS', 'goog.i18n.DateTimeSymbols_sh_YU', 'goog.i18n.DateTimeSymbols_si', 'goog.i18n.DateTimeSymbols_si_LK', 'goog.i18n.DateTimeSymbols_sid', 'goog.i18n.DateTimeSymbols_sid_ET', 'goog.i18n.DateTimeSymbols_sk_SK', 'goog.i18n.DateTimeSymbols_sl_SI', 'goog.i18n.DateTimeSymbols_so', 'goog.i18n.DateTimeSymbols_so_DJ', 'goog.i18n.DateTimeSymbols_so_ET', 'goog.i18n.DateTimeSymbols_so_KE', 'goog.i18n.DateTimeSymbols_so_SO', 'goog.i18n.DateTimeSymbols_sq_AL', 'goog.i18n.DateTimeSymbols_sr_BA', 'goog.i18n.DateTimeSymbols_sr_CS', 'goog.i18n.DateTimeSymbols_sr_Cyrl', 'goog.i18n.DateTimeSymbols_sr_Cyrl_BA', 'goog.i18n.DateTimeSymbols_sr_Cyrl_CS', 'goog.i18n.DateTimeSymbols_sr_Cyrl_ME', 'goog.i18n.DateTimeSymbols_sr_Cyrl_RS', 'goog.i18n.DateTimeSymbols_sr_Cyrl_YU', 'goog.i18n.DateTimeSymbols_sr_Latn', 'goog.i18n.DateTimeSymbols_sr_Latn_BA', 'goog.i18n.DateTimeSymbols_sr_Latn_CS', 'goog.i18n.DateTimeSymbols_sr_Latn_ME', 'goog.i18n.DateTimeSymbols_sr_Latn_RS', 'goog.i18n.DateTimeSymbols_sr_Latn_YU', 'goog.i18n.DateTimeSymbols_sr_ME', 'goog.i18n.DateTimeSymbols_sr_RS', 'goog.i18n.DateTimeSymbols_sr_YU', 'goog.i18n.DateTimeSymbols_ss', 'goog.i18n.DateTimeSymbols_ss_SZ', 'goog.i18n.DateTimeSymbols_ss_ZA', 'goog.i18n.DateTimeSymbols_st', 'goog.i18n.DateTimeSymbols_st_LS', 'goog.i18n.DateTimeSymbols_st_ZA', 'goog.i18n.DateTimeSymbols_sv_FI', 'goog.i18n.DateTimeSymbols_sv_SE', 'goog.i18n.DateTimeSymbols_sw_KE', 'goog.i18n.DateTimeSymbols_sw_TZ', 'goog.i18n.DateTimeSymbols_syr', 'goog.i18n.DateTimeSymbols_syr_SY', 'goog.i18n.DateTimeSymbols_ta_IN', 'goog.i18n.DateTimeSymbols_te_IN', 'goog.i18n.DateTimeSymbols_tg', 'goog.i18n.DateTimeSymbols_tg_Cyrl', 'goog.i18n.DateTimeSymbols_tg_Cyrl_TJ', 'goog.i18n.DateTimeSymbols_tg_TJ', 'goog.i18n.DateTimeSymbols_th_TH', 'goog.i18n.DateTimeSymbols_ti', 'goog.i18n.DateTimeSymbols_ti_ER', 'goog.i18n.DateTimeSymbols_ti_ET', 'goog.i18n.DateTimeSymbols_tig', 'goog.i18n.DateTimeSymbols_tig_ER', 'goog.i18n.DateTimeSymbols_tl_PH', 'goog.i18n.DateTimeSymbols_tn', 'goog.i18n.DateTimeSymbols_tn_ZA', 'goog.i18n.DateTimeSymbols_to', 'goog.i18n.DateTimeSymbols_to_TO', 'goog.i18n.DateTimeSymbols_tr_TR', 'goog.i18n.DateTimeSymbols_trv', 'goog.i18n.DateTimeSymbols_trv_TW', 'goog.i18n.DateTimeSymbols_ts', 'goog.i18n.DateTimeSymbols_ts_ZA', 'goog.i18n.DateTimeSymbols_tt', 'goog.i18n.DateTimeSymbols_tt_RU', 'goog.i18n.DateTimeSymbols_ug', 'goog.i18n.DateTimeSymbols_ug_Arab', 'goog.i18n.DateTimeSymbols_ug_Arab_CN', 'goog.i18n.DateTimeSymbols_ug_CN', 'goog.i18n.DateTimeSymbols_uk_UA', 'goog.i18n.DateTimeSymbols_ur_IN', 'goog.i18n.DateTimeSymbols_ur_PK', 'goog.i18n.DateTimeSymbols_uz', 'goog.i18n.DateTimeSymbols_uz_AF', 'goog.i18n.DateTimeSymbols_uz_Arab', 'goog.i18n.DateTimeSymbols_uz_Arab_AF', 'goog.i18n.DateTimeSymbols_uz_Cyrl', 'goog.i18n.DateTimeSymbols_uz_Cyrl_UZ', 'goog.i18n.DateTimeSymbols_uz_Latn', 'goog.i18n.DateTimeSymbols_uz_Latn_UZ', 'goog.i18n.DateTimeSymbols_uz_UZ', 'goog.i18n.DateTimeSymbols_ve', 'goog.i18n.DateTimeSymbols_ve_ZA', 'goog.i18n.DateTimeSymbols_vi_VN', 'goog.i18n.DateTimeSymbols_wal', 'goog.i18n.DateTimeSymbols_wal_ET', 'goog.i18n.DateTimeSymbols_wo', 'goog.i18n.DateTimeSymbols_wo_Latn', 'goog.i18n.DateTimeSymbols_wo_Latn_SN', 'goog.i18n.DateTimeSymbols_wo_SN', 'goog.i18n.DateTimeSymbols_xh', 'goog.i18n.DateTimeSymbols_xh_ZA', 'goog.i18n.DateTimeSymbols_yo', 'goog.i18n.DateTimeSymbols_yo_NG', 'goog.i18n.DateTimeSymbols_zh_Hans', 'goog.i18n.DateTimeSymbols_zh_Hans_CN', 'goog.i18n.DateTimeSymbols_zh_Hans_HK', 'goog.i18n.DateTimeSymbols_zh_Hans_MO', 'goog.i18n.DateTimeSymbols_zh_Hans_SG', 'goog.i18n.DateTimeSymbols_zh_Hant', 'goog.i18n.DateTimeSymbols_zh_Hant_HK', 'goog.i18n.DateTimeSymbols_zh_Hant_MO', 'goog.i18n.DateTimeSymbols_zh_Hant_TW', 'goog.i18n.DateTimeSymbols_zh_MO', 'goog.i18n.DateTimeSymbols_zh_SG', 'goog.i18n.DateTimeSymbols_zu', 'goog.i18n.DateTimeSymbols_zu_ZA'], ['goog.i18n.DateTimeSymbols']);
+goog.addDependency('i18n/datetimepatterns.js', ['goog.i18n.DateTimePatterns', 'goog.i18n.DateTimePatterns_af', 'goog.i18n.DateTimePatterns_am', 'goog.i18n.DateTimePatterns_ar', 'goog.i18n.DateTimePatterns_bg', 'goog.i18n.DateTimePatterns_bn', 'goog.i18n.DateTimePatterns_br', 'goog.i18n.DateTimePatterns_ca', 'goog.i18n.DateTimePatterns_chr', 'goog.i18n.DateTimePatterns_cs', 'goog.i18n.DateTimePatterns_cy', 'goog.i18n.DateTimePatterns_da', 'goog.i18n.DateTimePatterns_de', 'goog.i18n.DateTimePatterns_de_AT', 'goog.i18n.DateTimePatterns_de_CH', 'goog.i18n.DateTimePatterns_el', 'goog.i18n.DateTimePatterns_en', 'goog.i18n.DateTimePatterns_en_AU', 'goog.i18n.DateTimePatterns_en_GB', 'goog.i18n.DateTimePatterns_en_IE', 'goog.i18n.DateTimePatterns_en_IN', 'goog.i18n.DateTimePatterns_en_SG', 'goog.i18n.DateTimePatterns_en_US', 'goog.i18n.DateTimePatterns_en_ZA', 'goog.i18n.DateTimePatterns_es', 'goog.i18n.DateTimePatterns_es_419', 'goog.i18n.DateTimePatterns_es_ES', 'goog.i18n.DateTimePatterns_et', 'goog.i18n.DateTimePatterns_eu', 'goog.i18n.DateTimePatterns_fa', 'goog.i18n.DateTimePatterns_fi', 'goog.i18n.DateTimePatterns_fil', 'goog.i18n.DateTimePatterns_fr', 'goog.i18n.DateTimePatterns_fr_CA', 'goog.i18n.DateTimePatterns_gl', 'goog.i18n.DateTimePatterns_gsw', 'goog.i18n.DateTimePatterns_gu', 'goog.i18n.DateTimePatterns_haw', 'goog.i18n.DateTimePatterns_he', 'goog.i18n.DateTimePatterns_hi', 'goog.i18n.DateTimePatterns_hr', 'goog.i18n.DateTimePatterns_hu', 'goog.i18n.DateTimePatterns_id', 'goog.i18n.DateTimePatterns_in', 'goog.i18n.DateTimePatterns_is', 'goog.i18n.DateTimePatterns_it', 'goog.i18n.DateTimePatterns_iw', 'goog.i18n.DateTimePatterns_ja', 'goog.i18n.DateTimePatterns_kn', 'goog.i18n.DateTimePatterns_ko', 'goog.i18n.DateTimePatterns_ln', 'goog.i18n.DateTimePatterns_lt', 'goog.i18n.DateTimePatterns_lv', 'goog.i18n.DateTimePatterns_ml', 'goog.i18n.DateTimePatterns_mo', 'goog.i18n.DateTimePatterns_mr', 'goog.i18n.DateTimePatterns_ms', 'goog.i18n.DateTimePatterns_mt', 'goog.i18n.DateTimePatterns_nb', 'goog.i18n.DateTimePatterns_nl', 'goog.i18n.DateTimePatterns_no', 'goog.i18n.DateTimePatterns_or', 'goog.i18n.DateTimePatterns_pl', 'goog.i18n.DateTimePatterns_pt', 'goog.i18n.DateTimePatterns_pt_BR', 'goog.i18n.DateTimePatterns_pt_PT', 'goog.i18n.DateTimePatterns_ro', 'goog.i18n.DateTimePatterns_ru', 'goog.i18n.DateTimePatterns_sk', 'goog.i18n.DateTimePatterns_sl', 'goog.i18n.DateTimePatterns_sq', 'goog.i18n.DateTimePatterns_sr', 'goog.i18n.DateTimePatterns_sv', 'goog.i18n.DateTimePatterns_sw', 'goog.i18n.DateTimePatterns_ta', 'goog.i18n.DateTimePatterns_te', 'goog.i18n.DateTimePatterns_th', 'goog.i18n.DateTimePatterns_tl', 'goog.i18n.DateTimePatterns_tr', 'goog.i18n.DateTimePatterns_uk', 'goog.i18n.DateTimePatterns_ur', 'goog.i18n.DateTimePatterns_vi', 'goog.i18n.DateTimePatterns_zh', 'goog.i18n.DateTimePatterns_zh_CN', 'goog.i18n.DateTimePatterns_zh_HK', 'goog.i18n.DateTimePatterns_zh_TW', 'goog.i18n.DateTimePatterns_zu'], []);
+goog.addDependency('i18n/datetimepatternsext.js', ['goog.i18n.DateTimePatternsExt', 'goog.i18n.DateTimePatterns_af_NA', 'goog.i18n.DateTimePatterns_af_ZA', 'goog.i18n.DateTimePatterns_agq', 'goog.i18n.DateTimePatterns_agq_CM', 'goog.i18n.DateTimePatterns_ak', 'goog.i18n.DateTimePatterns_ak_GH', 'goog.i18n.DateTimePatterns_am_ET', 'goog.i18n.DateTimePatterns_ar_001', 'goog.i18n.DateTimePatterns_ar_AE', 'goog.i18n.DateTimePatterns_ar_BH', 'goog.i18n.DateTimePatterns_ar_DJ', 'goog.i18n.DateTimePatterns_ar_DZ', 'goog.i18n.DateTimePatterns_ar_EG', 'goog.i18n.DateTimePatterns_ar_EH', 'goog.i18n.DateTimePatterns_ar_ER', 'goog.i18n.DateTimePatterns_ar_IL', 'goog.i18n.DateTimePatterns_ar_IQ', 'goog.i18n.DateTimePatterns_ar_JO', 'goog.i18n.DateTimePatterns_ar_KM', 'goog.i18n.DateTimePatterns_ar_KW', 'goog.i18n.DateTimePatterns_ar_LB', 'goog.i18n.DateTimePatterns_ar_LY', 'goog.i18n.DateTimePatterns_ar_MA', 'goog.i18n.DateTimePatterns_ar_MR', 'goog.i18n.DateTimePatterns_ar_OM', 'goog.i18n.DateTimePatterns_ar_PS', 'goog.i18n.DateTimePatterns_ar_QA', 'goog.i18n.DateTimePatterns_ar_SA', 'goog.i18n.DateTimePatterns_ar_SD', 'goog.i18n.DateTimePatterns_ar_SO', 'goog.i18n.DateTimePatterns_ar_SY', 'goog.i18n.DateTimePatterns_ar_TD', 'goog.i18n.DateTimePatterns_ar_TN', 'goog.i18n.DateTimePatterns_ar_YE', 'goog.i18n.DateTimePatterns_as', 'goog.i18n.DateTimePatterns_as_IN', 'goog.i18n.DateTimePatterns_asa', 'goog.i18n.DateTimePatterns_asa_TZ', 'goog.i18n.DateTimePatterns_az', 'goog.i18n.DateTimePatterns_az_Cyrl', 'goog.i18n.DateTimePatterns_az_Cyrl_AZ', 'goog.i18n.DateTimePatterns_az_Latn', 'goog.i18n.DateTimePatterns_az_Latn_AZ', 'goog.i18n.DateTimePatterns_bas', 'goog.i18n.DateTimePatterns_bas_CM', 'goog.i18n.DateTimePatterns_be', 'goog.i18n.DateTimePatterns_be_BY', 'goog.i18n.DateTimePatterns_bem', 'goog.i18n.DateTimePatterns_bem_ZM', 'goog.i18n.DateTimePatterns_bez', 'goog.i18n.DateTimePatterns_bez_TZ', 'goog.i18n.DateTimePatterns_bg_BG', 'goog.i18n.DateTimePatterns_bm', 'goog.i18n.DateTimePatterns_bm_ML', 'goog.i18n.DateTimePatterns_bn_BD', 'goog.i18n.DateTimePatterns_bn_IN', 'goog.i18n.DateTimePatterns_bo', 'goog.i18n.DateTimePatterns_bo_CN', 'goog.i18n.DateTimePatterns_bo_IN', 'goog.i18n.DateTimePatterns_br_FR', 'goog.i18n.DateTimePatterns_brx', 'goog.i18n.DateTimePatterns_brx_IN', 'goog.i18n.DateTimePatterns_bs', 'goog.i18n.DateTimePatterns_bs_Cyrl', 'goog.i18n.DateTimePatterns_bs_Cyrl_BA', 'goog.i18n.DateTimePatterns_bs_Latn', 'goog.i18n.DateTimePatterns_bs_Latn_BA', 'goog.i18n.DateTimePatterns_ca_AD', 'goog.i18n.DateTimePatterns_ca_ES', 'goog.i18n.DateTimePatterns_cgg', 'goog.i18n.DateTimePatterns_cgg_UG', 'goog.i18n.DateTimePatterns_chr_US', 'goog.i18n.DateTimePatterns_cs_CZ', 'goog.i18n.DateTimePatterns_cy_GB', 'goog.i18n.DateTimePatterns_da_DK', 'goog.i18n.DateTimePatterns_dav', 'goog.i18n.DateTimePatterns_dav_KE', 'goog.i18n.DateTimePatterns_de_BE', 'goog.i18n.DateTimePatterns_de_DE', 'goog.i18n.DateTimePatterns_de_LI', 'goog.i18n.DateTimePatterns_de_LU', 'goog.i18n.DateTimePatterns_dje', 'goog.i18n.DateTimePatterns_dje_NE', 'goog.i18n.DateTimePatterns_dua', 'goog.i18n.DateTimePatterns_dua_CM', 'goog.i18n.DateTimePatterns_dyo', 'goog.i18n.DateTimePatterns_dyo_SN', 'goog.i18n.DateTimePatterns_dz', 'goog.i18n.DateTimePatterns_dz_BT', 'goog.i18n.DateTimePatterns_ebu', 'goog.i18n.DateTimePatterns_ebu_KE', 'goog.i18n.DateTimePatterns_ee', 'goog.i18n.DateTimePatterns_ee_GH', 'goog.i18n.DateTimePatterns_ee_TG', 'goog.i18n.DateTimePatterns_el_CY', 'goog.i18n.DateTimePatterns_el_GR', 'goog.i18n.DateTimePatterns_en_150', 'goog.i18n.DateTimePatterns_en_AG', 'goog.i18n.DateTimePatterns_en_AS', 'goog.i18n.DateTimePatterns_en_BB', 'goog.i18n.DateTimePatterns_en_BE', 'goog.i18n.DateTimePatterns_en_BM', 'goog.i18n.DateTimePatterns_en_BS', 'goog.i18n.DateTimePatterns_en_BW', 'goog.i18n.DateTimePatterns_en_BZ', 'goog.i18n.DateTimePatterns_en_CA', 'goog.i18n.DateTimePatterns_en_CM', 'goog.i18n.DateTimePatterns_en_DM', 'goog.i18n.DateTimePatterns_en_FJ', 'goog.i18n.DateTimePatterns_en_FM', 'goog.i18n.DateTimePatterns_en_GD', 'goog.i18n.DateTimePatterns_en_GG', 'goog.i18n.DateTimePatterns_en_GH', 'goog.i18n.DateTimePatterns_en_GI', 'goog.i18n.DateTimePatterns_en_GM', 'goog.i18n.DateTimePatterns_en_GU', 'goog.i18n.DateTimePatterns_en_GY', 'goog.i18n.DateTimePatterns_en_HK', 'goog.i18n.DateTimePatterns_en_IM', 'goog.i18n.DateTimePatterns_en_JE', 'goog.i18n.DateTimePatterns_en_JM', 'goog.i18n.DateTimePatterns_en_KE', 'goog.i18n.DateTimePatterns_en_KI', 'goog.i18n.DateTimePatterns_en_KN', 'goog.i18n.DateTimePatterns_en_KY', 'goog.i18n.DateTimePatterns_en_LC', 'goog.i18n.DateTimePatterns_en_LR', 'goog.i18n.DateTimePatterns_en_LS', 'goog.i18n.DateTimePatterns_en_MG', 'goog.i18n.DateTimePatterns_en_MH', 'goog.i18n.DateTimePatterns_en_MP', 'goog.i18n.DateTimePatterns_en_MT', 'goog.i18n.DateTimePatterns_en_MU', 'goog.i18n.DateTimePatterns_en_MW', 'goog.i18n.DateTimePatterns_en_NA', 'goog.i18n.DateTimePatterns_en_NG', 'goog.i18n.DateTimePatterns_en_NZ', 'goog.i18n.DateTimePatterns_en_PG', 'goog.i18n.DateTimePatterns_en_PH', 'goog.i18n.DateTimePatterns_en_PK', 'goog.i18n.DateTimePatterns_en_PR', 'goog.i18n.DateTimePatterns_en_PW', 'goog.i18n.DateTimePatterns_en_SB', 'goog.i18n.DateTimePatterns_en_SC', 'goog.i18n.DateTimePatterns_en_SL', 'goog.i18n.DateTimePatterns_en_SS', 'goog.i18n.DateTimePatterns_en_SZ', 'goog.i18n.DateTimePatterns_en_TC', 'goog.i18n.DateTimePatterns_en_TO', 'goog.i18n.DateTimePatterns_en_TT', 'goog.i18n.DateTimePatterns_en_TZ', 'goog.i18n.DateTimePatterns_en_UG', 'goog.i18n.DateTimePatterns_en_UM', 'goog.i18n.DateTimePatterns_en_US_POSIX', 'goog.i18n.DateTimePatterns_en_VC', 'goog.i18n.DateTimePatterns_en_VG', 'goog.i18n.DateTimePatterns_en_VI', 'goog.i18n.DateTimePatterns_en_VU', 'goog.i18n.DateTimePatterns_en_WS', 'goog.i18n.DateTimePatterns_en_ZM', 'goog.i18n.DateTimePatterns_en_ZW', 'goog.i18n.DateTimePatterns_eo', 'goog.i18n.DateTimePatterns_es_AR', 'goog.i18n.DateTimePatterns_es_BO', 'goog.i18n.DateTimePatterns_es_CL', 'goog.i18n.DateTimePatterns_es_CO', 'goog.i18n.DateTimePatterns_es_CR', 'goog.i18n.DateTimePatterns_es_CU', 'goog.i18n.DateTimePatterns_es_DO', 'goog.i18n.DateTimePatterns_es_EA', 'goog.i18n.DateTimePatterns_es_EC', 'goog.i18n.DateTimePatterns_es_GQ', 'goog.i18n.DateTimePatterns_es_GT', 'goog.i18n.DateTimePatterns_es_HN', 'goog.i18n.DateTimePatterns_es_IC', 'goog.i18n.DateTimePatterns_es_MX', 'goog.i18n.DateTimePatterns_es_NI', 'goog.i18n.DateTimePatterns_es_PA', 'goog.i18n.DateTimePatterns_es_PE', 'goog.i18n.DateTimePatterns_es_PH', 'goog.i18n.DateTimePatterns_es_PR', 'goog.i18n.DateTimePatterns_es_PY', 'goog.i18n.DateTimePatterns_es_SV', 'goog.i18n.DateTimePatterns_es_US', 'goog.i18n.DateTimePatterns_es_UY', 'goog.i18n.DateTimePatterns_es_VE', 'goog.i18n.DateTimePatterns_et_EE', 'goog.i18n.DateTimePatterns_eu_ES', 'goog.i18n.DateTimePatterns_ewo', 'goog.i18n.DateTimePatterns_ewo_CM', 'goog.i18n.DateTimePatterns_fa_AF', 'goog.i18n.DateTimePatterns_fa_IR', 'goog.i18n.DateTimePatterns_ff', 'goog.i18n.DateTimePatterns_ff_SN', 'goog.i18n.DateTimePatterns_fi_FI', 'goog.i18n.DateTimePatterns_fil_PH', 'goog.i18n.DateTimePatterns_fo', 'goog.i18n.DateTimePatterns_fo_FO', 'goog.i18n.DateTimePatterns_fr_BE', 'goog.i18n.DateTimePatterns_fr_BF', 'goog.i18n.DateTimePatterns_fr_BI', 'goog.i18n.DateTimePatterns_fr_BJ', 'goog.i18n.DateTimePatterns_fr_BL', 'goog.i18n.DateTimePatterns_fr_CD', 'goog.i18n.DateTimePatterns_fr_CF', 'goog.i18n.DateTimePatterns_fr_CG', 'goog.i18n.DateTimePatterns_fr_CH', 'goog.i18n.DateTimePatterns_fr_CI', 'goog.i18n.DateTimePatterns_fr_CM', 'goog.i18n.DateTimePatterns_fr_DJ', 'goog.i18n.DateTimePatterns_fr_DZ', 'goog.i18n.DateTimePatterns_fr_FR', 'goog.i18n.DateTimePatterns_fr_GA', 'goog.i18n.DateTimePatterns_fr_GF', 'goog.i18n.DateTimePatterns_fr_GN', 'goog.i18n.DateTimePatterns_fr_GP', 'goog.i18n.DateTimePatterns_fr_GQ', 'goog.i18n.DateTimePatterns_fr_HT', 'goog.i18n.DateTimePatterns_fr_KM', 'goog.i18n.DateTimePatterns_fr_LU', 'goog.i18n.DateTimePatterns_fr_MA', 'goog.i18n.DateTimePatterns_fr_MC', 'goog.i18n.DateTimePatterns_fr_MF', 'goog.i18n.DateTimePatterns_fr_MG', 'goog.i18n.DateTimePatterns_fr_ML', 'goog.i18n.DateTimePatterns_fr_MQ', 'goog.i18n.DateTimePatterns_fr_MR', 'goog.i18n.DateTimePatterns_fr_MU', 'goog.i18n.DateTimePatterns_fr_NC', 'goog.i18n.DateTimePatterns_fr_NE', 'goog.i18n.DateTimePatterns_fr_PF', 'goog.i18n.DateTimePatterns_fr_RE', 'goog.i18n.DateTimePatterns_fr_RW', 'goog.i18n.DateTimePatterns_fr_SC', 'goog.i18n.DateTimePatterns_fr_SN', 'goog.i18n.DateTimePatterns_fr_SY', 'goog.i18n.DateTimePatterns_fr_TD', 'goog.i18n.DateTimePatterns_fr_TG', 'goog.i18n.DateTimePatterns_fr_TN', 'goog.i18n.DateTimePatterns_fr_VU', 'goog.i18n.DateTimePatterns_fr_YT', 'goog.i18n.DateTimePatterns_ga', 'goog.i18n.DateTimePatterns_ga_IE', 'goog.i18n.DateTimePatterns_gl_ES', 'goog.i18n.DateTimePatterns_gsw_CH', 'goog.i18n.DateTimePatterns_gu_IN', 'goog.i18n.DateTimePatterns_guz', 'goog.i18n.DateTimePatterns_guz_KE', 'goog.i18n.DateTimePatterns_gv', 'goog.i18n.DateTimePatterns_gv_GB', 'goog.i18n.DateTimePatterns_ha', 'goog.i18n.DateTimePatterns_ha_Latn', 'goog.i18n.DateTimePatterns_ha_Latn_GH', 'goog.i18n.DateTimePatterns_ha_Latn_NE', 'goog.i18n.DateTimePatterns_ha_Latn_NG', 'goog.i18n.DateTimePatterns_haw_US', 'goog.i18n.DateTimePatterns_he_IL', 'goog.i18n.DateTimePatterns_hi_IN', 'goog.i18n.DateTimePatterns_hr_BA', 'goog.i18n.DateTimePatterns_hr_HR', 'goog.i18n.DateTimePatterns_hu_HU', 'goog.i18n.DateTimePatterns_hy', 'goog.i18n.DateTimePatterns_hy_AM', 'goog.i18n.DateTimePatterns_id_ID', 'goog.i18n.DateTimePatterns_ig', 'goog.i18n.DateTimePatterns_ig_NG', 'goog.i18n.DateTimePatterns_ii', 'goog.i18n.DateTimePatterns_ii_CN', 'goog.i18n.DateTimePatterns_is_IS', 'goog.i18n.DateTimePatterns_it_CH', 'goog.i18n.DateTimePatterns_it_IT', 'goog.i18n.DateTimePatterns_it_SM', 'goog.i18n.DateTimePatterns_ja_JP', 'goog.i18n.DateTimePatterns_jgo', 'goog.i18n.DateTimePatterns_jgo_CM', 'goog.i18n.DateTimePatterns_jmc', 'goog.i18n.DateTimePatterns_jmc_TZ', 'goog.i18n.DateTimePatterns_ka', 'goog.i18n.DateTimePatterns_ka_GE', 'goog.i18n.DateTimePatterns_kab', 'goog.i18n.DateTimePatterns_kab_DZ', 'goog.i18n.DateTimePatterns_kam', 'goog.i18n.DateTimePatterns_kam_KE', 'goog.i18n.DateTimePatterns_kde', 'goog.i18n.DateTimePatterns_kde_TZ', 'goog.i18n.DateTimePatterns_kea', 'goog.i18n.DateTimePatterns_kea_CV', 'goog.i18n.DateTimePatterns_khq', 'goog.i18n.DateTimePatterns_khq_ML', 'goog.i18n.DateTimePatterns_ki', 'goog.i18n.DateTimePatterns_ki_KE', 'goog.i18n.DateTimePatterns_kk', 'goog.i18n.DateTimePatterns_kk_Cyrl', 'goog.i18n.DateTimePatterns_kk_Cyrl_KZ', 'goog.i18n.DateTimePatterns_kl', 'goog.i18n.DateTimePatterns_kl_GL', 'goog.i18n.DateTimePatterns_kln', 'goog.i18n.DateTimePatterns_kln_KE', 'goog.i18n.DateTimePatterns_km', 'goog.i18n.DateTimePatterns_km_KH', 'goog.i18n.DateTimePatterns_kn_IN', 'goog.i18n.DateTimePatterns_ko_KP', 'goog.i18n.DateTimePatterns_ko_KR', 'goog.i18n.DateTimePatterns_kok', 'goog.i18n.DateTimePatterns_kok_IN', 'goog.i18n.DateTimePatterns_ks', 'goog.i18n.DateTimePatterns_ks_Arab', 'goog.i18n.DateTimePatterns_ks_Arab_IN', 'goog.i18n.DateTimePatterns_ksb', 'goog.i18n.DateTimePatterns_ksb_TZ', 'goog.i18n.DateTimePatterns_ksf', 'goog.i18n.DateTimePatterns_ksf_CM', 'goog.i18n.DateTimePatterns_kw', 'goog.i18n.DateTimePatterns_kw_GB', 'goog.i18n.DateTimePatterns_lag', 'goog.i18n.DateTimePatterns_lag_TZ', 'goog.i18n.DateTimePatterns_lg', 'goog.i18n.DateTimePatterns_lg_UG', 'goog.i18n.DateTimePatterns_ln_AO', 'goog.i18n.DateTimePatterns_ln_CD', 'goog.i18n.DateTimePatterns_ln_CF', 'goog.i18n.DateTimePatterns_ln_CG', 'goog.i18n.DateTimePatterns_lo', 'goog.i18n.DateTimePatterns_lo_LA', 'goog.i18n.DateTimePatterns_lt_LT', 'goog.i18n.DateTimePatterns_lu', 'goog.i18n.DateTimePatterns_lu_CD', 'goog.i18n.DateTimePatterns_luo', 'goog.i18n.DateTimePatterns_luo_KE', 'goog.i18n.DateTimePatterns_luy', 'goog.i18n.DateTimePatterns_luy_KE', 'goog.i18n.DateTimePatterns_lv_LV', 'goog.i18n.DateTimePatterns_mas', 'goog.i18n.DateTimePatterns_mas_KE', 'goog.i18n.DateTimePatterns_mas_TZ', 'goog.i18n.DateTimePatterns_mer', 'goog.i18n.DateTimePatterns_mer_KE', 'goog.i18n.DateTimePatterns_mfe', 'goog.i18n.DateTimePatterns_mfe_MU', 'goog.i18n.DateTimePatterns_mg', 'goog.i18n.DateTimePatterns_mg_MG', 'goog.i18n.DateTimePatterns_mgh', 'goog.i18n.DateTimePatterns_mgh_MZ', 'goog.i18n.DateTimePatterns_mgo', 'goog.i18n.DateTimePatterns_mgo_CM', 'goog.i18n.DateTimePatterns_mk', 'goog.i18n.DateTimePatterns_mk_MK', 'goog.i18n.DateTimePatterns_ml_IN', 'goog.i18n.DateTimePatterns_mn', 'goog.i18n.DateTimePatterns_mn_Cyrl', 'goog.i18n.DateTimePatterns_mn_Cyrl_MN', 'goog.i18n.DateTimePatterns_mr_IN', 'goog.i18n.DateTimePatterns_ms_Latn', 'goog.i18n.DateTimePatterns_ms_Latn_BN', 'goog.i18n.DateTimePatterns_ms_Latn_MY', 'goog.i18n.DateTimePatterns_ms_Latn_SG', 'goog.i18n.DateTimePatterns_mt_MT', 'goog.i18n.DateTimePatterns_mua', 'goog.i18n.DateTimePatterns_mua_CM', 'goog.i18n.DateTimePatterns_my', 'goog.i18n.DateTimePatterns_my_MM', 'goog.i18n.DateTimePatterns_naq', 'goog.i18n.DateTimePatterns_naq_NA', 'goog.i18n.DateTimePatterns_nb_NO', 'goog.i18n.DateTimePatterns_nd', 'goog.i18n.DateTimePatterns_nd_ZW', 'goog.i18n.DateTimePatterns_ne', 'goog.i18n.DateTimePatterns_ne_IN', 'goog.i18n.DateTimePatterns_ne_NP', 'goog.i18n.DateTimePatterns_nl_AW', 'goog.i18n.DateTimePatterns_nl_BE', 'goog.i18n.DateTimePatterns_nl_CW', 'goog.i18n.DateTimePatterns_nl_NL', 'goog.i18n.DateTimePatterns_nl_SR', 'goog.i18n.DateTimePatterns_nl_SX', 'goog.i18n.DateTimePatterns_nmg', 'goog.i18n.DateTimePatterns_nmg_CM', 'goog.i18n.DateTimePatterns_nn', 'goog.i18n.DateTimePatterns_nn_NO', 'goog.i18n.DateTimePatterns_nus', 'goog.i18n.DateTimePatterns_nus_SD', 'goog.i18n.DateTimePatterns_nyn', 'goog.i18n.DateTimePatterns_nyn_UG', 'goog.i18n.DateTimePatterns_om', 'goog.i18n.DateTimePatterns_om_ET', 'goog.i18n.DateTimePatterns_om_KE', 'goog.i18n.DateTimePatterns_or_IN', 'goog.i18n.DateTimePatterns_pa', 'goog.i18n.DateTimePatterns_pa_Arab', 'goog.i18n.DateTimePatterns_pa_Arab_PK', 'goog.i18n.DateTimePatterns_pa_Guru', 'goog.i18n.DateTimePatterns_pa_Guru_IN', 'goog.i18n.DateTimePatterns_pl_PL', 'goog.i18n.DateTimePatterns_ps', 'goog.i18n.DateTimePatterns_ps_AF', 'goog.i18n.DateTimePatterns_pt_AO', 'goog.i18n.DateTimePatterns_pt_CV', 'goog.i18n.DateTimePatterns_pt_GW', 'goog.i18n.DateTimePatterns_pt_MO', 'goog.i18n.DateTimePatterns_pt_MZ', 'goog.i18n.DateTimePatterns_pt_ST', 'goog.i18n.DateTimePatterns_pt_TL', 'goog.i18n.DateTimePatterns_rm', 'goog.i18n.DateTimePatterns_rm_CH', 'goog.i18n.DateTimePatterns_rn', 'goog.i18n.DateTimePatterns_rn_BI', 'goog.i18n.DateTimePatterns_ro_MD', 'goog.i18n.DateTimePatterns_ro_RO', 'goog.i18n.DateTimePatterns_rof', 'goog.i18n.DateTimePatterns_rof_TZ', 'goog.i18n.DateTimePatterns_ru_BY', 'goog.i18n.DateTimePatterns_ru_KG', 'goog.i18n.DateTimePatterns_ru_KZ', 'goog.i18n.DateTimePatterns_ru_MD', 'goog.i18n.DateTimePatterns_ru_RU', 'goog.i18n.DateTimePatterns_ru_UA', 'goog.i18n.DateTimePatterns_rw', 'goog.i18n.DateTimePatterns_rw_RW', 'goog.i18n.DateTimePatterns_rwk', 'goog.i18n.DateTimePatterns_rwk_TZ', 'goog.i18n.DateTimePatterns_saq', 'goog.i18n.DateTimePatterns_saq_KE', 'goog.i18n.DateTimePatterns_sbp', 'goog.i18n.DateTimePatterns_sbp_TZ', 'goog.i18n.DateTimePatterns_seh', 'goog.i18n.DateTimePatterns_seh_MZ', 'goog.i18n.DateTimePatterns_ses', 'goog.i18n.DateTimePatterns_ses_ML', 'goog.i18n.DateTimePatterns_sg', 'goog.i18n.DateTimePatterns_sg_CF', 'goog.i18n.DateTimePatterns_shi', 'goog.i18n.DateTimePatterns_shi_Latn', 'goog.i18n.DateTimePatterns_shi_Latn_MA', 'goog.i18n.DateTimePatterns_shi_Tfng', 'goog.i18n.DateTimePatterns_shi_Tfng_MA', 'goog.i18n.DateTimePatterns_si', 'goog.i18n.DateTimePatterns_si_LK', 'goog.i18n.DateTimePatterns_sk_SK', 'goog.i18n.DateTimePatterns_sl_SI', 'goog.i18n.DateTimePatterns_sn', 'goog.i18n.DateTimePatterns_sn_ZW', 'goog.i18n.DateTimePatterns_so', 'goog.i18n.DateTimePatterns_so_DJ', 'goog.i18n.DateTimePatterns_so_ET', 'goog.i18n.DateTimePatterns_so_KE', 'goog.i18n.DateTimePatterns_so_SO', 'goog.i18n.DateTimePatterns_sq_AL', 'goog.i18n.DateTimePatterns_sq_MK', 'goog.i18n.DateTimePatterns_sr_Cyrl', 'goog.i18n.DateTimePatterns_sr_Cyrl_BA', 'goog.i18n.DateTimePatterns_sr_Cyrl_ME', 'goog.i18n.DateTimePatterns_sr_Cyrl_RS', 'goog.i18n.DateTimePatterns_sr_Latn', 'goog.i18n.DateTimePatterns_sr_Latn_BA', 'goog.i18n.DateTimePatterns_sr_Latn_ME', 'goog.i18n.DateTimePatterns_sr_Latn_RS', 'goog.i18n.DateTimePatterns_sv_AX', 'goog.i18n.DateTimePatterns_sv_FI', 'goog.i18n.DateTimePatterns_sv_SE', 'goog.i18n.DateTimePatterns_sw_KE', 'goog.i18n.DateTimePatterns_sw_TZ', 'goog.i18n.DateTimePatterns_sw_UG', 'goog.i18n.DateTimePatterns_swc', 'goog.i18n.DateTimePatterns_swc_CD', 'goog.i18n.DateTimePatterns_ta_IN', 'goog.i18n.DateTimePatterns_ta_LK', 'goog.i18n.DateTimePatterns_ta_MY', 'goog.i18n.DateTimePatterns_ta_SG', 'goog.i18n.DateTimePatterns_te_IN', 'goog.i18n.DateTimePatterns_teo', 'goog.i18n.DateTimePatterns_teo_KE', 'goog.i18n.DateTimePatterns_teo_UG', 'goog.i18n.DateTimePatterns_th_TH', 'goog.i18n.DateTimePatterns_ti', 'goog.i18n.DateTimePatterns_ti_ER', 'goog.i18n.DateTimePatterns_ti_ET', 'goog.i18n.DateTimePatterns_to', 'goog.i18n.DateTimePatterns_to_TO', 'goog.i18n.DateTimePatterns_tr_CY', 'goog.i18n.DateTimePatterns_tr_TR', 'goog.i18n.DateTimePatterns_twq', 'goog.i18n.DateTimePatterns_twq_NE', 'goog.i18n.DateTimePatterns_tzm', 'goog.i18n.DateTimePatterns_tzm_Latn', 'goog.i18n.DateTimePatterns_tzm_Latn_MA', 'goog.i18n.DateTimePatterns_uk_UA', 'goog.i18n.DateTimePatterns_ur_IN', 'goog.i18n.DateTimePatterns_ur_PK', 'goog.i18n.DateTimePatterns_uz', 'goog.i18n.DateTimePatterns_uz_Arab', 'goog.i18n.DateTimePatterns_uz_Arab_AF', 'goog.i18n.DateTimePatterns_uz_Cyrl', 'goog.i18n.DateTimePatterns_uz_Cyrl_UZ', 'goog.i18n.DateTimePatterns_uz_Latn', 'goog.i18n.DateTimePatterns_uz_Latn_UZ', 'goog.i18n.DateTimePatterns_vai', 'goog.i18n.DateTimePatterns_vai_Latn', 'goog.i18n.DateTimePatterns_vai_Latn_LR', 'goog.i18n.DateTimePatterns_vai_Vaii', 'goog.i18n.DateTimePatterns_vai_Vaii_LR', 'goog.i18n.DateTimePatterns_vi_VN', 'goog.i18n.DateTimePatterns_vun', 'goog.i18n.DateTimePatterns_vun_TZ', 'goog.i18n.DateTimePatterns_xog', 'goog.i18n.DateTimePatterns_xog_UG', 'goog.i18n.DateTimePatterns_yav', 'goog.i18n.DateTimePatterns_yav_CM', 'goog.i18n.DateTimePatterns_yo', 'goog.i18n.DateTimePatterns_yo_NG', 'goog.i18n.DateTimePatterns_zh_Hans', 'goog.i18n.DateTimePatterns_zh_Hans_CN', 'goog.i18n.DateTimePatterns_zh_Hans_HK', 'goog.i18n.DateTimePatterns_zh_Hans_MO', 'goog.i18n.DateTimePatterns_zh_Hans_SG', 'goog.i18n.DateTimePatterns_zh_Hant', 'goog.i18n.DateTimePatterns_zh_Hant_HK', 'goog.i18n.DateTimePatterns_zh_Hant_MO', 'goog.i18n.DateTimePatterns_zh_Hant_TW', 'goog.i18n.DateTimePatterns_zu_ZA'], ['goog.i18n.DateTimePatterns']);
+goog.addDependency('i18n/datetimesymbols.js', ['goog.i18n.DateTimeSymbols', 'goog.i18n.DateTimeSymbols_af', 'goog.i18n.DateTimeSymbols_am', 'goog.i18n.DateTimeSymbols_ar', 'goog.i18n.DateTimeSymbols_bg', 'goog.i18n.DateTimeSymbols_bn', 'goog.i18n.DateTimeSymbols_br', 'goog.i18n.DateTimeSymbols_ca', 'goog.i18n.DateTimeSymbols_chr', 'goog.i18n.DateTimeSymbols_cs', 'goog.i18n.DateTimeSymbols_cy', 'goog.i18n.DateTimeSymbols_da', 'goog.i18n.DateTimeSymbols_de', 'goog.i18n.DateTimeSymbols_de_AT', 'goog.i18n.DateTimeSymbols_de_CH', 'goog.i18n.DateTimeSymbols_el', 'goog.i18n.DateTimeSymbols_en', 'goog.i18n.DateTimeSymbols_en_AU', 'goog.i18n.DateTimeSymbols_en_GB', 'goog.i18n.DateTimeSymbols_en_IE', 'goog.i18n.DateTimeSymbols_en_IN', 'goog.i18n.DateTimeSymbols_en_ISO', 'goog.i18n.DateTimeSymbols_en_SG', 'goog.i18n.DateTimeSymbols_en_US', 'goog.i18n.DateTimeSymbols_en_ZA', 'goog.i18n.DateTimeSymbols_es', 'goog.i18n.DateTimeSymbols_es_419', 'goog.i18n.DateTimeSymbols_es_ES', 'goog.i18n.DateTimeSymbols_et', 'goog.i18n.DateTimeSymbols_eu', 'goog.i18n.DateTimeSymbols_fa', 'goog.i18n.DateTimeSymbols_fi', 'goog.i18n.DateTimeSymbols_fil', 'goog.i18n.DateTimeSymbols_fr', 'goog.i18n.DateTimeSymbols_fr_CA', 'goog.i18n.DateTimeSymbols_gl', 'goog.i18n.DateTimeSymbols_gsw', 'goog.i18n.DateTimeSymbols_gu', 'goog.i18n.DateTimeSymbols_haw', 'goog.i18n.DateTimeSymbols_he', 'goog.i18n.DateTimeSymbols_hi', 'goog.i18n.DateTimeSymbols_hr', 'goog.i18n.DateTimeSymbols_hu', 'goog.i18n.DateTimeSymbols_id', 'goog.i18n.DateTimeSymbols_in', 'goog.i18n.DateTimeSymbols_is', 'goog.i18n.DateTimeSymbols_it', 'goog.i18n.DateTimeSymbols_iw', 'goog.i18n.DateTimeSymbols_ja', 'goog.i18n.DateTimeSymbols_kn', 'goog.i18n.DateTimeSymbols_ko', 'goog.i18n.DateTimeSymbols_ln', 'goog.i18n.DateTimeSymbols_lt', 'goog.i18n.DateTimeSymbols_lv', 'goog.i18n.DateTimeSymbols_ml', 'goog.i18n.DateTimeSymbols_mr', 'goog.i18n.DateTimeSymbols_ms', 'goog.i18n.DateTimeSymbols_mt', 'goog.i18n.DateTimeSymbols_nb', 'goog.i18n.DateTimeSymbols_nl', 'goog.i18n.DateTimeSymbols_no', 'goog.i18n.DateTimeSymbols_or', 'goog.i18n.DateTimeSymbols_pl', 'goog.i18n.DateTimeSymbols_pt', 'goog.i18n.DateTimeSymbols_pt_BR', 'goog.i18n.DateTimeSymbols_pt_PT', 'goog.i18n.DateTimeSymbols_ro', 'goog.i18n.DateTimeSymbols_ru', 'goog.i18n.DateTimeSymbols_sk', 'goog.i18n.DateTimeSymbols_sl', 'goog.i18n.DateTimeSymbols_sq', 'goog.i18n.DateTimeSymbols_sr', 'goog.i18n.DateTimeSymbols_sv', 'goog.i18n.DateTimeSymbols_sw', 'goog.i18n.DateTimeSymbols_ta', 'goog.i18n.DateTimeSymbols_te', 'goog.i18n.DateTimeSymbols_th', 'goog.i18n.DateTimeSymbols_tl', 'goog.i18n.DateTimeSymbols_tr', 'goog.i18n.DateTimeSymbols_uk', 'goog.i18n.DateTimeSymbols_ur', 'goog.i18n.DateTimeSymbols_vi', 'goog.i18n.DateTimeSymbols_zh', 'goog.i18n.DateTimeSymbols_zh_CN', 'goog.i18n.DateTimeSymbols_zh_HK', 'goog.i18n.DateTimeSymbols_zh_TW', 'goog.i18n.DateTimeSymbols_zu'], []);
+goog.addDependency('i18n/datetimesymbolsext.js', ['goog.i18n.DateTimeSymbolsExt', 'goog.i18n.DateTimeSymbols_aa', 'goog.i18n.DateTimeSymbols_aa_DJ', 'goog.i18n.DateTimeSymbols_aa_ER', 'goog.i18n.DateTimeSymbols_aa_ET', 'goog.i18n.DateTimeSymbols_af_NA', 'goog.i18n.DateTimeSymbols_af_ZA', 'goog.i18n.DateTimeSymbols_agq', 'goog.i18n.DateTimeSymbols_agq_CM', 'goog.i18n.DateTimeSymbols_ak', 'goog.i18n.DateTimeSymbols_ak_GH', 'goog.i18n.DateTimeSymbols_am_ET', 'goog.i18n.DateTimeSymbols_ar_001', 'goog.i18n.DateTimeSymbols_ar_AE', 'goog.i18n.DateTimeSymbols_ar_BH', 'goog.i18n.DateTimeSymbols_ar_DJ', 'goog.i18n.DateTimeSymbols_ar_DZ', 'goog.i18n.DateTimeSymbols_ar_EG', 'goog.i18n.DateTimeSymbols_ar_EH', 'goog.i18n.DateTimeSymbols_ar_ER', 'goog.i18n.DateTimeSymbols_ar_IL', 'goog.i18n.DateTimeSymbols_ar_IQ', 'goog.i18n.DateTimeSymbols_ar_JO', 'goog.i18n.DateTimeSymbols_ar_KM', 'goog.i18n.DateTimeSymbols_ar_KW', 'goog.i18n.DateTimeSymbols_ar_LB', 'goog.i18n.DateTimeSymbols_ar_LY', 'goog.i18n.DateTimeSymbols_ar_MA', 'goog.i18n.DateTimeSymbols_ar_MR', 'goog.i18n.DateTimeSymbols_ar_OM', 'goog.i18n.DateTimeSymbols_ar_PS', 'goog.i18n.DateTimeSymbols_ar_QA', 'goog.i18n.DateTimeSymbols_ar_SA', 'goog.i18n.DateTimeSymbols_ar_SD', 'goog.i18n.DateTimeSymbols_ar_SO', 'goog.i18n.DateTimeSymbols_ar_SY', 'goog.i18n.DateTimeSymbols_ar_TD', 'goog.i18n.DateTimeSymbols_ar_TN', 'goog.i18n.DateTimeSymbols_ar_YE', 'goog.i18n.DateTimeSymbols_as', 'goog.i18n.DateTimeSymbols_as_IN', 'goog.i18n.DateTimeSymbols_asa', 'goog.i18n.DateTimeSymbols_asa_TZ', 'goog.i18n.DateTimeSymbols_ast', 'goog.i18n.DateTimeSymbols_ast_ES', 'goog.i18n.DateTimeSymbols_az', 'goog.i18n.DateTimeSymbols_az_Cyrl', 'goog.i18n.DateTimeSymbols_az_Cyrl_AZ', 'goog.i18n.DateTimeSymbols_az_Latn', 'goog.i18n.DateTimeSymbols_az_Latn_AZ', 'goog.i18n.DateTimeSymbols_bas', 'goog.i18n.DateTimeSymbols_bas_CM', 'goog.i18n.DateTimeSymbols_be', 'goog.i18n.DateTimeSymbols_be_BY', 'goog.i18n.DateTimeSymbols_bem', 'goog.i18n.DateTimeSymbols_bem_ZM', 'goog.i18n.DateTimeSymbols_bez', 'goog.i18n.DateTimeSymbols_bez_TZ', 'goog.i18n.DateTimeSymbols_bg_BG', 'goog.i18n.DateTimeSymbols_bm', 'goog.i18n.DateTimeSymbols_bm_ML', 'goog.i18n.DateTimeSymbols_bn_BD', 'goog.i18n.DateTimeSymbols_bn_IN', 'goog.i18n.DateTimeSymbols_bo', 'goog.i18n.DateTimeSymbols_bo_CN', 'goog.i18n.DateTimeSymbols_bo_IN', 'goog.i18n.DateTimeSymbols_br_FR', 'goog.i18n.DateTimeSymbols_brx', 'goog.i18n.DateTimeSymbols_brx_IN', 'goog.i18n.DateTimeSymbols_bs', 'goog.i18n.DateTimeSymbols_bs_Cyrl', 'goog.i18n.DateTimeSymbols_bs_Cyrl_BA', 'goog.i18n.DateTimeSymbols_bs_Latn', 'goog.i18n.DateTimeSymbols_bs_Latn_BA', 'goog.i18n.DateTimeSymbols_byn', 'goog.i18n.DateTimeSymbols_byn_ER', 'goog.i18n.DateTimeSymbols_ca_AD', 'goog.i18n.DateTimeSymbols_ca_ES', 'goog.i18n.DateTimeSymbols_cgg', 'goog.i18n.DateTimeSymbols_cgg_UG', 'goog.i18n.DateTimeSymbols_chr_US', 'goog.i18n.DateTimeSymbols_ckb', 'goog.i18n.DateTimeSymbols_ckb_Arab', 'goog.i18n.DateTimeSymbols_ckb_Arab_IQ', 'goog.i18n.DateTimeSymbols_ckb_Arab_IR', 'goog.i18n.DateTimeSymbols_ckb_IQ', 'goog.i18n.DateTimeSymbols_ckb_IR', 'goog.i18n.DateTimeSymbols_ckb_Latn', 'goog.i18n.DateTimeSymbols_ckb_Latn_IQ', 'goog.i18n.DateTimeSymbols_cs_CZ', 'goog.i18n.DateTimeSymbols_cy_GB', 'goog.i18n.DateTimeSymbols_da_DK', 'goog.i18n.DateTimeSymbols_dav', 'goog.i18n.DateTimeSymbols_dav_KE', 'goog.i18n.DateTimeSymbols_de_BE', 'goog.i18n.DateTimeSymbols_de_DE', 'goog.i18n.DateTimeSymbols_de_LI', 'goog.i18n.DateTimeSymbols_de_LU', 'goog.i18n.DateTimeSymbols_dje', 'goog.i18n.DateTimeSymbols_dje_NE', 'goog.i18n.DateTimeSymbols_dua', 'goog.i18n.DateTimeSymbols_dua_CM', 'goog.i18n.DateTimeSymbols_dyo', 'goog.i18n.DateTimeSymbols_dyo_SN', 'goog.i18n.DateTimeSymbols_dz', 'goog.i18n.DateTimeSymbols_dz_BT', 'goog.i18n.DateTimeSymbols_ebu', 'goog.i18n.DateTimeSymbols_ebu_KE', 'goog.i18n.DateTimeSymbols_ee', 'goog.i18n.DateTimeSymbols_ee_GH', 'goog.i18n.DateTimeSymbols_ee_TG', 'goog.i18n.DateTimeSymbols_el_CY', 'goog.i18n.DateTimeSymbols_el_GR', 'goog.i18n.DateTimeSymbols_en_150', 'goog.i18n.DateTimeSymbols_en_AG', 'goog.i18n.DateTimeSymbols_en_AS', 'goog.i18n.DateTimeSymbols_en_BB', 'goog.i18n.DateTimeSymbols_en_BE', 'goog.i18n.DateTimeSymbols_en_BM', 'goog.i18n.DateTimeSymbols_en_BS', 'goog.i18n.DateTimeSymbols_en_BW', 'goog.i18n.DateTimeSymbols_en_BZ', 'goog.i18n.DateTimeSymbols_en_CA', 'goog.i18n.DateTimeSymbols_en_CM', 'goog.i18n.DateTimeSymbols_en_DM', 'goog.i18n.DateTimeSymbols_en_Dsrt', 'goog.i18n.DateTimeSymbols_en_Dsrt_US', 'goog.i18n.DateTimeSymbols_en_FJ', 'goog.i18n.DateTimeSymbols_en_FM', 'goog.i18n.DateTimeSymbols_en_GD', 'goog.i18n.DateTimeSymbols_en_GG', 'goog.i18n.DateTimeSymbols_en_GH', 'goog.i18n.DateTimeSymbols_en_GI', 'goog.i18n.DateTimeSymbols_en_GM', 'goog.i18n.DateTimeSymbols_en_GU', 'goog.i18n.DateTimeSymbols_en_GY', 'goog.i18n.DateTimeSymbols_en_HK', 'goog.i18n.DateTimeSymbols_en_IM', 'goog.i18n.DateTimeSymbols_en_JE', 'goog.i18n.DateTimeSymbols_en_JM', 'goog.i18n.DateTimeSymbols_en_KE', 'goog.i18n.DateTimeSymbols_en_KI', 'goog.i18n.DateTimeSymbols_en_KN', 'goog.i18n.DateTimeSymbols_en_KY', 'goog.i18n.DateTimeSymbols_en_LC', 'goog.i18n.DateTimeSymbols_en_LR', 'goog.i18n.DateTimeSymbols_en_LS', 'goog.i18n.DateTimeSymbols_en_MG', 'goog.i18n.DateTimeSymbols_en_MH', 'goog.i18n.DateTimeSymbols_en_MP', 'goog.i18n.DateTimeSymbols_en_MT', 'goog.i18n.DateTimeSymbols_en_MU', 'goog.i18n.DateTimeSymbols_en_MW', 'goog.i18n.DateTimeSymbols_en_NA', 'goog.i18n.DateTimeSymbols_en_NG', 'goog.i18n.DateTimeSymbols_en_NZ', 'goog.i18n.DateTimeSymbols_en_PG', 'goog.i18n.DateTimeSymbols_en_PH', 'goog.i18n.DateTimeSymbols_en_PK', 'goog.i18n.DateTimeSymbols_en_PR', 'goog.i18n.DateTimeSymbols_en_PW', 'goog.i18n.DateTimeSymbols_en_SB', 'goog.i18n.DateTimeSymbols_en_SC', 'goog.i18n.DateTimeSymbols_en_SL', 'goog.i18n.DateTimeSymbols_en_SS', 'goog.i18n.DateTimeSymbols_en_SZ', 'goog.i18n.DateTimeSymbols_en_TC', 'goog.i18n.DateTimeSymbols_en_TO', 'goog.i18n.DateTimeSymbols_en_TT', 'goog.i18n.DateTimeSymbols_en_TZ', 'goog.i18n.DateTimeSymbols_en_UG', 'goog.i18n.DateTimeSymbols_en_UM', 'goog.i18n.DateTimeSymbols_en_VC', 'goog.i18n.DateTimeSymbols_en_VG', 'goog.i18n.DateTimeSymbols_en_VI', 'goog.i18n.DateTimeSymbols_en_VU', 'goog.i18n.DateTimeSymbols_en_WS', 'goog.i18n.DateTimeSymbols_en_ZM', 'goog.i18n.DateTimeSymbols_en_ZW', 'goog.i18n.DateTimeSymbols_eo', 'goog.i18n.DateTimeSymbols_es_AR', 'goog.i18n.DateTimeSymbols_es_BO', 'goog.i18n.DateTimeSymbols_es_CL', 'goog.i18n.DateTimeSymbols_es_CO', 'goog.i18n.DateTimeSymbols_es_CR', 'goog.i18n.DateTimeSymbols_es_CU', 'goog.i18n.DateTimeSymbols_es_DO', 'goog.i18n.DateTimeSymbols_es_EA', 'goog.i18n.DateTimeSymbols_es_EC', 'goog.i18n.DateTimeSymbols_es_GQ', 'goog.i18n.DateTimeSymbols_es_GT', 'goog.i18n.DateTimeSymbols_es_HN', 'goog.i18n.DateTimeSymbols_es_IC', 'goog.i18n.DateTimeSymbols_es_MX', 'goog.i18n.DateTimeSymbols_es_NI', 'goog.i18n.DateTimeSymbols_es_PA', 'goog.i18n.DateTimeSymbols_es_PE', 'goog.i18n.DateTimeSymbols_es_PH', 'goog.i18n.DateTimeSymbols_es_PR', 'goog.i18n.DateTimeSymbols_es_PY', 'goog.i18n.DateTimeSymbols_es_SV', 'goog.i18n.DateTimeSymbols_es_US', 'goog.i18n.DateTimeSymbols_es_UY', 'goog.i18n.DateTimeSymbols_es_VE', 'goog.i18n.DateTimeSymbols_et_EE', 'goog.i18n.DateTimeSymbols_eu_ES', 'goog.i18n.DateTimeSymbols_ewo', 'goog.i18n.DateTimeSymbols_ewo_CM', 'goog.i18n.DateTimeSymbols_fa_AF', 'goog.i18n.DateTimeSymbols_fa_IR', 'goog.i18n.DateTimeSymbols_ff', 'goog.i18n.DateTimeSymbols_ff_SN', 'goog.i18n.DateTimeSymbols_fi_FI', 'goog.i18n.DateTimeSymbols_fil_PH', 'goog.i18n.DateTimeSymbols_fo', 'goog.i18n.DateTimeSymbols_fo_FO', 'goog.i18n.DateTimeSymbols_fr_BE', 'goog.i18n.DateTimeSymbols_fr_BF', 'goog.i18n.DateTimeSymbols_fr_BI', 'goog.i18n.DateTimeSymbols_fr_BJ', 'goog.i18n.DateTimeSymbols_fr_BL', 'goog.i18n.DateTimeSymbols_fr_CD', 'goog.i18n.DateTimeSymbols_fr_CF', 'goog.i18n.DateTimeSymbols_fr_CG', 'goog.i18n.DateTimeSymbols_fr_CH', 'goog.i18n.DateTimeSymbols_fr_CI', 'goog.i18n.DateTimeSymbols_fr_CM', 'goog.i18n.DateTimeSymbols_fr_DJ', 'goog.i18n.DateTimeSymbols_fr_DZ', 'goog.i18n.DateTimeSymbols_fr_FR', 'goog.i18n.DateTimeSymbols_fr_GA', 'goog.i18n.DateTimeSymbols_fr_GF', 'goog.i18n.DateTimeSymbols_fr_GN', 'goog.i18n.DateTimeSymbols_fr_GP', 'goog.i18n.DateTimeSymbols_fr_GQ', 'goog.i18n.DateTimeSymbols_fr_HT', 'goog.i18n.DateTimeSymbols_fr_KM', 'goog.i18n.DateTimeSymbols_fr_LU', 'goog.i18n.DateTimeSymbols_fr_MA', 'goog.i18n.DateTimeSymbols_fr_MC', 'goog.i18n.DateTimeSymbols_fr_MF', 'goog.i18n.DateTimeSymbols_fr_MG', 'goog.i18n.DateTimeSymbols_fr_ML', 'goog.i18n.DateTimeSymbols_fr_MQ', 'goog.i18n.DateTimeSymbols_fr_MR', 'goog.i18n.DateTimeSymbols_fr_MU', 'goog.i18n.DateTimeSymbols_fr_NC', 'goog.i18n.DateTimeSymbols_fr_NE', 'goog.i18n.DateTimeSymbols_fr_PF', 'goog.i18n.DateTimeSymbols_fr_RE', 'goog.i18n.DateTimeSymbols_fr_RW', 'goog.i18n.DateTimeSymbols_fr_SC', 'goog.i18n.DateTimeSymbols_fr_SN', 'goog.i18n.DateTimeSymbols_fr_SY', 'goog.i18n.DateTimeSymbols_fr_TD', 'goog.i18n.DateTimeSymbols_fr_TG', 'goog.i18n.DateTimeSymbols_fr_TN', 'goog.i18n.DateTimeSymbols_fr_VU', 'goog.i18n.DateTimeSymbols_fr_YT', 'goog.i18n.DateTimeSymbols_fur', 'goog.i18n.DateTimeSymbols_fur_IT', 'goog.i18n.DateTimeSymbols_ga', 'goog.i18n.DateTimeSymbols_ga_IE', 'goog.i18n.DateTimeSymbols_gd', 'goog.i18n.DateTimeSymbols_gd_GB', 'goog.i18n.DateTimeSymbols_gl_ES', 'goog.i18n.DateTimeSymbols_gsw_CH', 'goog.i18n.DateTimeSymbols_gu_IN', 'goog.i18n.DateTimeSymbols_guz', 'goog.i18n.DateTimeSymbols_guz_KE', 'goog.i18n.DateTimeSymbols_gv', 'goog.i18n.DateTimeSymbols_gv_GB', 'goog.i18n.DateTimeSymbols_ha', 'goog.i18n.DateTimeSymbols_ha_Latn', 'goog.i18n.DateTimeSymbols_ha_Latn_GH', 'goog.i18n.DateTimeSymbols_ha_Latn_NE', 'goog.i18n.DateTimeSymbols_ha_Latn_NG', 'goog.i18n.DateTimeSymbols_haw_US', 'goog.i18n.DateTimeSymbols_he_IL', 'goog.i18n.DateTimeSymbols_hi_IN', 'goog.i18n.DateTimeSymbols_hr_BA', 'goog.i18n.DateTimeSymbols_hr_HR', 'goog.i18n.DateTimeSymbols_hu_HU', 'goog.i18n.DateTimeSymbols_hy', 'goog.i18n.DateTimeSymbols_hy_AM', 'goog.i18n.DateTimeSymbols_ia', 'goog.i18n.DateTimeSymbols_ia_FR', 'goog.i18n.DateTimeSymbols_id_ID', 'goog.i18n.DateTimeSymbols_ig', 'goog.i18n.DateTimeSymbols_ig_NG', 'goog.i18n.DateTimeSymbols_ii', 'goog.i18n.DateTimeSymbols_ii_CN', 'goog.i18n.DateTimeSymbols_is_IS', 'goog.i18n.DateTimeSymbols_it_CH', 'goog.i18n.DateTimeSymbols_it_IT', 'goog.i18n.DateTimeSymbols_it_SM', 'goog.i18n.DateTimeSymbols_ja_JP', 'goog.i18n.DateTimeSymbols_jgo', 'goog.i18n.DateTimeSymbols_jgo_CM', 'goog.i18n.DateTimeSymbols_jmc', 'goog.i18n.DateTimeSymbols_jmc_TZ', 'goog.i18n.DateTimeSymbols_ka', 'goog.i18n.DateTimeSymbols_ka_GE', 'goog.i18n.DateTimeSymbols_kab', 'goog.i18n.DateTimeSymbols_kab_DZ', 'goog.i18n.DateTimeSymbols_kam', 'goog.i18n.DateTimeSymbols_kam_KE', 'goog.i18n.DateTimeSymbols_kde', 'goog.i18n.DateTimeSymbols_kde_TZ', 'goog.i18n.DateTimeSymbols_kea', 'goog.i18n.DateTimeSymbols_kea_CV', 'goog.i18n.DateTimeSymbols_khq', 'goog.i18n.DateTimeSymbols_khq_ML', 'goog.i18n.DateTimeSymbols_ki', 'goog.i18n.DateTimeSymbols_ki_KE', 'goog.i18n.DateTimeSymbols_kk', 'goog.i18n.DateTimeSymbols_kk_Cyrl', 'goog.i18n.DateTimeSymbols_kk_Cyrl_KZ', 'goog.i18n.DateTimeSymbols_kkj', 'goog.i18n.DateTimeSymbols_kkj_CM', 'goog.i18n.DateTimeSymbols_kl', 'goog.i18n.DateTimeSymbols_kl_GL', 'goog.i18n.DateTimeSymbols_kln', 'goog.i18n.DateTimeSymbols_kln_KE', 'goog.i18n.DateTimeSymbols_km', 'goog.i18n.DateTimeSymbols_km_KH', 'goog.i18n.DateTimeSymbols_kn_IN', 'goog.i18n.DateTimeSymbols_ko_KP', 'goog.i18n.DateTimeSymbols_ko_KR', 'goog.i18n.DateTimeSymbols_kok', 'goog.i18n.DateTimeSymbols_kok_IN', 'goog.i18n.DateTimeSymbols_ks', 'goog.i18n.DateTimeSymbols_ks_Arab', 'goog.i18n.DateTimeSymbols_ks_Arab_IN', 'goog.i18n.DateTimeSymbols_ksb', 'goog.i18n.DateTimeSymbols_ksb_TZ', 'goog.i18n.DateTimeSymbols_ksf', 'goog.i18n.DateTimeSymbols_ksf_CM', 'goog.i18n.DateTimeSymbols_ksh', 'goog.i18n.DateTimeSymbols_ksh_DE', 'goog.i18n.DateTimeSymbols_kw', 'goog.i18n.DateTimeSymbols_kw_GB', 'goog.i18n.DateTimeSymbols_ky', 'goog.i18n.DateTimeSymbols_ky_KG', 'goog.i18n.DateTimeSymbols_lag', 'goog.i18n.DateTimeSymbols_lag_TZ', 'goog.i18n.DateTimeSymbols_lg', 'goog.i18n.DateTimeSymbols_lg_UG', 'goog.i18n.DateTimeSymbols_ln_AO', 'goog.i18n.DateTimeSymbols_ln_CD', 'goog.i18n.DateTimeSymbols_ln_CF', 'goog.i18n.DateTimeSymbols_ln_CG', 'goog.i18n.DateTimeSymbols_lo', 'goog.i18n.DateTimeSymbols_lo_LA', 'goog.i18n.DateTimeSymbols_lt_LT', 'goog.i18n.DateTimeSymbols_lu', 'goog.i18n.DateTimeSymbols_lu_CD', 'goog.i18n.DateTimeSymbols_luo', 'goog.i18n.DateTimeSymbols_luo_KE', 'goog.i18n.DateTimeSymbols_luy', 'goog.i18n.DateTimeSymbols_luy_KE', 'goog.i18n.DateTimeSymbols_lv_LV', 'goog.i18n.DateTimeSymbols_mas', 'goog.i18n.DateTimeSymbols_mas_KE', 'goog.i18n.DateTimeSymbols_mas_TZ', 'goog.i18n.DateTimeSymbols_mer', 'goog.i18n.DateTimeSymbols_mer_KE', 'goog.i18n.DateTimeSymbols_mfe', 'goog.i18n.DateTimeSymbols_mfe_MU', 'goog.i18n.DateTimeSymbols_mg', 'goog.i18n.DateTimeSymbols_mg_MG', 'goog.i18n.DateTimeSymbols_mgh', 'goog.i18n.DateTimeSymbols_mgh_MZ', 'goog.i18n.DateTimeSymbols_mgo', 'goog.i18n.DateTimeSymbols_mgo_CM', 'goog.i18n.DateTimeSymbols_mk', 'goog.i18n.DateTimeSymbols_mk_MK', 'goog.i18n.DateTimeSymbols_ml_IN', 'goog.i18n.DateTimeSymbols_mn', 'goog.i18n.DateTimeSymbols_mn_Cyrl', 'goog.i18n.DateTimeSymbols_mn_Cyrl_MN', 'goog.i18n.DateTimeSymbols_mr_IN', 'goog.i18n.DateTimeSymbols_ms_Latn', 'goog.i18n.DateTimeSymbols_ms_Latn_BN', 'goog.i18n.DateTimeSymbols_ms_Latn_MY', 'goog.i18n.DateTimeSymbols_ms_Latn_SG', 'goog.i18n.DateTimeSymbols_mt_MT', 'goog.i18n.DateTimeSymbols_mua', 'goog.i18n.DateTimeSymbols_mua_CM', 'goog.i18n.DateTimeSymbols_my', 'goog.i18n.DateTimeSymbols_my_MM', 'goog.i18n.DateTimeSymbols_naq', 'goog.i18n.DateTimeSymbols_naq_NA', 'goog.i18n.DateTimeSymbols_nb_NO', 'goog.i18n.DateTimeSymbols_nd', 'goog.i18n.DateTimeSymbols_nd_ZW', 'goog.i18n.DateTimeSymbols_ne', 'goog.i18n.DateTimeSymbols_ne_IN', 'goog.i18n.DateTimeSymbols_ne_NP', 'goog.i18n.DateTimeSymbols_nl_AW', 'goog.i18n.DateTimeSymbols_nl_BE', 'goog.i18n.DateTimeSymbols_nl_CW', 'goog.i18n.DateTimeSymbols_nl_NL', 'goog.i18n.DateTimeSymbols_nl_SR', 'goog.i18n.DateTimeSymbols_nl_SX', 'goog.i18n.DateTimeSymbols_nmg', 'goog.i18n.DateTimeSymbols_nmg_CM', 'goog.i18n.DateTimeSymbols_nn', 'goog.i18n.DateTimeSymbols_nn_NO', 'goog.i18n.DateTimeSymbols_nnh', 'goog.i18n.DateTimeSymbols_nnh_CM', 'goog.i18n.DateTimeSymbols_nr', 'goog.i18n.DateTimeSymbols_nr_ZA', 'goog.i18n.DateTimeSymbols_nso', 'goog.i18n.DateTimeSymbols_nso_ZA', 'goog.i18n.DateTimeSymbols_nus', 'goog.i18n.DateTimeSymbols_nus_SD', 'goog.i18n.DateTimeSymbols_nyn', 'goog.i18n.DateTimeSymbols_nyn_UG', 'goog.i18n.DateTimeSymbols_om', 'goog.i18n.DateTimeSymbols_om_ET', 'goog.i18n.DateTimeSymbols_om_KE', 'goog.i18n.DateTimeSymbols_or_IN', 'goog.i18n.DateTimeSymbols_os', 'goog.i18n.DateTimeSymbols_os_GE', 'goog.i18n.DateTimeSymbols_os_RU', 'goog.i18n.DateTimeSymbols_pa', 'goog.i18n.DateTimeSymbols_pa_Arab', 'goog.i18n.DateTimeSymbols_pa_Arab_PK', 'goog.i18n.DateTimeSymbols_pa_Guru', 'goog.i18n.DateTimeSymbols_pa_Guru_IN', 'goog.i18n.DateTimeSymbols_pl_PL', 'goog.i18n.DateTimeSymbols_ps', 'goog.i18n.DateTimeSymbols_ps_AF', 'goog.i18n.DateTimeSymbols_pt_AO', 'goog.i18n.DateTimeSymbols_pt_CV', 'goog.i18n.DateTimeSymbols_pt_GW', 'goog.i18n.DateTimeSymbols_pt_MO', 'goog.i18n.DateTimeSymbols_pt_MZ', 'goog.i18n.DateTimeSymbols_pt_ST', 'goog.i18n.DateTimeSymbols_pt_TL', 'goog.i18n.DateTimeSymbols_rm', 'goog.i18n.DateTimeSymbols_rm_CH', 'goog.i18n.DateTimeSymbols_rn', 'goog.i18n.DateTimeSymbols_rn_BI', 'goog.i18n.DateTimeSymbols_ro_MD', 'goog.i18n.DateTimeSymbols_ro_RO', 'goog.i18n.DateTimeSymbols_rof', 'goog.i18n.DateTimeSymbols_rof_TZ', 'goog.i18n.DateTimeSymbols_ru_BY', 'goog.i18n.DateTimeSymbols_ru_KG', 'goog.i18n.DateTimeSymbols_ru_KZ', 'goog.i18n.DateTimeSymbols_ru_MD', 'goog.i18n.DateTimeSymbols_ru_RU', 'goog.i18n.DateTimeSymbols_ru_UA', 'goog.i18n.DateTimeSymbols_rw', 'goog.i18n.DateTimeSymbols_rw_RW', 'goog.i18n.DateTimeSymbols_rwk', 'goog.i18n.DateTimeSymbols_rwk_TZ', 'goog.i18n.DateTimeSymbols_sah', 'goog.i18n.DateTimeSymbols_sah_RU', 'goog.i18n.DateTimeSymbols_saq', 'goog.i18n.DateTimeSymbols_saq_KE', 'goog.i18n.DateTimeSymbols_sbp', 'goog.i18n.DateTimeSymbols_sbp_TZ', 'goog.i18n.DateTimeSymbols_se', 'goog.i18n.DateTimeSymbols_se_FI', 'goog.i18n.DateTimeSymbols_se_NO', 'goog.i18n.DateTimeSymbols_seh', 'goog.i18n.DateTimeSymbols_seh_MZ', 'goog.i18n.DateTimeSymbols_ses', 'goog.i18n.DateTimeSymbols_ses_ML', 'goog.i18n.DateTimeSymbols_sg', 'goog.i18n.DateTimeSymbols_sg_CF', 'goog.i18n.DateTimeSymbols_shi', 'goog.i18n.DateTimeSymbols_shi_Latn', 'goog.i18n.DateTimeSymbols_shi_Latn_MA', 'goog.i18n.DateTimeSymbols_shi_Tfng', 'goog.i18n.DateTimeSymbols_shi_Tfng_MA', 'goog.i18n.DateTimeSymbols_si', 'goog.i18n.DateTimeSymbols_si_LK', 'goog.i18n.DateTimeSymbols_sk_SK', 'goog.i18n.DateTimeSymbols_sl_SI', 'goog.i18n.DateTimeSymbols_sn', 'goog.i18n.DateTimeSymbols_sn_ZW', 'goog.i18n.DateTimeSymbols_so', 'goog.i18n.DateTimeSymbols_so_DJ', 'goog.i18n.DateTimeSymbols_so_ET', 'goog.i18n.DateTimeSymbols_so_KE', 'goog.i18n.DateTimeSymbols_so_SO', 'goog.i18n.DateTimeSymbols_sq_AL', 'goog.i18n.DateTimeSymbols_sq_MK', 'goog.i18n.DateTimeSymbols_sq_XK', 'goog.i18n.DateTimeSymbols_sr_Cyrl', 'goog.i18n.DateTimeSymbols_sr_Cyrl_BA', 'goog.i18n.DateTimeSymbols_sr_Cyrl_ME', 'goog.i18n.DateTimeSymbols_sr_Cyrl_RS', 'goog.i18n.DateTimeSymbols_sr_Cyrl_XK', 'goog.i18n.DateTimeSymbols_sr_Latn', 'goog.i18n.DateTimeSymbols_sr_Latn_BA', 'goog.i18n.DateTimeSymbols_sr_Latn_ME', 'goog.i18n.DateTimeSymbols_sr_Latn_RS', 'goog.i18n.DateTimeSymbols_sr_Latn_XK', 'goog.i18n.DateTimeSymbols_ss', 'goog.i18n.DateTimeSymbols_ss_SZ', 'goog.i18n.DateTimeSymbols_ss_ZA', 'goog.i18n.DateTimeSymbols_ssy', 'goog.i18n.DateTimeSymbols_ssy_ER', 'goog.i18n.DateTimeSymbols_st', 'goog.i18n.DateTimeSymbols_st_LS', 'goog.i18n.DateTimeSymbols_st_ZA', 'goog.i18n.DateTimeSymbols_sv_AX', 'goog.i18n.DateTimeSymbols_sv_FI', 'goog.i18n.DateTimeSymbols_sv_SE', 'goog.i18n.DateTimeSymbols_sw_KE', 'goog.i18n.DateTimeSymbols_sw_TZ', 'goog.i18n.DateTimeSymbols_sw_UG', 'goog.i18n.DateTimeSymbols_swc', 'goog.i18n.DateTimeSymbols_swc_CD', 'goog.i18n.DateTimeSymbols_ta_IN', 'goog.i18n.DateTimeSymbols_ta_LK', 'goog.i18n.DateTimeSymbols_ta_MY', 'goog.i18n.DateTimeSymbols_ta_SG', 'goog.i18n.DateTimeSymbols_te_IN', 'goog.i18n.DateTimeSymbols_teo', 'goog.i18n.DateTimeSymbols_teo_KE', 'goog.i18n.DateTimeSymbols_teo_UG', 'goog.i18n.DateTimeSymbols_tg', 'goog.i18n.DateTimeSymbols_tg_Cyrl', 'goog.i18n.DateTimeSymbols_tg_Cyrl_TJ', 'goog.i18n.DateTimeSymbols_th_TH', 'goog.i18n.DateTimeSymbols_ti', 'goog.i18n.DateTimeSymbols_ti_ER', 'goog.i18n.DateTimeSymbols_ti_ET', 'goog.i18n.DateTimeSymbols_tig', 'goog.i18n.DateTimeSymbols_tig_ER', 'goog.i18n.DateTimeSymbols_tn', 'goog.i18n.DateTimeSymbols_tn_BW', 'goog.i18n.DateTimeSymbols_tn_ZA', 'goog.i18n.DateTimeSymbols_to', 'goog.i18n.DateTimeSymbols_to_TO', 'goog.i18n.DateTimeSymbols_tr_CY', 'goog.i18n.DateTimeSymbols_tr_TR', 'goog.i18n.DateTimeSymbols_ts', 'goog.i18n.DateTimeSymbols_ts_ZA', 'goog.i18n.DateTimeSymbols_twq', 'goog.i18n.DateTimeSymbols_twq_NE', 'goog.i18n.DateTimeSymbols_tzm', 'goog.i18n.DateTimeSymbols_tzm_Latn', 'goog.i18n.DateTimeSymbols_tzm_Latn_MA', 'goog.i18n.DateTimeSymbols_uk_UA', 'goog.i18n.DateTimeSymbols_ur_IN', 'goog.i18n.DateTimeSymbols_ur_PK', 'goog.i18n.DateTimeSymbols_uz', 'goog.i18n.DateTimeSymbols_uz_Arab', 'goog.i18n.DateTimeSymbols_uz_Arab_AF', 'goog.i18n.DateTimeSymbols_uz_Cyrl', 'goog.i18n.DateTimeSymbols_uz_Cyrl_UZ', 'goog.i18n.DateTimeSymbols_uz_Latn', 'goog.i18n.DateTimeSymbols_uz_Latn_UZ', 'goog.i18n.DateTimeSymbols_vai', 'goog.i18n.DateTimeSymbols_vai_Latn', 'goog.i18n.DateTimeSymbols_vai_Latn_LR', 'goog.i18n.DateTimeSymbols_vai_Vaii', 'goog.i18n.DateTimeSymbols_vai_Vaii_LR', 'goog.i18n.DateTimeSymbols_ve', 'goog.i18n.DateTimeSymbols_ve_ZA', 'goog.i18n.DateTimeSymbols_vi_VN', 'goog.i18n.DateTimeSymbols_vo', 'goog.i18n.DateTimeSymbols_vun', 'goog.i18n.DateTimeSymbols_vun_TZ', 'goog.i18n.DateTimeSymbols_wae', 'goog.i18n.DateTimeSymbols_wae_CH', 'goog.i18n.DateTimeSymbols_wal', 'goog.i18n.DateTimeSymbols_wal_ET', 'goog.i18n.DateTimeSymbols_xh', 'goog.i18n.DateTimeSymbols_xh_ZA', 'goog.i18n.DateTimeSymbols_xog', 'goog.i18n.DateTimeSymbols_xog_UG', 'goog.i18n.DateTimeSymbols_yav', 'goog.i18n.DateTimeSymbols_yav_CM', 'goog.i18n.DateTimeSymbols_yo', 'goog.i18n.DateTimeSymbols_yo_NG', 'goog.i18n.DateTimeSymbols_zh_Hans', 'goog.i18n.DateTimeSymbols_zh_Hans_CN', 'goog.i18n.DateTimeSymbols_zh_Hans_HK', 'goog.i18n.DateTimeSymbols_zh_Hans_MO', 'goog.i18n.DateTimeSymbols_zh_Hans_SG', 'goog.i18n.DateTimeSymbols_zh_Hant', 'goog.i18n.DateTimeSymbols_zh_Hant_HK', 'goog.i18n.DateTimeSymbols_zh_Hant_MO', 'goog.i18n.DateTimeSymbols_zh_Hant_TW', 'goog.i18n.DateTimeSymbols_zu_ZA'], ['goog.i18n.DateTimeSymbols']);
 goog.addDependency('i18n/graphemebreak.js', ['goog.i18n.GraphemeBreak'], ['goog.structs.InversionMap']);
-goog.addDependency('i18n/mime.js', ['goog.i18n.mime', 'goog.i18n.mime.encode'], []);
-goog.addDependency('i18n/numberformat.js', ['goog.i18n.NumberFormat'], ['goog.i18n.NumberFormatSymbols', 'goog.i18n.currencyCodeMap']);
-goog.addDependency('i18n/numberformatsymbols.js', ['goog.i18n.NumberFormatSymbols', 'goog.i18n.NumberFormatSymbols_aa', 'goog.i18n.NumberFormatSymbols_aa_DJ', 'goog.i18n.NumberFormatSymbols_aa_ER', 'goog.i18n.NumberFormatSymbols_aa_ER_SAAHO', 'goog.i18n.NumberFormatSymbols_aa_ET', 'goog.i18n.NumberFormatSymbols_af', 'goog.i18n.NumberFormatSymbols_af_NA', 'goog.i18n.NumberFormatSymbols_af_ZA', 'goog.i18n.NumberFormatSymbols_ak', 'goog.i18n.NumberFormatSymbols_ak_GH', 'goog.i18n.NumberFormatSymbols_am', 'goog.i18n.NumberFormatSymbols_am_ET', 'goog.i18n.NumberFormatSymbols_ar', 'goog.i18n.NumberFormatSymbols_ar_AE', 'goog.i18n.NumberFormatSymbols_ar_BH', 'goog.i18n.NumberFormatSymbols_ar_DZ', 'goog.i18n.NumberFormatSymbols_ar_EG', 'goog.i18n.NumberFormatSymbols_ar_IQ', 'goog.i18n.NumberFormatSymbols_ar_JO', 'goog.i18n.NumberFormatSymbols_ar_KW', 'goog.i18n.NumberFormatSymbols_ar_LB', 'goog.i18n.NumberFormatSymbols_ar_LY', 'goog.i18n.NumberFormatSymbols_ar_MA', 'goog.i18n.NumberFormatSymbols_ar_OM', 'goog.i18n.NumberFormatSymbols_ar_QA', 'goog.i18n.NumberFormatSymbols_ar_SA', 'goog.i18n.NumberFormatSymbols_ar_SD', 'goog.i18n.NumberFormatSymbols_ar_SY', 'goog.i18n.NumberFormatSymbols_ar_TN', 'goog.i18n.NumberFormatSymbols_ar_YE', 'goog.i18n.NumberFormatSymbols_as', 'goog.i18n.NumberFormatSymbols_as_IN', 'goog.i18n.NumberFormatSymbols_az', 'goog.i18n.NumberFormatSymbols_az_AZ', 'goog.i18n.NumberFormatSymbols_az_Cyrl', 'goog.i18n.NumberFormatSymbols_az_Cyrl_AZ', 'goog.i18n.NumberFormatSymbols_az_Latn', 'goog.i18n.NumberFormatSymbols_az_Latn_AZ', 'goog.i18n.NumberFormatSymbols_be', 'goog.i18n.NumberFormatSymbols_be_BY', 'goog.i18n.NumberFormatSymbols_bg', 'goog.i18n.NumberFormatSymbols_bg_BG', 'goog.i18n.NumberFormatSymbols_bn', 'goog.i18n.NumberFormatSymbols_bn_BD', 'goog.i18n.NumberFormatSymbols_bn_IN', 'goog.i18n.NumberFormatSymbols_bo', 'goog.i18n.NumberFormatSymbols_bo_CN', 'goog.i18n.NumberFormatSymbols_bo_IN', 'goog.i18n.NumberFormatSymbols_bs', 'goog.i18n.NumberFormatSymbols_bs_BA', 'goog.i18n.NumberFormatSymbols_byn', 'goog.i18n.NumberFormatSymbols_byn_ER', 'goog.i18n.NumberFormatSymbols_ca', 'goog.i18n.NumberFormatSymbols_ca_ES', 'goog.i18n.NumberFormatSymbols_cch', 'goog.i18n.NumberFormatSymbols_cch_NG', 'goog.i18n.NumberFormatSymbols_cop', 'goog.i18n.NumberFormatSymbols_cs', 'goog.i18n.NumberFormatSymbols_cs_CZ', 'goog.i18n.NumberFormatSymbols_cy', 'goog.i18n.NumberFormatSymbols_cy_GB', 'goog.i18n.NumberFormatSymbols_da', 'goog.i18n.NumberFormatSymbols_da_DK', 'goog.i18n.NumberFormatSymbols_de', 'goog.i18n.NumberFormatSymbols_de_AT', 'goog.i18n.NumberFormatSymbols_de_BE', 'goog.i18n.NumberFormatSymbols_de_CH', 'goog.i18n.NumberFormatSymbols_de_DE', 'goog.i18n.NumberFormatSymbols_de_LI', 'goog.i18n.NumberFormatSymbols_de_LU', 'goog.i18n.NumberFormatSymbols_dv', 'goog.i18n.NumberFormatSymbols_dv_MV', 'goog.i18n.NumberFormatSymbols_dz', 'goog.i18n.NumberFormatSymbols_dz_BT', 'goog.i18n.NumberFormatSymbols_ee', 'goog.i18n.NumberFormatSymbols_ee_GH', 'goog.i18n.NumberFormatSymbols_ee_TG', 'goog.i18n.NumberFormatSymbols_el', 'goog.i18n.NumberFormatSymbols_el_CY', 'goog.i18n.NumberFormatSymbols_el_GR', 'goog.i18n.NumberFormatSymbols_el_POLYTON', 'goog.i18n.NumberFormatSymbols_en', 'goog.i18n.NumberFormatSymbols_en_AS', 'goog.i18n.NumberFormatSymbols_en_AU', 'goog.i18n.NumberFormatSymbols_en_BE', 'goog.i18n.NumberFormatSymbols_en_BW', 'goog.i18n.NumberFormatSymbols_en_BZ', 'goog.i18n.NumberFormatSymbols_en_CA', 'goog.i18n.NumberFormatSymbols_en_Dsrt', 'goog.i18n.NumberFormatSymbols_en_Dsrt_US', 'goog.i18n.NumberFormatSymbols_en_GB', 'goog.i18n.NumberFormatSymbols_en_GU', 'goog.i18n.NumberFormatSymbols_en_HK', 'goog.i18n.NumberFormatSymbols_en_IE', 'goog.i18n.NumberFormatSymbols_en_IN', 'goog.i18n.NumberFormatSymbols_en_JM', 'goog.i18n.NumberFormatSymbols_en_MH', 'goog.i18n.NumberFormatSymbols_en_MP', 'goog.i18n.NumberFormatSymbols_en_MT', 'goog.i18n.NumberFormatSymbols_en_NA', 'goog.i18n.NumberFormatSymbols_en_NZ', 'goog.i18n.NumberFormatSymbols_en_PH', 'goog.i18n.NumberFormatSymbols_en_PK', 'goog.i18n.NumberFormatSymbols_en_SG', 'goog.i18n.NumberFormatSymbols_en_Shaw', 'goog.i18n.NumberFormatSymbols_en_TT', 'goog.i18n.NumberFormatSymbols_en_UM', 'goog.i18n.NumberFormatSymbols_en_US', 'goog.i18n.NumberFormatSymbols_en_VI', 'goog.i18n.NumberFormatSymbols_en_ZA', 'goog.i18n.NumberFormatSymbols_en_ZW', 'goog.i18n.NumberFormatSymbols_eo', 'goog.i18n.NumberFormatSymbols_es', 'goog.i18n.NumberFormatSymbols_es_AR', 'goog.i18n.NumberFormatSymbols_es_BO', 'goog.i18n.NumberFormatSymbols_es_CL', 'goog.i18n.NumberFormatSymbols_es_CO', 'goog.i18n.NumberFormatSymbols_es_CR', 'goog.i18n.NumberFormatSymbols_es_DO', 'goog.i18n.NumberFormatSymbols_es_EC', 'goog.i18n.NumberFormatSymbols_es_ES', 'goog.i18n.NumberFormatSymbols_es_GT', 'goog.i18n.NumberFormatSymbols_es_HN', 'goog.i18n.NumberFormatSymbols_es_MX', 'goog.i18n.NumberFormatSymbols_es_NI', 'goog.i18n.NumberFormatSymbols_es_PA', 'goog.i18n.NumberFormatSymbols_es_PE', 'goog.i18n.NumberFormatSymbols_es_PR', 'goog.i18n.NumberFormatSymbols_es_PY', 'goog.i18n.NumberFormatSymbols_es_SV', 'goog.i18n.NumberFormatSymbols_es_US', 'goog.i18n.NumberFormatSymbols_es_UY', 'goog.i18n.NumberFormatSymbols_es_VE', 'goog.i18n.NumberFormatSymbols_et', 'goog.i18n.NumberFormatSymbols_et_EE', 'goog.i18n.NumberFormatSymbols_eu', 'goog.i18n.NumberFormatSymbols_eu_ES', 'goog.i18n.NumberFormatSymbols_fa', 'goog.i18n.NumberFormatSymbols_fa_AF', 'goog.i18n.NumberFormatSymbols_fa_IR', 'goog.i18n.NumberFormatSymbols_fi', 'goog.i18n.NumberFormatSymbols_fi_FI', 'goog.i18n.NumberFormatSymbols_fil', 'goog.i18n.NumberFormatSymbols_fil_PH', 'goog.i18n.NumberFormatSymbols_fo', 'goog.i18n.NumberFormatSymbols_fo_FO', 'goog.i18n.NumberFormatSymbols_fr', 'goog.i18n.NumberFormatSymbols_fr_BE', 'goog.i18n.NumberFormatSymbols_fr_CA', 'goog.i18n.NumberFormatSymbols_fr_CH', 'goog.i18n.NumberFormatSymbols_fr_FR', 'goog.i18n.NumberFormatSymbols_fr_LU', 'goog.i18n.NumberFormatSymbols_fr_MC', 'goog.i18n.NumberFormatSymbols_fr_SN', 'goog.i18n.NumberFormatSymbols_fur', 'goog.i18n.NumberFormatSymbols_fur_IT', 'goog.i18n.NumberFormatSymbols_ga', 'goog.i18n.NumberFormatSymbols_ga_IE', 'goog.i18n.NumberFormatSymbols_gaa', 'goog.i18n.NumberFormatSymbols_gaa_GH', 'goog.i18n.NumberFormatSymbols_gez', 'goog.i18n.NumberFormatSymbols_gez_ER', 'goog.i18n.NumberFormatSymbols_gez_ET', 'goog.i18n.NumberFormatSymbols_gl', 'goog.i18n.NumberFormatSymbols_gl_ES', 'goog.i18n.NumberFormatSymbols_gsw', 'goog.i18n.NumberFormatSymbols_gsw_CH', 'goog.i18n.NumberFormatSymbols_gu', 'goog.i18n.NumberFormatSymbols_gu_IN', 'goog.i18n.NumberFormatSymbols_gv', 'goog.i18n.NumberFormatSymbols_gv_GB', 'goog.i18n.NumberFormatSymbols_ha', 'goog.i18n.NumberFormatSymbols_ha_Arab', 'goog.i18n.NumberFormatSymbols_ha_Arab_NG', 'goog.i18n.NumberFormatSymbols_ha_Arab_SD', 'goog.i18n.NumberFormatSymbols_ha_GH', 'goog.i18n.NumberFormatSymbols_ha_Latn', 'goog.i18n.NumberFormatSymbols_ha_Latn_GH', 'goog.i18n.NumberFormatSymbols_ha_Latn_NE', 'goog.i18n.NumberFormatSymbols_ha_Latn_NG', 'goog.i18n.NumberFormatSymbols_ha_NE', 'goog.i18n.NumberFormatSymbols_ha_NG', 'goog.i18n.NumberFormatSymbols_ha_SD', 'goog.i18n.NumberFormatSymbols_haw', 'goog.i18n.NumberFormatSymbols_haw_US', 'goog.i18n.NumberFormatSymbols_he', 'goog.i18n.NumberFormatSymbols_he_IL', 'goog.i18n.NumberFormatSymbols_hi', 'goog.i18n.NumberFormatSymbols_hi_IN', 'goog.i18n.NumberFormatSymbols_hr', 'goog.i18n.NumberFormatSymbols_hr_HR', 'goog.i18n.NumberFormatSymbols_hu', 'goog.i18n.NumberFormatSymbols_hu_HU', 'goog.i18n.NumberFormatSymbols_hy', 'goog.i18n.NumberFormatSymbols_hy_AM', 'goog.i18n.NumberFormatSymbols_ia', 'goog.i18n.NumberFormatSymbols_id', 'goog.i18n.NumberFormatSymbols_id_ID', 'goog.i18n.NumberFormatSymbols_ig', 'goog.i18n.NumberFormatSymbols_ig_NG', 'goog.i18n.NumberFormatSymbols_ii', 'goog.i18n.NumberFormatSymbols_ii_CN', 'goog.i18n.NumberFormatSymbols_in', 'goog.i18n.NumberFormatSymbols_is', 'goog.i18n.NumberFormatSymbols_is_IS', 'goog.i18n.NumberFormatSymbols_it', 'goog.i18n.NumberFormatSymbols_it_CH', 'goog.i18n.NumberFormatSymbols_it_IT', 'goog.i18n.NumberFormatSymbols_iu', 'goog.i18n.NumberFormatSymbols_iw', 'goog.i18n.NumberFormatSymbols_ja', 'goog.i18n.NumberFormatSymbols_ja_JP', 'goog.i18n.NumberFormatSymbols_ka', 'goog.i18n.NumberFormatSymbols_ka_GE', 'goog.i18n.NumberFormatSymbols_kaj', 'goog.i18n.NumberFormatSymbols_kaj_NG', 'goog.i18n.NumberFormatSymbols_kam', 'goog.i18n.NumberFormatSymbols_kam_KE', 'goog.i18n.NumberFormatSymbols_kcg', 'goog.i18n.NumberFormatSymbols_kcg_NG', 'goog.i18n.NumberFormatSymbols_kfo', 'goog.i18n.NumberFormatSymbols_kfo_CI', 'goog.i18n.NumberFormatSymbols_kk', 'goog.i18n.NumberFormatSymbols_kk_Cyrl', 'goog.i18n.NumberFormatSymbols_kk_Cyrl_KZ', 'goog.i18n.NumberFormatSymbols_kk_KZ', 'goog.i18n.NumberFormatSymbols_kl', 'goog.i18n.NumberFormatSymbols_kl_GL', 'goog.i18n.NumberFormatSymbols_km', 'goog.i18n.NumberFormatSymbols_km_KH', 'goog.i18n.NumberFormatSymbols_kn', 'goog.i18n.NumberFormatSymbols_kn_IN', 'goog.i18n.NumberFormatSymbols_ko', 'goog.i18n.NumberFormatSymbols_ko_KR', 'goog.i18n.NumberFormatSymbols_kok', 'goog.i18n.NumberFormatSymbols_kok_IN', 'goog.i18n.NumberFormatSymbols_kpe', 'goog.i18n.NumberFormatSymbols_kpe_GN', 'goog.i18n.NumberFormatSymbols_kpe_LR', 'goog.i18n.NumberFormatSymbols_ku', 'goog.i18n.NumberFormatSymbols_ku_Arab', 'goog.i18n.NumberFormatSymbols_ku_Arab_IQ', 'goog.i18n.NumberFormatSymbols_ku_Arab_IR', 'goog.i18n.NumberFormatSymbols_ku_Arab_SY', 'goog.i18n.NumberFormatSymbols_ku_IQ', 'goog.i18n.NumberFormatSymbols_ku_IR', 'goog.i18n.NumberFormatSymbols_ku_Latn', 'goog.i18n.NumberFormatSymbols_ku_Latn_TR', 'goog.i18n.NumberFormatSymbols_ku_SY', 'goog.i18n.NumberFormatSymbols_ku_TR', 'goog.i18n.NumberFormatSymbols_kw', 'goog.i18n.NumberFormatSymbols_kw_GB', 'goog.i18n.NumberFormatSymbols_ky', 'goog.i18n.NumberFormatSymbols_ky_KG', 'goog.i18n.NumberFormatSymbols_ln', 'goog.i18n.NumberFormatSymbols_ln_CD', 'goog.i18n.NumberFormatSymbols_ln_CG', 'goog.i18n.NumberFormatSymbols_lo', 'goog.i18n.NumberFormatSymbols_lo_LA', 'goog.i18n.NumberFormatSymbols_lt', 'goog.i18n.NumberFormatSymbols_lt_LT', 'goog.i18n.NumberFormatSymbols_lv', 'goog.i18n.NumberFormatSymbols_lv_LV', 'goog.i18n.NumberFormatSymbols_mk', 'goog.i18n.NumberFormatSymbols_mk_MK', 'goog.i18n.NumberFormatSymbols_ml', 'goog.i18n.NumberFormatSymbols_ml_IN', 'goog.i18n.NumberFormatSymbols_mn', 'goog.i18n.NumberFormatSymbols_mn_CN', 'goog.i18n.NumberFormatSymbols_mn_Cyrl', 'goog.i18n.NumberFormatSymbols_mn_Cyrl_MN', 'goog.i18n.NumberFormatSymbols_mn_MN', 'goog.i18n.NumberFormatSymbols_mn_Mong', 'goog.i18n.NumberFormatSymbols_mn_Mong_CN', 'goog.i18n.NumberFormatSymbols_mo', 'goog.i18n.NumberFormatSymbols_mr', 'goog.i18n.NumberFormatSymbols_mr_IN', 'goog.i18n.NumberFormatSymbols_ms', 'goog.i18n.NumberFormatSymbols_ms_BN', 'goog.i18n.NumberFormatSymbols_ms_MY', 'goog.i18n.NumberFormatSymbols_mt', 'goog.i18n.NumberFormatSymbols_mt_MT', 'goog.i18n.NumberFormatSymbols_my', 'goog.i18n.NumberFormatSymbols_my_MM', 'goog.i18n.NumberFormatSymbols_nb', 'goog.i18n.NumberFormatSymbols_nb_NO', 'goog.i18n.NumberFormatSymbols_nds', 'goog.i18n.NumberFormatSymbols_nds_DE', 'goog.i18n.NumberFormatSymbols_ne', 'goog.i18n.NumberFormatSymbols_ne_IN', 'goog.i18n.NumberFormatSymbols_ne_NP', 'goog.i18n.NumberFormatSymbols_nl', 'goog.i18n.NumberFormatSymbols_nl_BE', 'goog.i18n.NumberFormatSymbols_nl_NL', 'goog.i18n.NumberFormatSymbols_nn', 'goog.i18n.NumberFormatSymbols_nn_NO', 'goog.i18n.NumberFormatSymbols_no', 'goog.i18n.NumberFormatSymbols_nr', 'goog.i18n.NumberFormatSymbols_nr_ZA', 'goog.i18n.NumberFormatSymbols_nso', 'goog.i18n.NumberFormatSymbols_nso_ZA', 'goog.i18n.NumberFormatSymbols_ny', 'goog.i18n.NumberFormatSymbols_ny_MW', 'goog.i18n.NumberFormatSymbols_oc', 'goog.i18n.NumberFormatSymbols_oc_FR', 'goog.i18n.NumberFormatSymbols_om', 'goog.i18n.NumberFormatSymbols_om_ET', 'goog.i18n.NumberFormatSymbols_om_KE', 'goog.i18n.NumberFormatSymbols_or', 'goog.i18n.NumberFormatSymbols_or_IN', 'goog.i18n.NumberFormatSymbols_pa', 'goog.i18n.NumberFormatSymbols_pa_Arab', 'goog.i18n.NumberFormatSymbols_pa_Arab_PK', 'goog.i18n.NumberFormatSymbols_pa_Guru', 'goog.i18n.NumberFormatSymbols_pa_Guru_IN', 'goog.i18n.NumberFormatSymbols_pa_IN', 'goog.i18n.NumberFormatSymbols_pa_PK', 'goog.i18n.NumberFormatSymbols_pl', 'goog.i18n.NumberFormatSymbols_pl_PL', 'goog.i18n.NumberFormatSymbols_ps', 'goog.i18n.NumberFormatSymbols_ps_AF', 'goog.i18n.NumberFormatSymbols_pt', 'goog.i18n.NumberFormatSymbols_pt_BR', 'goog.i18n.NumberFormatSymbols_pt_PT', 'goog.i18n.NumberFormatSymbols_ro', 'goog.i18n.NumberFormatSymbols_ro_MD', 'goog.i18n.NumberFormatSymbols_ro_RO', 'goog.i18n.NumberFormatSymbols_ru', 'goog.i18n.NumberFormatSymbols_ru_RU', 'goog.i18n.NumberFormatSymbols_ru_UA', 'goog.i18n.NumberFormatSymbols_rw', 'goog.i18n.NumberFormatSymbols_rw_RW', 'goog.i18n.NumberFormatSymbols_sa', 'goog.i18n.NumberFormatSymbols_sa_IN', 'goog.i18n.NumberFormatSymbols_se', 'goog.i18n.NumberFormatSymbols_se_FI', 'goog.i18n.NumberFormatSymbols_se_NO', 'goog.i18n.NumberFormatSymbols_sh', 'goog.i18n.NumberFormatSymbols_sh_BA', 'goog.i18n.NumberFormatSymbols_sh_CS', 'goog.i18n.NumberFormatSymbols_sh_YU', 'goog.i18n.NumberFormatSymbols_si', 'goog.i18n.NumberFormatSymbols_si_LK', 'goog.i18n.NumberFormatSymbols_sid', 'goog.i18n.NumberFormatSymbols_sid_ET', 'goog.i18n.NumberFormatSymbols_sk', 'goog.i18n.NumberFormatSymbols_sk_SK', 'goog.i18n.NumberFormatSymbols_sl', 'goog.i18n.NumberFormatSymbols_sl_SI', 'goog.i18n.NumberFormatSymbols_so', 'goog.i18n.NumberFormatSymbols_so_DJ', 'goog.i18n.NumberFormatSymbols_so_ET', 'goog.i18n.NumberFormatSymbols_so_KE', 'goog.i18n.NumberFormatSymbols_so_SO', 'goog.i18n.NumberFormatSymbols_sq', 'goog.i18n.NumberFormatSymbols_sq_AL', 'goog.i18n.NumberFormatSymbols_sr', 'goog.i18n.NumberFormatSymbols_sr_BA', 'goog.i18n.NumberFormatSymbols_sr_CS', 'goog.i18n.NumberFormatSymbols_sr_Cyrl', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_BA', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_CS', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_ME', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_RS', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_YU', 'goog.i18n.NumberFormatSymbols_sr_Latn', 'goog.i18n.NumberFormatSymbols_sr_Latn_BA', 'goog.i18n.NumberFormatSymbols_sr_Latn_CS', 'goog.i18n.NumberFormatSymbols_sr_Latn_ME', 'goog.i18n.NumberFormatSymbols_sr_Latn_RS', 'goog.i18n.NumberFormatSymbols_sr_Latn_YU', 'goog.i18n.NumberFormatSymbols_sr_ME', 'goog.i18n.NumberFormatSymbols_sr_RS', 'goog.i18n.NumberFormatSymbols_sr_YU', 'goog.i18n.NumberFormatSymbols_ss', 'goog.i18n.NumberFormatSymbols_ss_SZ', 'goog.i18n.NumberFormatSymbols_ss_ZA', 'goog.i18n.NumberFormatSymbols_st', 'goog.i18n.NumberFormatSymbols_st_LS', 'goog.i18n.NumberFormatSymbols_st_ZA', 'goog.i18n.NumberFormatSymbols_sv', 'goog.i18n.NumberFormatSymbols_sv_FI', 'goog.i18n.NumberFormatSymbols_sv_SE', 'goog.i18n.NumberFormatSymbols_sw', 'goog.i18n.NumberFormatSymbols_sw_KE', 'goog.i18n.NumberFormatSymbols_sw_TZ', 'goog.i18n.NumberFormatSymbols_syr', 'goog.i18n.NumberFormatSymbols_syr_SY', 'goog.i18n.NumberFormatSymbols_ta', 'goog.i18n.NumberFormatSymbols_ta_IN', 'goog.i18n.NumberFormatSymbols_te', 'goog.i18n.NumberFormatSymbols_te_IN', 'goog.i18n.NumberFormatSymbols_tg', 'goog.i18n.NumberFormatSymbols_tg_Cyrl', 'goog.i18n.NumberFormatSymbols_tg_Cyrl_TJ', 'goog.i18n.NumberFormatSymbols_tg_TJ', 'goog.i18n.NumberFormatSymbols_th', 'goog.i18n.NumberFormatSymbols_th_TH', 'goog.i18n.NumberFormatSymbols_ti', 'goog.i18n.NumberFormatSymbols_ti_ER', 'goog.i18n.NumberFormatSymbols_ti_ET', 'goog.i18n.NumberFormatSymbols_tig', 'goog.i18n.NumberFormatSymbols_tig_ER', 'goog.i18n.NumberFormatSymbols_tl', 'goog.i18n.NumberFormatSymbols_tl_PH', 'goog.i18n.NumberFormatSymbols_tn', 'goog.i18n.NumberFormatSymbols_tn_ZA', 'goog.i18n.NumberFormatSymbols_to', 'goog.i18n.NumberFormatSymbols_to_TO', 'goog.i18n.NumberFormatSymbols_tr', 'goog.i18n.NumberFormatSymbols_tr_TR', 'goog.i18n.NumberFormatSymbols_trv', 'goog.i18n.NumberFormatSymbols_trv_TW', 'goog.i18n.NumberFormatSymbols_ts', 'goog.i18n.NumberFormatSymbols_ts_ZA', 'goog.i18n.NumberFormatSymbols_tt', 'goog.i18n.NumberFormatSymbols_tt_RU', 'goog.i18n.NumberFormatSymbols_ug', 'goog.i18n.NumberFormatSymbols_ug_Arab', 'goog.i18n.NumberFormatSymbols_ug_Arab_CN', 'goog.i18n.NumberFormatSymbols_ug_CN', 'goog.i18n.NumberFormatSymbols_uk', 'goog.i18n.NumberFormatSymbols_uk_UA', 'goog.i18n.NumberFormatSymbols_ur', 'goog.i18n.NumberFormatSymbols_ur_IN', 'goog.i18n.NumberFormatSymbols_ur_PK', 'goog.i18n.NumberFormatSymbols_uz', 'goog.i18n.NumberFormatSymbols_uz_AF', 'goog.i18n.NumberFormatSymbols_uz_Arab', 'goog.i18n.NumberFormatSymbols_uz_Arab_AF', 'goog.i18n.NumberFormatSymbols_uz_Cyrl', 'goog.i18n.NumberFormatSymbols_uz_Cyrl_UZ', 'goog.i18n.NumberFormatSymbols_uz_Latn', 'goog.i18n.NumberFormatSymbols_uz_Latn_UZ', 'goog.i18n.NumberFormatSymbols_uz_UZ', 'goog.i18n.NumberFormatSymbols_ve', 'goog.i18n.NumberFormatSymbols_ve_ZA', 'goog.i18n.NumberFormatSymbols_vi', 'goog.i18n.NumberFormatSymbols_vi_VN', 'goog.i18n.NumberFormatSymbols_wal', 'goog.i18n.NumberFormatSymbols_wal_ET', 'goog.i18n.NumberFormatSymbols_wo', 'goog.i18n.NumberFormatSymbols_wo_Latn', 'goog.i18n.NumberFormatSymbols_wo_Latn_SN', 'goog.i18n.NumberFormatSymbols_wo_SN', 'goog.i18n.NumberFormatSymbols_xh', 'goog.i18n.NumberFormatSymbols_xh_ZA', 'goog.i18n.NumberFormatSymbols_yo', 'goog.i18n.NumberFormatSymbols_yo_NG', 'goog.i18n.NumberFormatSymbols_zh', 'goog.i18n.NumberFormatSymbols_zh_CN', 'goog.i18n.NumberFormatSymbols_zh_HK', 'goog.i18n.NumberFormatSymbols_zh_Hans', 'goog.i18n.NumberFormatSymbols_zh_Hans_CN', 'goog.i18n.NumberFormatSymbols_zh_Hans_HK', 'goog.i18n.NumberFormatSymbols_zh_Hans_MO', 'goog.i18n.NumberFormatSymbols_zh_Hans_SG', 'goog.i18n.NumberFormatSymbols_zh_Hant', 'goog.i18n.NumberFormatSymbols_zh_Hant_HK', 'goog.i18n.NumberFormatSymbols_zh_Hant_MO', 'goog.i18n.NumberFormatSymbols_zh_Hant_TW', 'goog.i18n.NumberFormatSymbols_zh_MO', 'goog.i18n.NumberFormatSymbols_zh_SG', 'goog.i18n.NumberFormatSymbols_zh_TW', 'goog.i18n.NumberFormatSymbols_zu', 'goog.i18n.NumberFormatSymbols_zu_ZA'], []);
-goog.addDependency('i18n/timezone.js', ['goog.i18n.TimeZone'], ['goog.array', 'goog.string']);
+goog.addDependency('i18n/messageformat.js', ['goog.i18n.MessageFormat'], ['goog.asserts', 'goog.i18n.NumberFormat', 'goog.i18n.ordinalRules', 'goog.i18n.pluralRules']);
+goog.addDependency('i18n/mime.js', ['goog.i18n.mime', 'goog.i18n.mime.encode'], ['goog.array']);
+goog.addDependency('i18n/numberformat.js', ['goog.i18n.NumberFormat', 'goog.i18n.NumberFormat.CurrencyStyle', 'goog.i18n.NumberFormat.Format'], ['goog.asserts', 'goog.i18n.CompactNumberFormatSymbols', 'goog.i18n.NumberFormatSymbols', 'goog.i18n.currency', 'goog.math']);
+goog.addDependency('i18n/numberformatsymbols.js', ['goog.i18n.NumberFormatSymbols', 'goog.i18n.NumberFormatSymbols_af', 'goog.i18n.NumberFormatSymbols_af_ZA', 'goog.i18n.NumberFormatSymbols_am', 'goog.i18n.NumberFormatSymbols_am_ET', 'goog.i18n.NumberFormatSymbols_ar', 'goog.i18n.NumberFormatSymbols_ar_001', 'goog.i18n.NumberFormatSymbols_ar_EG', 'goog.i18n.NumberFormatSymbols_bg', 'goog.i18n.NumberFormatSymbols_bg_BG', 'goog.i18n.NumberFormatSymbols_bn', 'goog.i18n.NumberFormatSymbols_bn_BD', 'goog.i18n.NumberFormatSymbols_br', 'goog.i18n.NumberFormatSymbols_br_FR', 'goog.i18n.NumberFormatSymbols_ca', 'goog.i18n.NumberFormatSymbols_ca_AD', 'goog.i18n.NumberFormatSymbols_ca_ES', 'goog.i18n.NumberFormatSymbols_chr', 'goog.i18n.NumberFormatSymbols_chr_US', 'goog.i18n.NumberFormatSymbols_cs', 'goog.i18n.NumberFormatSymbols_cs_CZ', 'goog.i18n.NumberFormatSymbols_cy', 'goog.i18n.NumberFormatSymbols_cy_GB', 'goog.i18n.NumberFormatSymbols_da', 'goog.i18n.NumberFormatSymbols_da_DK', 'goog.i18n.NumberFormatSymbols_de', 'goog.i18n.NumberFormatSymbols_de_AT', 'goog.i18n.NumberFormatSymbols_de_BE', 'goog.i18n.NumberFormatSymbols_de_CH', 'goog.i18n.NumberFormatSymbols_de_DE', 'goog.i18n.NumberFormatSymbols_de_LU', 'goog.i18n.NumberFormatSymbols_el', 'goog.i18n.NumberFormatSymbols_el_GR', 'goog.i18n.NumberFormatSymbols_en', 'goog.i18n.NumberFormatSymbols_en_AS', 'goog.i18n.NumberFormatSymbols_en_AU', 'goog.i18n.NumberFormatSymbols_en_Dsrt_US', 'goog.i18n.NumberFormatSymbols_en_FM', 'goog.i18n.NumberFormatSymbols_en_GB', 'goog.i18n.NumberFormatSymbols_en_GU', 'goog.i18n.NumberFormatSymbols_en_IE', 'goog.i18n.NumberFormatSymbols_en_IN', 'goog.i18n.NumberFormatSymbols_en_MH', 'goog.i18n.NumberFormatSymbols_en_MP', 'goog.i18n.NumberFormatSymbols_en_PR', 'goog.i18n.NumberFormatSymbols_en_PW', 'goog.i18n.NumberFormatSymbols_en_SG', 'goog.i18n.NumberFormatSymbols_en_TC', 'goog.i18n.NumberFormatSymbols_en_UM', 'goog.i18n.NumberFormatSymbols_en_US', 'goog.i18n.NumberFormatSymbols_en_VG', 'goog.i18n.NumberFormatSymbols_en_VI', 'goog.i18n.NumberFormatSymbols_en_ZA', 'goog.i18n.NumberFormatSymbols_es', 'goog.i18n.NumberFormatSymbols_es_419', 'goog.i18n.NumberFormatSymbols_es_EA', 'goog.i18n.NumberFormatSymbols_es_ES', 'goog.i18n.NumberFormatSymbols_es_IC', 'goog.i18n.NumberFormatSymbols_et', 'goog.i18n.NumberFormatSymbols_et_EE', 'goog.i18n.NumberFormatSymbols_eu', 'goog.i18n.NumberFormatSymbols_eu_ES', 'goog.i18n.NumberFormatSymbols_fa', 'goog.i18n.NumberFormatSymbols_fa_IR', 'goog.i18n.NumberFormatSymbols_fi', 'goog.i18n.NumberFormatSymbols_fi_FI', 'goog.i18n.NumberFormatSymbols_fil', 'goog.i18n.NumberFormatSymbols_fil_PH', 'goog.i18n.NumberFormatSymbols_fr', 'goog.i18n.NumberFormatSymbols_fr_BL', 'goog.i18n.NumberFormatSymbols_fr_CA', 'goog.i18n.NumberFormatSymbols_fr_FR', 'goog.i18n.NumberFormatSymbols_fr_GF', 'goog.i18n.NumberFormatSymbols_fr_GP', 'goog.i18n.NumberFormatSymbols_fr_MC', 'goog.i18n.NumberFormatSymbols_fr_MF', 'goog.i18n.NumberFormatSymbols_fr_MQ', 'goog.i18n.NumberFormatSymbols_fr_RE', 'goog.i18n.NumberFormatSymbols_fr_YT', 'goog.i18n.NumberFormatSymbols_gl', 'goog.i18n.NumberFormatSymbols_gl_ES', 'goog.i18n.NumberFormatSymbols_gsw', 'goog.i18n.NumberFormatSymbols_gsw_CH', 'goog.i18n.NumberFormatSymbols_gu', 'goog.i18n.NumberFormatSymbols_gu_IN', 'goog.i18n.NumberFormatSymbols_haw', 'goog.i18n.NumberFormatSymbols_haw_US', 'goog.i18n.NumberFormatSymbols_he', 'goog.i18n.NumberFormatSymbols_he_IL', 'goog.i18n.NumberFormatSymbols_hi', 'goog.i18n.NumberFormatSymbols_hi_IN', 'goog.i18n.NumberFormatSymbols_hr', 'goog.i18n.NumberFormatSymbols_hr_HR', 'goog.i18n.NumberFormatSymbols_hu', 'goog.i18n.NumberFormatSymbols_hu_HU', 'goog.i18n.NumberFormatSymbols_id', 'goog.i18n.NumberFormatSymbols_id_ID', 'goog.i18n.NumberFormatSymbols_in', 'goog.i18n.NumberFormatSymbols_is', 'goog.i18n.NumberFormatSymbols_is_IS', 'goog.i18n.NumberFormatSymbols_it', 'goog.i18n.NumberFormatSymbols_it_IT', 'goog.i18n.NumberFormatSymbols_it_SM', 'goog.i18n.NumberFormatSymbols_iw', 'goog.i18n.NumberFormatSymbols_ja', 'goog.i18n.NumberFormatSymbols_ja_JP', 'goog.i18n.NumberFormatSymbols_kn', 'goog.i18n.NumberFormatSymbols_kn_IN', 'goog.i18n.NumberFormatSymbols_ko', 'goog.i18n.NumberFormatSymbols_ko_KR', 'goog.i18n.NumberFormatSymbols_ln', 'goog.i18n.NumberFormatSymbols_ln_CD', 'goog.i18n.NumberFormatSymbols_lt', 'goog.i18n.NumberFormatSymbols_lt_LT', 'goog.i18n.NumberFormatSymbols_lv', 'goog.i18n.NumberFormatSymbols_lv_LV', 'goog.i18n.NumberFormatSymbols_ml', 'goog.i18n.NumberFormatSymbols_ml_IN', 'goog.i18n.NumberFormatSymbols_mr', 'goog.i18n.NumberFormatSymbols_mr_IN', 'goog.i18n.NumberFormatSymbols_ms', 'goog.i18n.NumberFormatSymbols_ms_Latn_MY', 'goog.i18n.NumberFormatSymbols_mt', 'goog.i18n.NumberFormatSymbols_mt_MT', 'goog.i18n.NumberFormatSymbols_nb', 'goog.i18n.NumberFormatSymbols_nb_NO', 'goog.i18n.NumberFormatSymbols_nl', 'goog.i18n.NumberFormatSymbols_nl_NL', 'goog.i18n.NumberFormatSymbols_no', 'goog.i18n.NumberFormatSymbols_or', 'goog.i18n.NumberFormatSymbols_or_IN', 'goog.i18n.NumberFormatSymbols_pl', 'goog.i18n.NumberFormatSymbols_pl_PL', 'goog.i18n.NumberFormatSymbols_pt', 'goog.i18n.NumberFormatSymbols_pt_BR', 'goog.i18n.NumberFormatSymbols_pt_PT', 'goog.i18n.NumberFormatSymbols_ro', 'goog.i18n.NumberFormatSymbols_ro_RO', 'goog.i18n.NumberFormatSymbols_ru', 'goog.i18n.NumberFormatSymbols_ru_RU', 'goog.i18n.NumberFormatSymbols_sk', 'goog.i18n.NumberFormatSymbols_sk_SK', 'goog.i18n.NumberFormatSymbols_sl', 'goog.i18n.NumberFormatSymbols_sl_SI', 'goog.i18n.NumberFormatSymbols_sq', 'goog.i18n.NumberFormatSymbols_sq_AL', 'goog.i18n.NumberFormatSymbols_sr', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_RS', 'goog.i18n.NumberFormatSymbols_sv', 'goog.i18n.NumberFormatSymbols_sv_SE', 'goog.i18n.NumberFormatSymbols_sw', 'goog.i18n.NumberFormatSymbols_sw_TZ', 'goog.i18n.NumberFormatSymbols_ta', 'goog.i18n.NumberFormatSymbols_ta_IN', 'goog.i18n.NumberFormatSymbols_te', 'goog.i18n.NumberFormatSymbols_te_IN', 'goog.i18n.NumberFormatSymbols_th', 'goog.i18n.NumberFormatSymbols_th_TH', 'goog.i18n.NumberFormatSymbols_tl', 'goog.i18n.NumberFormatSymbols_tr', 'goog.i18n.NumberFormatSymbols_tr_TR', 'goog.i18n.NumberFormatSymbols_uk', 'goog.i18n.NumberFormatSymbols_uk_UA', 'goog.i18n.NumberFormatSymbols_ur', 'goog.i18n.NumberFormatSymbols_ur_PK', 'goog.i18n.NumberFormatSymbols_vi', 'goog.i18n.NumberFormatSymbols_vi_VN', 'goog.i18n.NumberFormatSymbols_zh', 'goog.i18n.NumberFormatSymbols_zh_CN', 'goog.i18n.NumberFormatSymbols_zh_HK', 'goog.i18n.NumberFormatSymbols_zh_Hans_CN', 'goog.i18n.NumberFormatSymbols_zh_TW', 'goog.i18n.NumberFormatSymbols_zu', 'goog.i18n.NumberFormatSymbols_zu_ZA'], []);
+goog.addDependency('i18n/numberformatsymbolsext.js', ['goog.i18n.NumberFormatSymbolsExt', 'goog.i18n.NumberFormatSymbols_aa', 'goog.i18n.NumberFormatSymbols_aa_DJ', 'goog.i18n.NumberFormatSymbols_aa_ER', 'goog.i18n.NumberFormatSymbols_aa_ET', 'goog.i18n.NumberFormatSymbols_af_NA', 'goog.i18n.NumberFormatSymbols_agq', 'goog.i18n.NumberFormatSymbols_agq_CM', 'goog.i18n.NumberFormatSymbols_ak', 'goog.i18n.NumberFormatSymbols_ak_GH', 'goog.i18n.NumberFormatSymbols_ar_AE', 'goog.i18n.NumberFormatSymbols_ar_BH', 'goog.i18n.NumberFormatSymbols_ar_DJ', 'goog.i18n.NumberFormatSymbols_ar_DZ', 'goog.i18n.NumberFormatSymbols_ar_EH', 'goog.i18n.NumberFormatSymbols_ar_ER', 'goog.i18n.NumberFormatSymbols_ar_IL', 'goog.i18n.NumberFormatSymbols_ar_IQ', 'goog.i18n.NumberFormatSymbols_ar_JO', 'goog.i18n.NumberFormatSymbols_ar_KM', 'goog.i18n.NumberFormatSymbols_ar_KW', 'goog.i18n.NumberFormatSymbols_ar_LB', 'goog.i18n.NumberFormatSymbols_ar_LY', 'goog.i18n.NumberFormatSymbols_ar_MA', 'goog.i18n.NumberFormatSymbols_ar_MR', 'goog.i18n.NumberFormatSymbols_ar_OM', 'goog.i18n.NumberFormatSymbols_ar_PS', 'goog.i18n.NumberFormatSymbols_ar_QA', 'goog.i18n.NumberFormatSymbols_ar_SA', 'goog.i18n.NumberFormatSymbols_ar_SD', 'goog.i18n.NumberFormatSymbols_ar_SO', 'goog.i18n.NumberFormatSymbols_ar_SY', 'goog.i18n.NumberFormatSymbols_ar_TD', 'goog.i18n.NumberFormatSymbols_ar_TN', 'goog.i18n.NumberFormatSymbols_ar_YE', 'goog.i18n.NumberFormatSymbols_as', 'goog.i18n.NumberFormatSymbols_as_IN', 'goog.i18n.NumberFormatSymbols_asa', 'goog.i18n.NumberFormatSymbols_asa_TZ', 'goog.i18n.NumberFormatSymbols_ast', 'goog.i18n.NumberFormatSymbols_ast_ES', 'goog.i18n.NumberFormatSymbols_az', 'goog.i18n.NumberFormatSymbols_az_Cyrl', 'goog.i18n.NumberFormatSymbols_az_Cyrl_AZ', 'goog.i18n.NumberFormatSymbols_az_Latn', 'goog.i18n.NumberFormatSymbols_az_Latn_AZ', 'goog.i18n.NumberFormatSymbols_bas', 'goog.i18n.NumberFormatSymbols_bas_CM', 'goog.i18n.NumberFormatSymbols_be', 'goog.i18n.NumberFormatSymbols_be_BY', 'goog.i18n.NumberFormatSymbols_bem', 'goog.i18n.NumberFormatSymbols_bem_ZM', 'goog.i18n.NumberFormatSymbols_bez', 'goog.i18n.NumberFormatSymbols_bez_TZ', 'goog.i18n.NumberFormatSymbols_bm', 'goog.i18n.NumberFormatSymbols_bm_ML', 'goog.i18n.NumberFormatSymbols_bn_IN', 'goog.i18n.NumberFormatSymbols_bo', 'goog.i18n.NumberFormatSymbols_bo_CN', 'goog.i18n.NumberFormatSymbols_bo_IN', 'goog.i18n.NumberFormatSymbols_brx', 'goog.i18n.NumberFormatSymbols_brx_IN', 'goog.i18n.NumberFormatSymbols_bs', 'goog.i18n.NumberFormatSymbols_bs_Cyrl', 'goog.i18n.NumberFormatSymbols_bs_Cyrl_BA', 'goog.i18n.NumberFormatSymbols_bs_Latn', 'goog.i18n.NumberFormatSymbols_bs_Latn_BA', 'goog.i18n.NumberFormatSymbols_byn', 'goog.i18n.NumberFormatSymbols_byn_ER', 'goog.i18n.NumberFormatSymbols_cgg', 'goog.i18n.NumberFormatSymbols_cgg_UG', 'goog.i18n.NumberFormatSymbols_ckb', 'goog.i18n.NumberFormatSymbols_ckb_Arab', 'goog.i18n.NumberFormatSymbols_ckb_Arab_IQ', 'goog.i18n.NumberFormatSymbols_ckb_Arab_IR', 'goog.i18n.NumberFormatSymbols_ckb_IQ', 'goog.i18n.NumberFormatSymbols_ckb_IR', 'goog.i18n.NumberFormatSymbols_ckb_Latn', 'goog.i18n.NumberFormatSymbols_ckb_Latn_IQ', 'goog.i18n.NumberFormatSymbols_dav', 'goog.i18n.NumberFormatSymbols_dav_KE', 'goog.i18n.NumberFormatSymbols_de_LI', 'goog.i18n.NumberFormatSymbols_dje', 'goog.i18n.NumberFormatSymbols_dje_NE', 'goog.i18n.NumberFormatSymbols_dua', 'goog.i18n.NumberFormatSymbols_dua_CM', 'goog.i18n.NumberFormatSymbols_dyo', 'goog.i18n.NumberFormatSymbols_dyo_SN', 'goog.i18n.NumberFormatSymbols_dz', 'goog.i18n.NumberFormatSymbols_dz_BT', 'goog.i18n.NumberFormatSymbols_ebu', 'goog.i18n.NumberFormatSymbols_ebu_KE', 'goog.i18n.NumberFormatSymbols_ee', 'goog.i18n.NumberFormatSymbols_ee_GH', 'goog.i18n.NumberFormatSymbols_ee_TG', 'goog.i18n.NumberFormatSymbols_el_CY', 'goog.i18n.NumberFormatSymbols_en_150', 'goog.i18n.NumberFormatSymbols_en_AG', 'goog.i18n.NumberFormatSymbols_en_BB', 'goog.i18n.NumberFormatSymbols_en_BE', 'goog.i18n.NumberFormatSymbols_en_BM', 'goog.i18n.NumberFormatSymbols_en_BS', 'goog.i18n.NumberFormatSymbols_en_BW', 'goog.i18n.NumberFormatSymbols_en_BZ', 'goog.i18n.NumberFormatSymbols_en_CA', 'goog.i18n.NumberFormatSymbols_en_CM', 'goog.i18n.NumberFormatSymbols_en_DM', 'goog.i18n.NumberFormatSymbols_en_Dsrt', 'goog.i18n.NumberFormatSymbols_en_FJ', 'goog.i18n.NumberFormatSymbols_en_GD', 'goog.i18n.NumberFormatSymbols_en_GG', 'goog.i18n.NumberFormatSymbols_en_GH', 'goog.i18n.NumberFormatSymbols_en_GI', 'goog.i18n.NumberFormatSymbols_en_GM', 'goog.i18n.NumberFormatSymbols_en_GY', 'goog.i18n.NumberFormatSymbols_en_HK', 'goog.i18n.NumberFormatSymbols_en_IM', 'goog.i18n.NumberFormatSymbols_en_JE', 'goog.i18n.NumberFormatSymbols_en_JM', 'goog.i18n.NumberFormatSymbols_en_KE', 'goog.i18n.NumberFormatSymbols_en_KI', 'goog.i18n.NumberFormatSymbols_en_KN', 'goog.i18n.NumberFormatSymbols_en_KY', 'goog.i18n.NumberFormatSymbols_en_LC', 'goog.i18n.NumberFormatSymbols_en_LR', 'goog.i18n.NumberFormatSymbols_en_LS', 'goog.i18n.NumberFormatSymbols_en_MG', 'goog.i18n.NumberFormatSymbols_en_MT', 'goog.i18n.NumberFormatSymbols_en_MU', 'goog.i18n.NumberFormatSymbols_en_MW', 'goog.i18n.NumberFormatSymbols_en_NA', 'goog.i18n.NumberFormatSymbols_en_NG', 'goog.i18n.NumberFormatSymbols_en_NZ', 'goog.i18n.NumberFormatSymbols_en_PG', 'goog.i18n.NumberFormatSymbols_en_PH', 'goog.i18n.NumberFormatSymbols_en_PK', 'goog.i18n.NumberFormatSymbols_en_SB', 'goog.i18n.NumberFormatSymbols_en_SC', 'goog.i18n.NumberFormatSymbols_en_SL', 'goog.i18n.NumberFormatSymbols_en_SS', 'goog.i18n.NumberFormatSymbols_en_SZ', 'goog.i18n.NumberFormatSymbols_en_TO', 'goog.i18n.NumberFormatSymbols_en_TT', 'goog.i18n.NumberFormatSymbols_en_TZ', 'goog.i18n.NumberFormatSymbols_en_UG', 'goog.i18n.NumberFormatSymbols_en_VC', 'goog.i18n.NumberFormatSymbols_en_VU', 'goog.i18n.NumberFormatSymbols_en_WS', 'goog.i18n.NumberFormatSymbols_en_ZM', 'goog.i18n.NumberFormatSymbols_en_ZW', 'goog.i18n.NumberFormatSymbols_eo', 'goog.i18n.NumberFormatSymbols_es_AR', 'goog.i18n.NumberFormatSymbols_es_BO', 'goog.i18n.NumberFormatSymbols_es_CL', 'goog.i18n.NumberFormatSymbols_es_CO', 'goog.i18n.NumberFormatSymbols_es_CR', 'goog.i18n.NumberFormatSymbols_es_CU', 'goog.i18n.NumberFormatSymbols_es_DO', 'goog.i18n.NumberFormatSymbols_es_EC', 'goog.i18n.NumberFormatSymbols_es_GQ', 'goog.i18n.NumberFormatSymbols_es_GT', 'goog.i18n.NumberFormatSymbols_es_HN', 'goog.i18n.NumberFormatSymbols_es_MX', 'goog.i18n.NumberFormatSymbols_es_NI', 'goog.i18n.NumberFormatSymbols_es_PA', 'goog.i18n.NumberFormatSymbols_es_PE', 'goog.i18n.NumberFormatSymbols_es_PH', 'goog.i18n.NumberFormatSymbols_es_PR', 'goog.i18n.NumberFormatSymbols_es_PY', 'goog.i18n.NumberFormatSymbols_es_SV', 'goog.i18n.NumberFormatSymbols_es_US', 'goog.i18n.NumberFormatSymbols_es_UY', 'goog.i18n.NumberFormatSymbols_es_VE', 'goog.i18n.NumberFormatSymbols_ewo', 'goog.i18n.NumberFormatSymbols_ewo_CM', 'goog.i18n.NumberFormatSymbols_fa_AF', 'goog.i18n.NumberFormatSymbols_ff', 'goog.i18n.NumberFormatSymbols_ff_SN', 'goog.i18n.NumberFormatSymbols_fo', 'goog.i18n.NumberFormatSymbols_fo_FO', 'goog.i18n.NumberFormatSymbols_fr_BE', 'goog.i18n.NumberFormatSymbols_fr_BF', 'goog.i18n.NumberFormatSymbols_fr_BI', 'goog.i18n.NumberFormatSymbols_fr_BJ', 'goog.i18n.NumberFormatSymbols_fr_CD', 'goog.i18n.NumberFormatSymbols_fr_CF', 'goog.i18n.NumberFormatSymbols_fr_CG', 'goog.i18n.NumberFormatSymbols_fr_CH', 'goog.i18n.NumberFormatSymbols_fr_CI', 'goog.i18n.NumberFormatSymbols_fr_CM', 'goog.i18n.NumberFormatSymbols_fr_DJ', 'goog.i18n.NumberFormatSymbols_fr_DZ', 'goog.i18n.NumberFormatSymbols_fr_GA', 'goog.i18n.NumberFormatSymbols_fr_GN', 'goog.i18n.NumberFormatSymbols_fr_GQ', 'goog.i18n.NumberFormatSymbols_fr_HT', 'goog.i18n.NumberFormatSymbols_fr_KM', 'goog.i18n.NumberFormatSymbols_fr_LU', 'goog.i18n.NumberFormatSymbols_fr_MA', 'goog.i18n.NumberFormatSymbols_fr_MG', 'goog.i18n.NumberFormatSymbols_fr_ML', 'goog.i18n.NumberFormatSymbols_fr_MR', 'goog.i18n.NumberFormatSymbols_fr_MU', 'goog.i18n.NumberFormatSymbols_fr_NC', 'goog.i18n.NumberFormatSymbols_fr_NE', 'goog.i18n.NumberFormatSymbols_fr_PF', 'goog.i18n.NumberFormatSymbols_fr_RW', 'goog.i18n.NumberFormatSymbols_fr_SC', 'goog.i18n.NumberFormatSymbols_fr_SN', 'goog.i18n.NumberFormatSymbols_fr_SY', 'goog.i18n.NumberFormatSymbols_fr_TD', 'goog.i18n.NumberFormatSymbols_fr_TG', 'goog.i18n.NumberFormatSymbols_fr_TN', 'goog.i18n.NumberFormatSymbols_fr_VU', 'goog.i18n.NumberFormatSymbols_fur', 'goog.i18n.NumberFormatSymbols_fur_IT', 'goog.i18n.NumberFormatSymbols_ga', 'goog.i18n.NumberFormatSymbols_ga_IE', 'goog.i18n.NumberFormatSymbols_gd', 'goog.i18n.NumberFormatSymbols_gd_GB', 'goog.i18n.NumberFormatSymbols_guz', 'goog.i18n.NumberFormatSymbols_guz_KE', 'goog.i18n.NumberFormatSymbols_gv', 'goog.i18n.NumberFormatSymbols_gv_GB', 'goog.i18n.NumberFormatSymbols_ha', 'goog.i18n.NumberFormatSymbols_ha_Latn', 'goog.i18n.NumberFormatSymbols_ha_Latn_GH', 'goog.i18n.NumberFormatSymbols_ha_Latn_NE', 'goog.i18n.NumberFormatSymbols_ha_Latn_NG', 'goog.i18n.NumberFormatSymbols_hr_BA', 'goog.i18n.NumberFormatSymbols_hy', 'goog.i18n.NumberFormatSymbols_hy_AM', 'goog.i18n.NumberFormatSymbols_ia', 'goog.i18n.NumberFormatSymbols_ia_FR', 'goog.i18n.NumberFormatSymbols_ig', 'goog.i18n.NumberFormatSymbols_ig_NG', 'goog.i18n.NumberFormatSymbols_ii', 'goog.i18n.NumberFormatSymbols_ii_CN', 'goog.i18n.NumberFormatSymbols_it_CH', 'goog.i18n.NumberFormatSymbols_jgo', 'goog.i18n.NumberFormatSymbols_jgo_CM', 'goog.i18n.NumberFormatSymbols_jmc', 'goog.i18n.NumberFormatSymbols_jmc_TZ', 'goog.i18n.NumberFormatSymbols_ka', 'goog.i18n.NumberFormatSymbols_ka_GE', 'goog.i18n.NumberFormatSymbols_kab', 'goog.i18n.NumberFormatSymbols_kab_DZ', 'goog.i18n.NumberFormatSymbols_kam', 'goog.i18n.NumberFormatSymbols_kam_KE', 'goog.i18n.NumberFormatSymbols_kde', 'goog.i18n.NumberFormatSymbols_kde_TZ', 'goog.i18n.NumberFormatSymbols_kea', 'goog.i18n.NumberFormatSymbols_kea_CV', 'goog.i18n.NumberFormatSymbols_khq', 'goog.i18n.NumberFormatSymbols_khq_ML', 'goog.i18n.NumberFormatSymbols_ki', 'goog.i18n.NumberFormatSymbols_ki_KE', 'goog.i18n.NumberFormatSymbols_kk', 'goog.i18n.NumberFormatSymbols_kk_Cyrl', 'goog.i18n.NumberFormatSymbols_kk_Cyrl_KZ', 'goog.i18n.NumberFormatSymbols_kkj', 'goog.i18n.NumberFormatSymbols_kkj_CM', 'goog.i18n.NumberFormatSymbols_kl', 'goog.i18n.NumberFormatSymbols_kl_GL', 'goog.i18n.NumberFormatSymbols_kln', 'goog.i18n.NumberFormatSymbols_kln_KE', 'goog.i18n.NumberFormatSymbols_km', 'goog.i18n.NumberFormatSymbols_km_KH', 'goog.i18n.NumberFormatSymbols_ko_KP', 'goog.i18n.NumberFormatSymbols_kok', 'goog.i18n.NumberFormatSymbols_kok_IN', 'goog.i18n.NumberFormatSymbols_ks', 'goog.i18n.NumberFormatSymbols_ks_Arab', 'goog.i18n.NumberFormatSymbols_ks_Arab_IN', 'goog.i18n.NumberFormatSymbols_ksb', 'goog.i18n.NumberFormatSymbols_ksb_TZ', 'goog.i18n.NumberFormatSymbols_ksf', 'goog.i18n.NumberFormatSymbols_ksf_CM', 'goog.i18n.NumberFormatSymbols_ksh', 'goog.i18n.NumberFormatSymbols_ksh_DE', 'goog.i18n.NumberFormatSymbols_kw', 'goog.i18n.NumberFormatSymbols_kw_GB', 'goog.i18n.NumberFormatSymbols_ky', 'goog.i18n.NumberFormatSymbols_ky_KG', 'goog.i18n.NumberFormatSymbols_lag', 'goog.i18n.NumberFormatSymbols_lag_TZ', 'goog.i18n.NumberFormatSymbols_lg', 'goog.i18n.NumberFormatSymbols_lg_UG', 'goog.i18n.NumberFormatSymbols_ln_AO', 'goog.i18n.NumberFormatSymbols_ln_CF', 'goog.i18n.NumberFormatSymbols_ln_CG', 'goog.i18n.NumberFormatSymbols_lo', 'goog.i18n.NumberFormatSymbols_lo_LA', 'goog.i18n.NumberFormatSymbols_lu', 'goog.i18n.NumberFormatSymbols_lu_CD', 'goog.i18n.NumberFormatSymbols_luo', 'goog.i18n.NumberFormatSymbols_luo_KE', 'goog.i18n.NumberFormatSymbols_luy', 'goog.i18n.NumberFormatSymbols_luy_KE', 'goog.i18n.NumberFormatSymbols_mas', 'goog.i18n.NumberFormatSymbols_mas_KE', 'goog.i18n.NumberFormatSymbols_mas_TZ', 'goog.i18n.NumberFormatSymbols_mer', 'goog.i18n.NumberFormatSymbols_mer_KE', 'goog.i18n.NumberFormatSymbols_mfe', 'goog.i18n.NumberFormatSymbols_mfe_MU', 'goog.i18n.NumberFormatSymbols_mg', 'goog.i18n.NumberFormatSymbols_mg_MG', 'goog.i18n.NumberFormatSymbols_mgh', 'goog.i18n.NumberFormatSymbols_mgh_MZ', 'goog.i18n.NumberFormatSymbols_mgo', 'goog.i18n.NumberFormatSymbols_mgo_CM', 'goog.i18n.NumberFormatSymbols_mk', 'goog.i18n.NumberFormatSymbols_mk_MK', 'goog.i18n.NumberFormatSymbols_mn', 'goog.i18n.NumberFormatSymbols_mn_Cyrl', 'goog.i18n.NumberFormatSymbols_mn_Cyrl_MN', 'goog.i18n.NumberFormatSymbols_ms_Latn', 'goog.i18n.NumberFormatSymbols_ms_Latn_BN', 'goog.i18n.NumberFormatSymbols_ms_Latn_SG', 'goog.i18n.NumberFormatSymbols_mua', 'goog.i18n.NumberFormatSymbols_mua_CM', 'goog.i18n.NumberFormatSymbols_my', 'goog.i18n.NumberFormatSymbols_my_MM', 'goog.i18n.NumberFormatSymbols_naq', 'goog.i18n.NumberFormatSymbols_naq_NA', 'goog.i18n.NumberFormatSymbols_nd', 'goog.i18n.NumberFormatSymbols_nd_ZW', 'goog.i18n.NumberFormatSymbols_ne', 'goog.i18n.NumberFormatSymbols_ne_IN', 'goog.i18n.NumberFormatSymbols_ne_NP', 'goog.i18n.NumberFormatSymbols_nl_AW', 'goog.i18n.NumberFormatSymbols_nl_BE', 'goog.i18n.NumberFormatSymbols_nl_CW', 'goog.i18n.NumberFormatSymbols_nl_SR', 'goog.i18n.NumberFormatSymbols_nl_SX', 'goog.i18n.NumberFormatSymbols_nmg', 'goog.i18n.NumberFormatSymbols_nmg_CM', 'goog.i18n.NumberFormatSymbols_nn', 'goog.i18n.NumberFormatSymbols_nn_NO', 'goog.i18n.NumberFormatSymbols_nnh', 'goog.i18n.NumberFormatSymbols_nnh_CM', 'goog.i18n.NumberFormatSymbols_nr', 'goog.i18n.NumberFormatSymbols_nr_ZA', 'goog.i18n.NumberFormatSymbols_nso', 'goog.i18n.NumberFormatSymbols_nso_ZA', 'goog.i18n.NumberFormatSymbols_nus', 'goog.i18n.NumberFormatSymbols_nus_SD', 'goog.i18n.NumberFormatSymbols_nyn', 'goog.i18n.NumberFormatSymbols_nyn_UG', 'goog.i18n.NumberFormatSymbols_om', 'goog.i18n.NumberFormatSymbols_om_ET', 'goog.i18n.NumberFormatSymbols_om_KE', 'goog.i18n.NumberFormatSymbols_os', 'goog.i18n.NumberFormatSymbols_os_GE', 'goog.i18n.NumberFormatSymbols_os_RU', 'goog.i18n.NumberFormatSymbols_pa', 'goog.i18n.NumberFormatSymbols_pa_Arab', 'goog.i18n.NumberFormatSymbols_pa_Arab_PK', 'goog.i18n.NumberFormatSymbols_pa_Guru', 'goog.i18n.NumberFormatSymbols_pa_Guru_IN', 'goog.i18n.NumberFormatSymbols_ps', 'goog.i18n.NumberFormatSymbols_ps_AF', 'goog.i18n.NumberFormatSymbols_pt_AO', 'goog.i18n.NumberFormatSymbols_pt_CV', 'goog.i18n.NumberFormatSymbols_pt_GW', 'goog.i18n.NumberFormatSymbols_pt_MO', 'goog.i18n.NumberFormatSymbols_pt_MZ', 'goog.i18n.NumberFormatSymbols_pt_ST', 'goog.i18n.NumberFormatSymbols_pt_TL', 'goog.i18n.NumberFormatSymbols_rm', 'goog.i18n.NumberFormatSymbols_rm_CH', 'goog.i18n.NumberFormatSymbols_rn', 'goog.i18n.NumberFormatSymbols_rn_BI', 'goog.i18n.NumberFormatSymbols_ro_MD', 'goog.i18n.NumberFormatSymbols_rof', 'goog.i18n.NumberFormatSymbols_rof_TZ', 'goog.i18n.NumberFormatSymbols_ru_BY', 'goog.i18n.NumberFormatSymbols_ru_KG', 'goog.i18n.NumberFormatSymbols_ru_KZ', 'goog.i18n.NumberFormatSymbols_ru_MD', 'goog.i18n.NumberFormatSymbols_ru_UA', 'goog.i18n.NumberFormatSymbols_rw', 'goog.i18n.NumberFormatSymbols_rw_RW', 'goog.i18n.NumberFormatSymbols_rwk', 'goog.i18n.NumberFormatSymbols_rwk_TZ', 'goog.i18n.NumberFormatSymbols_sah', 'goog.i18n.NumberFormatSymbols_sah_RU', 'goog.i18n.NumberFormatSymbols_saq', 'goog.i18n.NumberFormatSymbols_saq_KE', 'goog.i18n.NumberFormatSymbols_sbp', 'goog.i18n.NumberFormatSymbols_sbp_TZ', 'goog.i18n.NumberFormatSymbols_se', 'goog.i18n.NumberFormatSymbols_se_FI', 'goog.i18n.NumberFormatSymbols_se_NO', 'goog.i18n.NumberFormatSymbols_seh', 'goog.i18n.NumberFormatSymbols_seh_MZ', 'goog.i18n.NumberFormatSymbols_ses', 'goog.i18n.NumberFormatSymbols_ses_ML', 'goog.i18n.NumberFormatSymbols_sg', 'goog.i18n.NumberFormatSymbols_sg_CF', 'goog.i18n.NumberFormatSymbols_shi', 'goog.i18n.NumberFormatSymbols_shi_Latn', 'goog.i18n.NumberFormatSymbols_shi_Latn_MA', 'goog.i18n.NumberFormatSymbols_shi_Tfng', 'goog.i18n.NumberFormatSymbols_shi_Tfng_MA', 'goog.i18n.NumberFormatSymbols_si', 'goog.i18n.NumberFormatSymbols_si_LK', 'goog.i18n.NumberFormatSymbols_sn', 'goog.i18n.NumberFormatSymbols_sn_ZW', 'goog.i18n.NumberFormatSymbols_so', 'goog.i18n.NumberFormatSymbols_so_DJ', 'goog.i18n.NumberFormatSymbols_so_ET', 'goog.i18n.NumberFormatSymbols_so_KE', 'goog.i18n.NumberFormatSymbols_so_SO', 'goog.i18n.NumberFormatSymbols_sq_MK', 'goog.i18n.NumberFormatSymbols_sq_XK', 'goog.i18n.NumberFormatSymbols_sr_Cyrl', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_BA', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_ME', 'goog.i18n.NumberFormatSymbols_sr_Cyrl_XK', 'goog.i18n.NumberFormatSymbols_sr_Latn', 'goog.i18n.NumberFormatSymbols_sr_Latn_BA', 'goog.i18n.NumberFormatSymbols_sr_Latn_ME', 'goog.i18n.NumberFormatSymbols_sr_Latn_RS', 'goog.i18n.NumberFormatSymbols_sr_Latn_XK', 'goog.i18n.NumberFormatSymbols_ss', 'goog.i18n.NumberFormatSymbols_ss_SZ', 'goog.i18n.NumberFormatSymbols_ss_ZA', 'goog.i18n.NumberFormatSymbols_ssy', 'goog.i18n.NumberFormatSymbols_ssy_ER', 'goog.i18n.NumberFormatSymbols_st', 'goog.i18n.NumberFormatSymbols_st_LS', 'goog.i18n.NumberFormatSymbols_st_ZA', 'goog.i18n.NumberFormatSymbols_sv_AX', 'goog.i18n.NumberFormatSymbols_sv_FI', 'goog.i18n.NumberFormatSymbols_sw_KE', 'goog.i18n.NumberFormatSymbols_sw_UG', 'goog.i18n.NumberFormatSymbols_swc', 'goog.i18n.NumberFormatSymbols_swc_CD', 'goog.i18n.NumberFormatSymbols_ta_LK', 'goog.i18n.NumberFormatSymbols_ta_MY', 'goog.i18n.NumberFormatSymbols_ta_SG', 'goog.i18n.NumberFormatSymbols_teo', 'goog.i18n.NumberFormatSymbols_teo_KE', 'goog.i18n.NumberFormatSymbols_teo_UG', 'goog.i18n.NumberFormatSymbols_tg', 'goog.i18n.NumberFormatSymbols_tg_Cyrl', 'goog.i18n.NumberFormatSymbols_tg_Cyrl_TJ', 'goog.i18n.NumberFormatSymbols_ti', 'goog.i18n.NumberFormatSymbols_ti_ER', 'goog.i18n.NumberFormatSymbols_ti_ET', 'goog.i18n.NumberFormatSymbols_tig', 'goog.i18n.NumberFormatSymbols_tig_ER', 'goog.i18n.NumberFormatSymbols_tn', 'goog.i18n.NumberFormatSymbols_tn_BW', 'goog.i18n.NumberFormatSymbols_tn_ZA', 'goog.i18n.NumberFormatSymbols_to', 'goog.i18n.NumberFormatSymbols_to_TO', 'goog.i18n.NumberFormatSymbols_tr_CY', 'goog.i18n.NumberFormatSymbols_ts', 'goog.i18n.NumberFormatSymbols_ts_ZA', 'goog.i18n.NumberFormatSymbols_twq', 'goog.i18n.NumberFormatSymbols_twq_NE', 'goog.i18n.NumberFormatSymbols_tzm', 'goog.i18n.NumberFormatSymbols_tzm_Latn', 'goog.i18n.NumberFormatSymbols_tzm_Latn_MA', 'goog.i18n.NumberFormatSymbols_ur_IN', 'goog.i18n.NumberFormatSymbols_uz', 'goog.i18n.NumberFormatSymbols_uz_Arab', 'goog.i18n.NumberFormatSymbols_uz_Arab_AF', 'goog.i18n.NumberFormatSymbols_uz_Cyrl', 'goog.i18n.NumberFormatSymbols_uz_Cyrl_UZ', 'goog.i18n.NumberFormatSymbols_uz_Latn', 'goog.i18n.NumberFormatSymbols_uz_Latn_UZ', 'goog.i18n.NumberFormatSymbols_vai', 'goog.i18n.NumberFormatSymbols_vai_Latn', 'goog.i18n.NumberFormatSymbols_vai_Latn_LR', 'goog.i18n.NumberFormatSymbols_vai_Vaii', 'goog.i18n.NumberFormatSymbols_vai_Vaii_LR', 'goog.i18n.NumberFormatSymbols_ve', 'goog.i18n.NumberFormatSymbols_ve_ZA', 'goog.i18n.NumberFormatSymbols_vo', 'goog.i18n.NumberFormatSymbols_vun', 'goog.i18n.NumberFormatSymbols_vun_TZ', 'goog.i18n.NumberFormatSymbols_wae', 'goog.i18n.NumberFormatSymbols_wae_CH', 'goog.i18n.NumberFormatSymbols_wal', 'goog.i18n.NumberFormatSymbols_wal_ET', 'goog.i18n.NumberFormatSymbols_xh', 'goog.i18n.NumberFormatSymbols_xh_ZA', 'goog.i18n.NumberFormatSymbols_xog', 'goog.i18n.NumberFormatSymbols_xog_UG', 'goog.i18n.NumberFormatSymbols_yav', 'goog.i18n.NumberFormatSymbols_yav_CM', 'goog.i18n.NumberFormatSymbols_yo', 'goog.i18n.NumberFormatSymbols_yo_NG', 'goog.i18n.NumberFormatSymbols_zh_Hans', 'goog.i18n.NumberFormatSymbols_zh_Hans_HK', 'goog.i18n.NumberFormatSymbols_zh_Hans_MO', 'goog.i18n.NumberFormatSymbols_zh_Hans_SG', 'goog.i18n.NumberFormatSymbols_zh_Hant', 'goog.i18n.NumberFormatSymbols_zh_Hant_HK', 'goog.i18n.NumberFormatSymbols_zh_Hant_MO', 'goog.i18n.NumberFormatSymbols_zh_Hant_TW'], ['goog.i18n.NumberFormatSymbols']);
+goog.addDependency('i18n/ordinalrules.js', ['goog.i18n.ordinalRules'], []);
+goog.addDependency('i18n/pluralrules.js', ['goog.i18n.pluralRules'], []);
+goog.addDependency('i18n/timezone.js', ['goog.i18n.TimeZone'], ['goog.array', 'goog.date.DateLike', 'goog.string']);
 goog.addDependency('i18n/uchar.js', ['goog.i18n.uChar'], []);
-goog.addDependency('iter/iter.js', ['goog.iter', 'goog.iter.Iterator', 'goog.iter.StopIteration'], ['goog.array']);
+goog.addDependency('i18n/uchar/localnamefetcher.js', ['goog.i18n.uChar.LocalNameFetcher'], ['goog.i18n.uChar', 'goog.i18n.uChar.NameFetcher', 'goog.log']);
+goog.addDependency('i18n/uchar/namefetcher.js', ['goog.i18n.uChar.NameFetcher'], []);
+goog.addDependency('i18n/uchar/remotenamefetcher.js', ['goog.i18n.uChar.RemoteNameFetcher'], ['goog.Disposable', 'goog.Uri', 'goog.i18n.uChar', 'goog.i18n.uChar.NameFetcher', 'goog.log', 'goog.net.XhrIo', 'goog.structs.Map']);
+goog.addDependency('iter/iter.js', ['goog.iter', 'goog.iter.Iterator', 'goog.iter.StopIteration'], ['goog.array', 'goog.asserts']);
+goog.addDependency('json/evaljsonprocessor.js', ['goog.json.EvalJsonProcessor'], ['goog.json', 'goog.json.Processor', 'goog.json.Serializer']);
 goog.addDependency('json/json.js', ['goog.json', 'goog.json.Serializer'], []);
+goog.addDependency('json/nativejsonprocessor.js', ['goog.json.NativeJsonProcessor'], ['goog.asserts', 'goog.json', 'goog.json.Processor']);
+goog.addDependency('json/processor.js', ['goog.json.Processor'], ['goog.string.Parser', 'goog.string.Stringifier']);
+goog.addDependency('labs/classdef/classdef.js', ['goog.labs.classdef'], []);
+goog.addDependency('labs/events/touch.js', ['goog.labs.events.touch', 'goog.labs.events.touch.TouchData'], ['goog.array', 'goog.asserts', 'goog.events.EventType', 'goog.string']);
+goog.addDependency('labs/events/touch_test.js', ['goog.labs.events.touchTest'], ['goog.labs.events.touch', 'goog.testing.jsunit']);
+goog.addDependency('labs/format/csv.js', ['goog.labs.format.csv', 'goog.labs.format.csv.ParseError', 'goog.labs.format.csv.Token'], ['goog.array', 'goog.asserts', 'goog.debug.Error', 'goog.object', 'goog.string', 'goog.string.newlines']);
+goog.addDependency('labs/format/csv_test.js', ['goog.labs.format.csvTest'], ['goog.labs.format.csv', 'goog.labs.format.csv.ParseError', 'goog.object', 'goog.testing.asserts', 'goog.testing.jsunit']);
+goog.addDependency('labs/mock/mock.js', ['goog.labs.mock'], ['goog.array', 'goog.debug', 'goog.debug.Error', 'goog.functions', 'goog.json']);
+goog.addDependency('labs/net/image.js', ['goog.labs.net.image'], ['goog.events.EventHandler', 'goog.events.EventType', 'goog.net.EventType', 'goog.result.SimpleResult', 'goog.userAgent']);
+goog.addDependency('labs/net/image_test.js', ['goog.labs.net.imageTest'], ['goog.events', 'goog.labs.net.image', 'goog.result', 'goog.result.Result', 'goog.string', 'goog.testing.AsyncTestCase', 'goog.testing.jsunit', 'goog.testing.recordFunction']);
+goog.addDependency('labs/net/webchannel.js', ['goog.net.WebChannel'], ['goog.events', 'goog.events.Event']);
+goog.addDependency('labs/net/webchannel/basetestchannel.js', ['goog.labs.net.webChannel.BaseTestChannel'], ['goog.json.EvalJsonProcessor', 'goog.labs.net.webChannel.Channel', 'goog.labs.net.webChannel.WebChannelRequest', 'goog.labs.net.webChannel.requestStats', 'goog.labs.net.webChannel.requestStats.ServerReachability', 'goog.labs.net.webChannel.requestStats.Stat', 'goog.net.tmpnetwork']);
+goog.addDependency('labs/net/webchannel/channel.js', ['goog.labs.net.webChannel.Channel'], []);
+goog.addDependency('labs/net/webchannel/requeststats.js', ['goog.labs.net.webChannel.requestStats', 'goog.labs.net.webChannel.requestStats.Event', 'goog.labs.net.webChannel.requestStats.ServerReachability', 'goog.labs.net.webChannel.requestStats.ServerReachabilityEvent', 'goog.labs.net.webChannel.requestStats.Stat', 'goog.labs.net.webChannel.requestStats.StatEvent', 'goog.labs.net.webChannel.requestStats.TimingEvent'], ['goog.events.Event', 'goog.events.EventTarget']);
+goog.addDependency('labs/net/webchannel/webchannelbase.js', ['goog.labs.net.webChannel.WebChannelBase'], ['goog.Uri', 'goog.array', 'goog.asserts', 'goog.debug.TextFormatter', 'goog.json', 'goog.json.EvalJsonProcessor', 'goog.labs.net.webChannel.BaseTestChannel', 'goog.labs.net.webChannel.Channel', 'goog.labs.net.webChannel.WebChannelDebug', 'goog.labs.net.webChannel.WebChannelRequest', 'goog.labs.net.webChannel.requestStats', 'goog.labs.net.webChannel.requestStats.Stat', 'goog.log', 'goog.net.XhrIo', 'goog.net.tmpnetwork', 'goog.string', 'goog.structs', 'goog.structs.CircularBuffer']);
+goog.addDependency('labs/net/webchannel/webchannelbase_test.js', ['goog.labs.net.webChannel.webChannelBaseTest'], ['goog.Timer', 'goog.array', 'goog.dom', 'goog.functions', 'goog.json', 'goog.labs.net.webChannel.WebChannelBase', 'goog.labs.net.webChannel.WebChannelDebug', 'goog.labs.net.webChannel.WebChannelRequest', 'goog.labs.net.webChannel.requestStats', 'goog.labs.net.webChannel.requestStats.Stat', 'goog.net.tmpnetwork', 'goog.structs.Map', 'goog.testing.MockClock', 'goog.testing.PropertyReplacer', 'goog.testing.asserts', 'goog.testing.jsunit', 'goog.testing.recordFunction']);
+goog.addDependency('labs/net/webchannel/webchannelbasetransport.js', ['goog.labs.net.webChannel.WebChannelBaseTransport'], ['goog.asserts', 'goog.events.EventTarget', 'goog.labs.net.webChannel.WebChannelBase', 'goog.log', 'goog.net.WebChannel', 'goog.net.WebChannelTransport', 'goog.string.path']);
+goog.addDependency('labs/net/webchannel/webchanneldebug.js', ['goog.labs.net.webChannel.WebChannelDebug'], ['goog.json', 'goog.log']);
+goog.addDependency('labs/net/webchannel/webchannelrequest.js', ['goog.labs.net.webChannel.WebChannelRequest'], ['goog.Timer', 'goog.async.Throttle', 'goog.events.EventHandler', 'goog.labs.net.webChannel.requestStats', 'goog.labs.net.webChannel.requestStats.ServerReachability', 'goog.labs.net.webChannel.requestStats.Stat', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.XmlHttp', 'goog.object', 'goog.userAgent']);
+goog.addDependency('labs/net/webchanneltransport.js', ['goog.net.WebChannelTransport'], []);
+goog.addDependency('labs/net/webchanneltransportfactory.js', ['goog.net.createWebChannelTransport'], ['goog.functions', 'goog.labs.net.webChannel.WebChannelBaseTransport']);
+goog.addDependency('labs/net/xhr.js', ['goog.labs.net.xhr', 'goog.labs.net.xhr.Error', 'goog.labs.net.xhr.HttpError', 'goog.labs.net.xhr.TimeoutError'], ['goog.debug.Error', 'goog.json', 'goog.net.HttpStatus', 'goog.net.XmlHttp', 'goog.result', 'goog.result.SimpleResult', 'goog.string', 'goog.uri.utils']);
+goog.addDependency('labs/object/object.js', ['goog.labs.object'], []);
+goog.addDependency('labs/observe/notice.js', ['goog.labs.observe.Notice'], []);
+goog.addDependency('labs/observe/observable.js', ['goog.labs.observe.Observable'], ['goog.disposable.IDisposable']);
+goog.addDependency('labs/observe/observableset.js', ['goog.labs.observe.ObservableSet'], ['goog.array', 'goog.labs.observe.Observer']);
+goog.addDependency('labs/observe/observationset.js', ['goog.labs.observe.ObservationSet'], ['goog.array', 'goog.labs.observe.Observer']);
+goog.addDependency('labs/observe/observer.js', ['goog.labs.observe.Observer'], []);
+goog.addDependency('labs/observe/simpleobservable.js', ['goog.labs.observe.SimpleObservable'], ['goog.Disposable', 'goog.array', 'goog.asserts', 'goog.labs.observe.Notice', 'goog.labs.observe.Observable', 'goog.labs.observe.Observer', 'goog.object']);
+goog.addDependency('labs/structs/map.js', ['goog.labs.structs.Map'], ['goog.array', 'goog.asserts', 'goog.labs.object', 'goog.object']);
+goog.addDependency('labs/structs/map_perf.js', ['goog.labs.structs.mapPerf'], ['goog.dom', 'goog.labs.structs.Map', 'goog.structs.Map', 'goog.testing.PerformanceTable', 'goog.testing.jsunit']);
+goog.addDependency('labs/structs/multimap.js', ['goog.labs.structs.Multimap'], ['goog.array', 'goog.labs.object', 'goog.labs.structs.Map']);
+goog.addDependency('labs/style/pixeldensitymonitor.js', ['goog.labs.style.PixelDensityMonitor', 'goog.labs.style.PixelDensityMonitor.Density', 'goog.labs.style.PixelDensityMonitor.EventType'], ['goog.events', 'goog.events.EventTarget']);
+goog.addDependency('labs/style/pixeldensitymonitor_test.js', ['goog.labs.style.PixelDensityMonitorTest'], ['goog.array', 'goog.dom.DomHelper', 'goog.events', 'goog.labs.style.PixelDensityMonitor', 'goog.testing.MockControl', 'goog.testing.jsunit', 'goog.testing.recordFunction']);
+goog.addDependency('labs/testing/assertthat.js', ['goog.labs.testing.MatcherError', 'goog.labs.testing.assertThat'], ['goog.asserts', 'goog.debug.Error', 'goog.labs.testing.Matcher']);
+goog.addDependency('labs/testing/decoratormatcher.js', ['goog.labs.testing.AnythingMatcher'], ['goog.labs.testing.Matcher']);
+goog.addDependency('labs/testing/dictionarymatcher.js', ['goog.labs.testing.HasEntriesMatcher', 'goog.labs.testing.HasEntryMatcher', 'goog.labs.testing.HasKeyMatcher', 'goog.labs.testing.HasValueMatcher'], ['goog.array', 'goog.asserts', 'goog.labs.testing.Matcher', 'goog.string']);
+goog.addDependency('labs/testing/logicmatcher.js', ['goog.labs.testing.AllOfMatcher', 'goog.labs.testing.AnyOfMatcher', 'goog.labs.testing.IsNotMatcher'], ['goog.array', 'goog.labs.testing.Matcher']);
+goog.addDependency('labs/testing/matcher.js', ['goog.labs.testing.Matcher'], []);
+goog.addDependency('labs/testing/numbermatcher.js', ['goog.labs.testing.CloseToMatcher', 'goog.labs.testing.EqualToMatcher', 'goog.labs.testing.GreaterThanEqualToMatcher', 'goog.labs.testing.GreaterThanMatcher', 'goog.labs.testing.LessThanEqualToMatcher', 'goog.labs.testing.LessThanMatcher'], ['goog.asserts', 'goog.labs.testing.Matcher']);
+goog.addDependency('labs/testing/objectmatcher.js', ['goog.labs.testing.HasPropertyMatcher', 'goog.labs.testing.InstanceOfMatcher', 'goog.labs.testing.IsNullMatcher', 'goog.labs.testing.IsNullOrUndefinedMatcher', 'goog.labs.testing.IsUndefinedMatcher', 'goog.labs.testing.ObjectEqualsMatcher'], ['goog.labs.testing.Matcher', 'goog.string']);
+goog.addDependency('labs/testing/stringmatcher.js', ['goog.labs.testing.ContainsStringMatcher', 'goog.labs.testing.EndsWithMatcher', 'goog.labs.testing.EqualToIgnoringCaseMatcher', 'goog.labs.testing.EqualToIgnoringWhitespaceMatcher', 'goog.labs.testing.EqualsMatcher', 'goog.labs.testing.RegexMatcher', 'goog.labs.testing.StartsWithMatcher', 'goog.labs.testing.StringContainsInOrderMatcher'], ['goog.asserts', 'goog.labs.testing.Matcher', 'goog.string']);
+goog.addDependency('labs/useragent/browser.js', ['goog.labs.userAgent.browser'], ['goog.asserts', 'goog.labs.userAgent.util', 'goog.memoize', 'goog.string']);
+goog.addDependency('labs/useragent/browser_test.js', ['goog.labs.userAgent.browserTest'], ['goog.labs.userAgent.browser', 'goog.labs.userAgent.testAgents', 'goog.testing.PropertyReplacer', 'goog.testing.jsunit']);
+goog.addDependency('labs/useragent/device.js', ['goog.labs.userAgent.device'], ['goog.labs.userAgent.util']);
+goog.addDependency('labs/useragent/device_test.js', ['goog.labs.userAgent.deviceTest'], ['goog.labs.userAgent.device', 'goog.labs.userAgent.testAgents', 'goog.testing.PropertyReplacer', 'goog.testing.jsunit']);
+goog.addDependency('labs/useragent/engine.js', ['goog.labs.userAgent.engine'], ['goog.array', 'goog.labs.userAgent.util', 'goog.memoize', 'goog.string']);
+goog.addDependency('labs/useragent/engine_test.js', ['goog.labs.userAgent.engineTest'], ['goog.labs.userAgent.engine', 'goog.labs.userAgent.testAgents', 'goog.testing.PropertyReplacer', 'goog.testing.jsunit']);
+goog.addDependency('labs/useragent/platform.js', ['goog.labs.userAgent.platform'], ['goog.labs.userAgent.util', 'goog.memoize', 'goog.string']);
+goog.addDependency('labs/useragent/platform_test.js', ['goog.labs.userAgent.platformTest'], ['goog.labs.userAgent.platform', 'goog.labs.userAgent.testAgents', 'goog.testing.PropertyReplacer', 'goog.testing.jsunit']);
+goog.addDependency('labs/useragent/test_agents.js', ['goog.labs.userAgent.testAgents'], []);
+goog.addDependency('labs/useragent/util.js', ['goog.labs.userAgent.util'], ['goog.memoize', 'goog.string']);
+goog.addDependency('labs/useragent/util_test.js', ['goog.labs.userAgent.utilTest'], ['goog.labs.userAgent.testAgents', 'goog.labs.userAgent.util', 'goog.testing.jsunit']);
 goog.addDependency('locale/countries.js', ['goog.locale.countries'], []);
 goog.addDependency('locale/defaultlocalenameconstants.js', ['goog.locale.defaultLocaleNameConstants'], []);
 goog.addDependency('locale/genericfontnames.js', ['goog.locale.genericFontNames'], []);
-goog.addDependency('locale/genericfontnamesdata.js', ['goog.locale.genericFontNamesData'], ['goog.locale']);
+goog.addDependency('locale/genericfontnamesdata.js', ['goog.locale.genericFontNamesData'], []);
 goog.addDependency('locale/locale.js', ['goog.locale'], ['goog.locale.nativeNameConstants']);
 goog.addDependency('locale/nativenameconstants.js', ['goog.locale.nativeNameConstants'], []);
 goog.addDependency('locale/scriptToLanguages.js', ['goog.locale.scriptToLanguages'], ['goog.locale']);
 goog.addDependency('locale/timezonedetection.js', ['goog.locale.timeZoneDetection'], ['goog.locale', 'goog.locale.TimeZoneFingerprint']);
-goog.addDependency('locale/timezonefingerprint.js', ['goog.locale.TimeZoneFingerprint'], ['goog.locale']);
+goog.addDependency('locale/timezonefingerprint.js', ['goog.locale.TimeZoneFingerprint'], []);
 goog.addDependency('locale/timezonelist.js', ['goog.locale.TimeZoneList'], ['goog.locale']);
+goog.addDependency('log/log.js', ['goog.log', 'goog.log.Level', 'goog.log.LogRecord', 'goog.log.Logger'], ['goog.debug', 'goog.debug.LogRecord', 'goog.debug.Logger']);
+goog.addDependency('log/log_test.js', ['goog.logTest'], ['goog.debug.LogManager', 'goog.log', 'goog.log.Level', 'goog.testing.jsunit']);
 goog.addDependency('math/bezier.js', ['goog.math.Bezier'], ['goog.math', 'goog.math.Coordinate']);
 goog.addDependency('math/box.js', ['goog.math.Box'], ['goog.math.Coordinate']);
-goog.addDependency('math/coordinate.js', ['goog.math.Coordinate'], []);
+goog.addDependency('math/coordinate.js', ['goog.math.Coordinate'], ['goog.math']);
 goog.addDependency('math/coordinate3.js', ['goog.math.Coordinate3'], []);
+goog.addDependency('math/exponentialbackoff.js', ['goog.math.ExponentialBackoff'], ['goog.asserts']);
 goog.addDependency('math/integer.js', ['goog.math.Integer'], []);
+goog.addDependency('math/interpolator/interpolator1.js', ['goog.math.interpolator.Interpolator1'], []);
+goog.addDependency('math/interpolator/linear1.js', ['goog.math.interpolator.Linear1'], ['goog.array', 'goog.math', 'goog.math.interpolator.Interpolator1']);
+goog.addDependency('math/interpolator/pchip1.js', ['goog.math.interpolator.Pchip1'], ['goog.math', 'goog.math.interpolator.Spline1']);
+goog.addDependency('math/interpolator/spline1.js', ['goog.math.interpolator.Spline1'], ['goog.array', 'goog.math', 'goog.math.interpolator.Interpolator1', 'goog.math.tdma']);
 goog.addDependency('math/line.js', ['goog.math.Line'], ['goog.math', 'goog.math.Coordinate']);
 goog.addDependency('math/long.js', ['goog.math.Long'], []);
-goog.addDependency('math/math.js', ['goog.math'], ['goog.array']);
-goog.addDependency('math/matrix.js', ['goog.math.Matrix'], ['goog.array', 'goog.math', 'goog.math.Size']);
+goog.addDependency('math/math.js', ['goog.math'], ['goog.array', 'goog.asserts']);
+goog.addDependency('math/matrix.js', ['goog.math.Matrix'], ['goog.array', 'goog.math', 'goog.math.Size', 'goog.string']);
 goog.addDependency('math/range.js', ['goog.math.Range'], []);
 goog.addDependency('math/rangeset.js', ['goog.math.RangeSet'], ['goog.array', 'goog.iter.Iterator', 'goog.iter.StopIteration', 'goog.math.Range']);
-goog.addDependency('math/rect.js', ['goog.math.Rect'], ['goog.math.Box', 'goog.math.Size']);
+goog.addDependency('math/rect.js', ['goog.math.Rect'], ['goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size']);
 goog.addDependency('math/size.js', ['goog.math.Size'], []);
+goog.addDependency('math/tdma.js', ['goog.math.tdma'], []);
 goog.addDependency('math/vec2.js', ['goog.math.Vec2'], ['goog.math', 'goog.math.Coordinate']);
 goog.addDependency('math/vec3.js', ['goog.math.Vec3'], ['goog.math', 'goog.math.Coordinate3']);
 goog.addDependency('memoize/memoize.js', ['goog.memoize'], []);
+goog.addDependency('messaging/abstractchannel.js', ['goog.messaging.AbstractChannel'], ['goog.Disposable', 'goog.debug', 'goog.json', 'goog.log', 'goog.messaging.MessageChannel']);
+goog.addDependency('messaging/bufferedchannel.js', ['goog.messaging.BufferedChannel'], ['goog.Timer', 'goog.Uri', 'goog.debug.Error', 'goog.events', 'goog.log', 'goog.messaging.MessageChannel', 'goog.messaging.MultiChannel']);
+goog.addDependency('messaging/deferredchannel.js', ['goog.messaging.DeferredChannel'], ['goog.Disposable', 'goog.async.Deferred', 'goog.messaging.MessageChannel']);
+goog.addDependency('messaging/loggerclient.js', ['goog.messaging.LoggerClient'], ['goog.Disposable', 'goog.debug', 'goog.debug.LogManager', 'goog.debug.Logger']);
+goog.addDependency('messaging/loggerserver.js', ['goog.messaging.LoggerServer'], ['goog.Disposable', 'goog.log']);
+goog.addDependency('messaging/messagechannel.js', ['goog.messaging.MessageChannel'], []);
+goog.addDependency('messaging/messaging.js', ['goog.messaging'], ['goog.messaging.MessageChannel']);
+goog.addDependency('messaging/multichannel.js', ['goog.messaging.MultiChannel', 'goog.messaging.MultiChannel.VirtualChannel'], ['goog.Disposable', 'goog.events.EventHandler', 'goog.log', 'goog.messaging.MessageChannel', 'goog.object']);
+goog.addDependency('messaging/portcaller.js', ['goog.messaging.PortCaller'], ['goog.Disposable', 'goog.async.Deferred', 'goog.messaging.DeferredChannel', 'goog.messaging.PortChannel', 'goog.messaging.PortNetwork', 'goog.object']);
+goog.addDependency('messaging/portchannel.js', ['goog.messaging.PortChannel'], ['goog.Timer', 'goog.array', 'goog.async.Deferred', 'goog.debug', 'goog.dom', 'goog.dom.DomHelper', 'goog.events', 'goog.events.EventType', 'goog.json', 'goog.log', 'goog.messaging.AbstractChannel', 'goog.messaging.DeferredChannel', 'goog.object', 'goog.string']);
+goog.addDependency('messaging/portnetwork.js', ['goog.messaging.PortNetwork'], []);
+goog.addDependency('messaging/portoperator.js', ['goog.messaging.PortOperator'], ['goog.Disposable', 'goog.asserts', 'goog.log', 'goog.messaging.PortChannel', 'goog.messaging.PortNetwork', 'goog.object']);
+goog.addDependency('messaging/respondingchannel.js', ['goog.messaging.RespondingChannel'], ['goog.Disposable', 'goog.log', 'goog.messaging.MessageChannel', 'goog.messaging.MultiChannel', 'goog.messaging.MultiChannel.VirtualChannel']);
+goog.addDependency('messaging/testdata/portchannel_worker.js', ['goog.messaging.testdata.portchannel_worker'], ['goog.messaging.PortChannel']);
+goog.addDependency('messaging/testdata/portnetwork_worker1.js', ['goog.messaging.testdata.portnetwork_worker1'], ['goog.messaging.PortCaller', 'goog.messaging.PortChannel']);
+goog.addDependency('messaging/testdata/portnetwork_worker2.js', ['goog.messaging.testdata.portnetwork_worker2'], ['goog.messaging.PortCaller', 'goog.messaging.PortChannel']);
 goog.addDependency('module/abstractmoduleloader.js', ['goog.module.AbstractModuleLoader'], []);
 goog.addDependency('module/basemodule.js', ['goog.module.BaseModule'], ['goog.Disposable']);
-goog.addDependency('module/basemoduleloader.js', ['goog.module.BaseModuleLoader'], ['goog.Disposable', 'goog.debug.Logger', 'goog.module.AbstractModuleLoader']);
 goog.addDependency('module/loader.js', ['goog.module.Loader'], ['goog.Timer', 'goog.array', 'goog.dom', 'goog.object']);
 goog.addDependency('module/module.js', ['goog.module'], ['goog.array', 'goog.module.Loader']);
-goog.addDependency('module/moduleinfo.js', ['goog.module.ModuleInfo'], ['goog.Disposable', 'goog.Timer', 'goog.functions', 'goog.module.BaseModule', 'goog.module.ModuleLoadCallback']);
-goog.addDependency('module/moduleloadcallback.js', ['goog.module.ModuleLoadCallback'], ['goog.debug.errorHandlerWeakDep']);
-goog.addDependency('module/moduleloader.js', ['goog.module.ModuleLoader'], ['goog.array', 'goog.debug.Logger', 'goog.dom', 'goog.events.EventHandler', 'goog.module.BaseModuleLoader', 'goog.net.BulkLoader', 'goog.net.EventType', 'goog.userAgent']);
-goog.addDependency('module/modulemanager.js', ['goog.module.ModuleManager', 'goog.module.ModuleManager.FailureType'], ['goog.Disposable', 'goog.array', 'goog.async.Deferred', 'goog.debug.Logger', 'goog.debug.Trace', 'goog.module.AbstractModuleLoader', 'goog.module.ModuleInfo', 'goog.module.ModuleLoadCallback']);
+goog.addDependency('module/moduleinfo.js', ['goog.module.ModuleInfo'], ['goog.Disposable', 'goog.functions', 'goog.module.BaseModule', 'goog.module.ModuleLoadCallback']);
+goog.addDependency('module/moduleloadcallback.js', ['goog.module.ModuleLoadCallback'], ['goog.debug.entryPointRegistry', 'goog.debug.errorHandlerWeakDep']);
+goog.addDependency('module/moduleloader.js', ['goog.module.ModuleLoader'], ['goog.Timer', 'goog.array', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.log', 'goog.module.AbstractModuleLoader', 'goog.net.BulkLoader', 'goog.net.EventType', 'goog.net.jsloader', 'goog.userAgent.product']);
+goog.addDependency('module/moduleloader_test.js', ['goog.module.ModuleLoaderTest'], ['goog.array', 'goog.dom', 'goog.functions', 'goog.module.ModuleLoader', 'goog.module.ModuleManager', 'goog.module.ModuleManager.CallbackType', 'goog.object', 'goog.testing.AsyncTestCase', 'goog.testing.PropertyReplacer', 'goog.testing.events.EventObserver', 'goog.testing.jsunit', 'goog.testing.recordFunction', 'goog.userAgent.product']);
+goog.addDependency('module/modulemanager.js', ['goog.module.ModuleManager', 'goog.module.ModuleManager.CallbackType', 'goog.module.ModuleManager.FailureType'], ['goog.Disposable', 'goog.array', 'goog.asserts', 'goog.async.Deferred', 'goog.debug.Trace', 'goog.dispose', 'goog.log', 'goog.module.ModuleInfo', 'goog.module.ModuleLoadCallback', 'goog.object']);
 goog.addDependency('module/testdata/modA_1.js', ['goog.module.testdata.modA_1'], []);
 goog.addDependency('module/testdata/modA_2.js', ['goog.module.testdata.modA_2'], ['goog.module.ModuleManager']);
 goog.addDependency('module/testdata/modB_1.js', ['goog.module.testdata.modB_1'], ['goog.module.ModuleManager']);
-goog.addDependency('net/browserchannel.js', ['goog.net.BrowserChannel', 'goog.net.BrowserChannel.Handler', 'goog.net.BrowserChannel.LogSaver', 'goog.net.BrowserChannel.QueuedMap', 'goog.net.BrowserChannel.StatEvent', 'goog.net.BrowserChannel.TimingEvent'], ['goog.Uri', 'goog.array', 'goog.debug.TextFormatter', 'goog.events.Event', 'goog.events.EventTarget', 'goog.json', 'goog.net.BrowserTestChannel', 'goog.net.ChannelDebug', 'goog.net.ChannelRequest', 'goog.net.XhrIo', 'goog.string', 'goog.structs.CircularBuffer', 'goog.userAgent']);
-goog.addDependency('net/browsertestchannel.js', ['goog.net.BrowserTestChannel'], ['goog.net.ChannelDebug', 'goog.net.ChannelRequest', 'goog.userAgent']);
-goog.addDependency('net/bulkloader.js', ['goog.net.BulkLoader'], ['goog.debug.Logger', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.net.BulkLoaderHelper', 'goog.net.EventType', 'goog.net.XhrIo']);
-goog.addDependency('net/bulkloaderhelper.js', ['goog.net.BulkLoaderHelper'], ['goog.Disposable', 'goog.debug.Logger']);
-goog.addDependency('net/channeldebug.js', ['goog.net.ChannelDebug'], ['goog.debug.Logger', 'goog.json']);
-goog.addDependency('net/channelrequest.js', ['goog.net.ChannelRequest'], ['goog.Timer', 'goog.Uri', 'goog.events.EventHandler', 'goog.net.XhrIo', 'goog.net.XmlHttp', 'goog.net.tmpnetwork', 'goog.object', 'goog.userAgent']);
-goog.addDependency('net/cookies.js', ['goog.net.cookies'], ['goog.userAgent']);
-goog.addDependency('net/crossdomainrpc.js', ['goog.net.CrossDomainRpc'], ['goog.Uri.QueryData', 'goog.debug.Logger', 'goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.json', 'goog.net.EventType', 'goog.userAgent']);
+goog.addDependency('net/browserchannel.js', ['goog.net.BrowserChannel', 'goog.net.BrowserChannel.Error', 'goog.net.BrowserChannel.Event', 'goog.net.BrowserChannel.Handler', 'goog.net.BrowserChannel.LogSaver', 'goog.net.BrowserChannel.QueuedMap', 'goog.net.BrowserChannel.ServerReachability', 'goog.net.BrowserChannel.ServerReachabilityEvent', 'goog.net.BrowserChannel.Stat', 'goog.net.BrowserChannel.StatEvent', 'goog.net.BrowserChannel.State', 'goog.net.BrowserChannel.TimingEvent'], ['goog.Uri', 'goog.array', 'goog.asserts', 'goog.debug.TextFormatter', 'goog.events.Event', 'goog.events.EventTarget', 'goog.json', 'goog.json.EvalJsonProcessor', 'goog.log', 'goog.net.BrowserTestChannel', 'goog.net.ChannelDebug', 'goog.net.ChannelRequest', 'goog.net.XhrIo', 'goog.net.tmpnetwork', 'goog.string', 'goog.structs', 'goog.structs.CircularBuffer']);
+goog.addDependency('net/browsertestchannel.js', ['goog.net.BrowserTestChannel'], ['goog.json.EvalJsonProcessor', 'goog.net.ChannelRequest', 'goog.net.ChannelRequest.Error', 'goog.net.tmpnetwork', 'goog.string.Parser', 'goog.userAgent']);
+goog.addDependency('net/bulkloader.js', ['goog.net.BulkLoader'], ['goog.events.EventHandler', 'goog.events.EventTarget', 'goog.log', 'goog.net.BulkLoaderHelper', 'goog.net.EventType', 'goog.net.XhrIo']);
+goog.addDependency('net/bulkloaderhelper.js', ['goog.net.BulkLoaderHelper'], ['goog.Disposable', 'goog.log']);
+goog.addDependency('net/channeldebug.js', ['goog.net.ChannelDebug'], ['goog.json', 'goog.log']);
+goog.addDependency('net/channelrequest.js', ['goog.net.ChannelRequest', 'goog.net.ChannelRequest.Error'], ['goog.Timer', 'goog.async.Throttle', 'goog.events.EventHandler', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.XmlHttp', 'goog.object', 'goog.userAgent']);
+goog.addDependency('net/cookies.js', ['goog.net.Cookies', 'goog.net.cookies'], []);
+goog.addDependency('net/crossdomainrpc.js', ['goog.net.CrossDomainRpc'], ['goog.Uri', 'goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.json', 'goog.log', 'goog.net.EventType', 'goog.net.HttpStatus', 'goog.string', 'goog.userAgent']);
 goog.addDependency('net/errorcode.js', ['goog.net.ErrorCode'], []);
 goog.addDependency('net/eventtype.js', ['goog.net.EventType'], []);
-goog.addDependency('net/iframeio.js', ['goog.net.IframeIo', 'goog.net.IframeIo.IncrementalDataEvent'], ['goog.Timer', 'goog.Uri', 'goog.debug', 'goog.debug.Logger', 'goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.json', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.xhrMonitor', 'goog.string', 'goog.structs', 'goog.userAgent']);
-goog.addDependency('net/iframeloadmonitor.js', ['goog.net.IframeLoadMonitor'], ['goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.userAgent']);
-goog.addDependency('net/imageloader.js', ['goog.net.ImageLoader'], ['goog.dom', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.net.EventType', 'goog.object', 'goog.userAgent']);
-goog.addDependency('net/jsonp.js', ['goog.net.Jsonp'], ['goog.Uri', 'goog.dom']);
-goog.addDependency('net/mockiframeio.js', ['goog.net.MockIFrameIo'], ['goog.events.EventTarget', 'goog.net.ErrorCode', 'goog.net.IframeIo', 'goog.net.IframeIo.IncrementalDataEvent']);
-goog.addDependency('net/mockxhrlite.js', ['goog.net.MockXhrLite'], ['goog.testing.net.XhrIo']);
-goog.addDependency('net/multiiframeloadmonitor.js', ['goog.net.MultiIframeLoadMonitor'], ['goog.net.IframeLoadMonitor']);
-goog.addDependency('net/networktester.js', ['goog.net.NetworkTester'], ['goog.Timer', 'goog.Uri', 'goog.debug.Logger']);
+goog.addDependency('net/filedownloader.js', ['goog.net.FileDownloader', 'goog.net.FileDownloader.Error'], ['goog.Disposable', 'goog.asserts', 'goog.async.Deferred', 'goog.crypt.hash32', 'goog.debug.Error', 'goog.events', 'goog.events.EventHandler', 'goog.fs', 'goog.fs.DirectoryEntry', 'goog.fs.Error', 'goog.fs.FileSaver', 'goog.net.EventType', 'goog.net.XhrIo', 'goog.net.XhrIoPool', 'goog.object']);
+goog.addDependency('net/httpstatus.js', ['goog.net.HttpStatus'], []);
+goog.addDependency('net/iframeio.js', ['goog.net.IframeIo', 'goog.net.IframeIo.IncrementalDataEvent'], ['goog.Timer', 'goog.Uri', 'goog.debug', 'goog.dom', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.json', 'goog.log', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.reflect', 'goog.string', 'goog.structs', 'goog.userAgent']);
+goog.addDependency('net/iframeloadmonitor.js', ['goog.net.IframeLoadMonitor'], ['goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.userAgent']);
+goog.addDependency('net/imageloader.js', ['goog.net.ImageLoader'], ['goog.array', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.net.EventType', 'goog.object', 'goog.userAgent']);
+goog.addDependency('net/ipaddress.js', ['goog.net.IpAddress', 'goog.net.Ipv4Address', 'goog.net.Ipv6Address'], ['goog.array', 'goog.math.Integer', 'goog.object', 'goog.string']);
+goog.addDependency('net/jsloader.js', ['goog.net.jsloader', 'goog.net.jsloader.Error', 'goog.net.jsloader.ErrorCode', 'goog.net.jsloader.Options'], ['goog.array', 'goog.async.Deferred', 'goog.debug.Error', 'goog.dom', 'goog.dom.TagName']);
+goog.addDependency('net/jsonp.js', ['goog.net.Jsonp'], ['goog.Uri', 'goog.net.jsloader']);
+goog.addDependency('net/mockiframeio.js', ['goog.net.MockIFrameIo'], ['goog.events.EventTarget', 'goog.json', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.IframeIo']);
+goog.addDependency('net/multiiframeloadmonitor.js', ['goog.net.MultiIframeLoadMonitor'], ['goog.events', 'goog.net.IframeLoadMonitor']);
+goog.addDependency('net/networkstatusmonitor.js', ['goog.net.NetworkStatusMonitor'], ['goog.events.Listenable']);
+goog.addDependency('net/networktester.js', ['goog.net.NetworkTester'], ['goog.Timer', 'goog.Uri', 'goog.log']);
+goog.addDependency('net/testdata/jsloader_test1.js', ['goog.net.testdata.jsloader_test1'], []);
+goog.addDependency('net/testdata/jsloader_test2.js', ['goog.net.testdata.jsloader_test2'], []);
+goog.addDependency('net/testdata/jsloader_test3.js', ['goog.net.testdata.jsloader_test3'], []);
+goog.addDependency('net/testdata/jsloader_test4.js', ['goog.net.testdata.jsloader_test4'], []);
 goog.addDependency('net/tmpnetwork.js', ['goog.net.tmpnetwork'], ['goog.Uri', 'goog.net.ChannelDebug']);
+goog.addDependency('net/websocket.js', ['goog.net.WebSocket', 'goog.net.WebSocket.ErrorEvent', 'goog.net.WebSocket.EventType', 'goog.net.WebSocket.MessageEvent'], ['goog.Timer', 'goog.asserts', 'goog.debug.entryPointRegistry', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.log']);
 goog.addDependency('net/wrapperxmlhttpfactory.js', ['goog.net.WrapperXmlHttpFactory'], ['goog.net.XmlHttpFactory']);
-goog.addDependency('net/xhrio.js', ['goog.net.XhrIo'], ['goog.Timer', 'goog.debug.Logger', 'goog.debug.errorHandlerWeakDep', 'goog.events.EventTarget', 'goog.json', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.XmlHttp', 'goog.net.xhrMonitor', 'goog.structs', 'goog.structs.Map']);
+goog.addDependency('net/xhrio.js', ['goog.net.XhrIo', 'goog.net.XhrIo.ResponseType'], ['goog.Timer', 'goog.array', 'goog.debug.entryPointRegistry', 'goog.events.EventTarget', 'goog.json', 'goog.log', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.HttpStatus', 'goog.net.XmlHttp', 'goog.object', 'goog.string', 'goog.structs', 'goog.structs.Map', 'goog.uri.utils', 'goog.userAgent']);
 goog.addDependency('net/xhriopool.js', ['goog.net.XhrIoPool'], ['goog.net.XhrIo', 'goog.structs', 'goog.structs.PriorityPool']);
-goog.addDependency('net/xhrlite.js', ['goog.net.XhrLite'], ['goog.net.XhrIo']);
-goog.addDependency('net/xhrlitepool.js', ['goog.net.XhrLitePool'], ['goog.net.XhrIoPool']);
-goog.addDependency('net/xhrmanager.js', ['goog.net.XhrManager', 'goog.net.XhrManager.Event', 'goog.net.XhrManager.Request'], ['goog.Disposable', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.net.EventType', 'goog.net.XhrIo', 'goog.net.XhrIoPool', 'goog.structs.Map']);
-goog.addDependency('net/xhrmonitor.js', ['goog.net.xhrMonitor'], ['goog.array', 'goog.debug.Logger', 'goog.userAgent']);
+goog.addDependency('net/xhrmanager.js', ['goog.net.XhrManager', 'goog.net.XhrManager.Event', 'goog.net.XhrManager.Request'], ['goog.Disposable', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.XhrIo', 'goog.net.XhrIoPool', 'goog.structs', 'goog.structs.Map']);
 goog.addDependency('net/xmlhttp.js', ['goog.net.DefaultXmlHttpFactory', 'goog.net.XmlHttp', 'goog.net.XmlHttp.OptionType', 'goog.net.XmlHttp.ReadyState'], ['goog.net.WrapperXmlHttpFactory', 'goog.net.XmlHttpFactory']);
 goog.addDependency('net/xmlhttpfactory.js', ['goog.net.XmlHttpFactory'], []);
-goog.addDependency('net/xpc/crosspagechannel.js', ['goog.net.xpc.CrossPageChannel', 'goog.net.xpc.CrossPageChannel.Role'], ['goog.Disposable', 'goog.Uri', 'goog.dom', 'goog.json', 'goog.net.xpc', 'goog.net.xpc.FrameElementMethodTransport', 'goog.net.xpc.IframePollingTransport', 'goog.net.xpc.IframeRelayTransport', 'goog.net.xpc.NativeMessagingTransport', 'goog.net.xpc.NixTransport', 'goog.net.xpc.Transport', 'goog.userAgent']);
-goog.addDependency('net/xpc/frameelementmethodtransport.js', ['goog.net.xpc.FrameElementMethodTransport'], ['goog.net.xpc', 'goog.net.xpc.Transport']);
-goog.addDependency('net/xpc/iframepollingtransport.js', ['goog.net.xpc.IframePollingTransport', 'goog.net.xpc.IframePollingTransport.Receiver', 'goog.net.xpc.IframePollingTransport.Sender'], ['goog.array', 'goog.dom', 'goog.net.xpc', 'goog.net.xpc.Transport', 'goog.userAgent']);
+goog.addDependency('net/xpc/crosspagechannel.js', ['goog.net.xpc.CrossPageChannel'], ['goog.Disposable', 'goog.Uri', 'goog.async.Deferred', 'goog.async.Delay', 'goog.dom', 'goog.events', 'goog.events.EventHandler', 'goog.json', 'goog.messaging.AbstractChannel', 'goog.net.xpc', 'goog.net.xpc.CrossPageChannelRole', 'goog.net.xpc.FrameElementMethodTransport', 'goog.net.xpc.IframePollingTransport', 'goog.net.xpc.IframeRelayTransport', 'goog.net.xpc.NativeMessagingTransport', 'goog.net.xpc.NixTransport', 'goog.net.xpc.Transport', 'goog.userAgent']);
+goog.addDependency('net/xpc/crosspagechannelrole.js', ['goog.net.xpc.CrossPageChannelRole'], []);
+goog.addDependency('net/xpc/frameelementmethodtransport.js', ['goog.net.xpc.FrameElementMethodTransport'], ['goog.net.xpc', 'goog.net.xpc.CrossPageChannelRole', 'goog.net.xpc.Transport']);
+goog.addDependency('net/xpc/iframepollingtransport.js', ['goog.net.xpc.IframePollingTransport', 'goog.net.xpc.IframePollingTransport.Receiver', 'goog.net.xpc.IframePollingTransport.Sender'], ['goog.array', 'goog.dom', 'goog.net.xpc', 'goog.net.xpc.CrossPageChannelRole', 'goog.net.xpc.Transport', 'goog.userAgent']);
 goog.addDependency('net/xpc/iframerelaytransport.js', ['goog.net.xpc.IframeRelayTransport'], ['goog.dom', 'goog.events', 'goog.net.xpc', 'goog.net.xpc.Transport', 'goog.userAgent']);
-goog.addDependency('net/xpc/nativemessagingtransport.js', ['goog.net.xpc.NativeMessagingTransport'], ['goog.events', 'goog.net.xpc', 'goog.net.xpc.Transport']);
-goog.addDependency('net/xpc/nixtransport.js', ['goog.net.xpc.NixTransport'], ['goog.net.xpc', 'goog.net.xpc.Transport']);
+goog.addDependency('net/xpc/nativemessagingtransport.js', ['goog.net.xpc.NativeMessagingTransport'], ['goog.Timer', 'goog.asserts', 'goog.async.Deferred', 'goog.events', 'goog.events.EventHandler', 'goog.net.xpc', 'goog.net.xpc.CrossPageChannelRole', 'goog.net.xpc.Transport']);
+goog.addDependency('net/xpc/nixtransport.js', ['goog.net.xpc.NixTransport'], ['goog.net.xpc', 'goog.net.xpc.CrossPageChannelRole', 'goog.net.xpc.Transport', 'goog.reflect']);
 goog.addDependency('net/xpc/relay.js', ['goog.net.xpc.relay'], []);
-goog.addDependency('net/xpc/transport.js', ['goog.net.xpc.Transport'], ['goog.Disposable', 'goog.net.xpc']);
-goog.addDependency('net/xpc/xpc.js', ['goog.net.xpc'], ['goog.debug.Logger']);
+goog.addDependency('net/xpc/transport.js', ['goog.net.xpc.Transport'], ['goog.Disposable', 'goog.dom', 'goog.net.xpc']);
+goog.addDependency('net/xpc/xpc.js', ['goog.net.xpc', 'goog.net.xpc.CfgFields', 'goog.net.xpc.ChannelStates', 'goog.net.xpc.TransportNames', 'goog.net.xpc.TransportTypes', 'goog.net.xpc.UriCfgFields'], ['goog.log']);
 goog.addDependency('object/object.js', ['goog.object'], []);
 goog.addDependency('positioning/absoluteposition.js', ['goog.positioning.AbsolutePosition'], ['goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.positioning', 'goog.positioning.AbstractPosition']);
 goog.addDependency('positioning/abstractposition.js', ['goog.positioning.AbstractPosition'], ['goog.math.Box', 'goog.math.Size', 'goog.positioning.Corner']);
 goog.addDependency('positioning/anchoredposition.js', ['goog.positioning.AnchoredPosition'], ['goog.math.Box', 'goog.positioning', 'goog.positioning.AbstractPosition']);
 goog.addDependency('positioning/anchoredviewportposition.js', ['goog.positioning.AnchoredViewportPosition'], ['goog.math.Box', 'goog.positioning', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus']);
-goog.addDependency('positioning/clientposition.js', ['goog.positioning.ClientPosition'], ['goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.positioning', 'goog.positioning.AbstractPosition']);
+goog.addDependency('positioning/clientposition.js', ['goog.positioning.ClientPosition'], ['goog.asserts', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.positioning', 'goog.positioning.AbstractPosition', 'goog.style']);
+goog.addDependency('positioning/clientposition_test.js', ['goog.positioning.clientPositionTest'], ['goog.dom', 'goog.positioning.ClientPosition', 'goog.style', 'goog.testing.jsunit']);
 goog.addDependency('positioning/menuanchoredposition.js', ['goog.positioning.MenuAnchoredPosition'], ['goog.math.Box', 'goog.math.Size', 'goog.positioning', 'goog.positioning.AnchoredViewportPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow']);
-goog.addDependency('positioning/positioning.js', ['goog.positioning', 'goog.positioning.Corner', 'goog.positioning.CornerBit', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus'], ['goog.dom', 'goog.dom.TagName', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.style']);
+goog.addDependency('positioning/positioning.js', ['goog.positioning', 'goog.positioning.Corner', 'goog.positioning.CornerBit', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus'], ['goog.asserts', 'goog.dom', 'goog.dom.TagName', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.style', 'goog.style.bidi']);
+goog.addDependency('positioning/positioning_test.js', ['goog.positioningTest'], ['goog.dom', 'goog.dom.DomHelper', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Rect', 'goog.math.Size', 'goog.positioning', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus', 'goog.style', 'goog.testing.ExpectedFailures', 'goog.testing.jsunit', 'goog.userAgent', 'goog.userAgent.product']);
 goog.addDependency('positioning/viewportclientposition.js', ['goog.positioning.ViewportClientPosition'], ['goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.positioning.ClientPosition']);
 goog.addDependency('positioning/viewportposition.js', ['goog.positioning.ViewportPosition'], ['goog.math.Box', 'goog.math.Coordinate', 'goog.math.Size', 'goog.positioning.AbstractPosition']);
 goog.addDependency('proto/proto.js', ['goog.proto'], ['goog.proto.Serializer']);
 goog.addDependency('proto/serializer.js', ['goog.proto.Serializer'], ['goog.json.Serializer', 'goog.string']);
 goog.addDependency('proto2/descriptor.js', ['goog.proto2.Descriptor', 'goog.proto2.Metadata'], ['goog.array', 'goog.object', 'goog.proto2.Util']);
 goog.addDependency('proto2/fielddescriptor.js', ['goog.proto2.FieldDescriptor'], ['goog.proto2.Util', 'goog.string']);
-goog.addDependency('proto2/lazydeserializer.js', ['goog.proto2.LazyDeserializer'], ['goog.proto2.Serializer', 'goog.proto2.Util']);
+goog.addDependency('proto2/lazydeserializer.js', ['goog.proto2.LazyDeserializer'], ['goog.proto2.Message', 'goog.proto2.Serializer', 'goog.proto2.Util']);
 goog.addDependency('proto2/message.js', ['goog.proto2.Message'], ['goog.proto2.Descriptor', 'goog.proto2.FieldDescriptor', 'goog.proto2.Util', 'goog.string']);
 goog.addDependency('proto2/objectserializer.js', ['goog.proto2.ObjectSerializer'], ['goog.proto2.Serializer', 'goog.proto2.Util', 'goog.string']);
 goog.addDependency('proto2/package_test.pb.js', ['someprotopackage.TestPackageTypes'], ['goog.proto2.Message', 'proto2.TestAllTypes']);
 goog.addDependency('proto2/pbliteserializer.js', ['goog.proto2.PbLiteSerializer'], ['goog.proto2.LazyDeserializer', 'goog.proto2.Util']);
 goog.addDependency('proto2/serializer.js', ['goog.proto2.Serializer'], ['goog.proto2.Descriptor', 'goog.proto2.FieldDescriptor', 'goog.proto2.Message', 'goog.proto2.Util']);
 goog.addDependency('proto2/test.pb.js', ['proto2.TestAllTypes', 'proto2.TestAllTypes.NestedEnum', 'proto2.TestAllTypes.NestedMessage', 'proto2.TestAllTypes.OptionalGroup', 'proto2.TestAllTypes.RepeatedGroup'], ['goog.proto2.Message']);
+goog.addDependency('proto2/textformatserializer.js', ['goog.proto2.TextFormatSerializer', 'goog.proto2.TextFormatSerializer.Parser'], ['goog.array', 'goog.asserts', 'goog.json', 'goog.proto2.Serializer', 'goog.proto2.Util', 'goog.string']);
+goog.addDependency('proto2/textformatserializer_test.js', ['goog.proto2.TextFormatSerializerTest'], ['goog.proto2.TextFormatSerializer', 'goog.testing.jsunit', 'proto2.TestAllTypes']);
 goog.addDependency('proto2/util.js', ['goog.proto2.Util'], ['goog.asserts']);
 goog.addDependency('pubsub/pubsub.js', ['goog.pubsub.PubSub'], ['goog.Disposable', 'goog.array']);
 goog.addDependency('reflect/reflect.js', ['goog.reflect'], []);
+goog.addDependency('result/deferredadaptor.js', ['goog.result.DeferredAdaptor'], ['goog.async.Deferred', 'goog.result', 'goog.result.Result']);
+goog.addDependency('result/dependentresult.js', ['goog.result.DependentResult'], ['goog.result.Result']);
+goog.addDependency('result/result_interface.js', ['goog.result.Result'], []);
+goog.addDependency('result/resultutil.js', ['goog.result'], ['goog.array', 'goog.result.DependentResult', 'goog.result.Result', 'goog.result.SimpleResult']);
+goog.addDependency('result/simpleresult.js', ['goog.result.SimpleResult', 'goog.result.SimpleResult.StateError'], ['goog.debug.Error', 'goog.result.Result']);
+goog.addDependency('soy/data.js', ['goog.soy.data', 'goog.soy.data.SanitizedContent', 'goog.soy.data.SanitizedContentKind'], []);
+goog.addDependency('soy/renderer.js', ['goog.soy.InjectedDataSupplier', 'goog.soy.Renderer'], ['goog.asserts', 'goog.dom', 'goog.soy', 'goog.soy.data.SanitizedContent', 'goog.soy.data.SanitizedContentKind']);
+goog.addDependency('soy/soy.js', ['goog.soy'], ['goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.soy.data', 'goog.string']);
+goog.addDependency('soy/soy_test.js', ['goog.soy.testHelper'], ['goog.dom', 'goog.dom.TagName', 'goog.soy.data.SanitizedContent', 'goog.soy.data.SanitizedContentKind', 'goog.string', 'goog.userAgent']);
 goog.addDependency('spell/spellcheck.js', ['goog.spell.SpellCheck', 'goog.spell.SpellCheck.WordChangedEvent'], ['goog.Timer', 'goog.events.EventTarget', 'goog.structs.Set']);
+goog.addDependency('stats/basicstat.js', ['goog.stats.BasicStat'], ['goog.array', 'goog.iter', 'goog.log', 'goog.object', 'goog.string.format', 'goog.structs.CircularBuffer']);
+goog.addDependency('storage/collectablestorage.js', ['goog.storage.CollectableStorage'], ['goog.array', 'goog.asserts', 'goog.iter', 'goog.storage.ErrorCode', 'goog.storage.ExpiringStorage', 'goog.storage.RichStorage.Wrapper', 'goog.storage.mechanism.IterableMechanism']);
+goog.addDependency('storage/encryptedstorage.js', ['goog.storage.EncryptedStorage'], ['goog.crypt', 'goog.crypt.Arc4', 'goog.crypt.Sha1', 'goog.crypt.base64', 'goog.json', 'goog.json.Serializer', 'goog.storage.CollectableStorage', 'goog.storage.ErrorCode', 'goog.storage.RichStorage', 'goog.storage.RichStorage.Wrapper', 'goog.storage.mechanism.IterableMechanism']);
+goog.addDependency('storage/errorcode.js', ['goog.storage.ErrorCode'], []);
+goog.addDependency('storage/expiringstorage.js', ['goog.storage.ExpiringStorage'], ['goog.storage.RichStorage', 'goog.storage.RichStorage.Wrapper', 'goog.storage.mechanism.Mechanism']);
+goog.addDependency('storage/mechanism/errorcode.js', ['goog.storage.mechanism.ErrorCode'], []);
+goog.addDependency('storage/mechanism/errorhandlingmechanism.js', ['goog.storage.mechanism.ErrorHandlingMechanism'], ['goog.storage.mechanism.Mechanism']);
+goog.addDependency('storage/mechanism/html5localstorage.js', ['goog.storage.mechanism.HTML5LocalStorage'], ['goog.storage.mechanism.HTML5WebStorage']);
+goog.addDependency('storage/mechanism/html5sessionstorage.js', ['goog.storage.mechanism.HTML5SessionStorage'], ['goog.storage.mechanism.HTML5WebStorage']);
+goog.addDependency('storage/mechanism/html5webstorage.js', ['goog.storage.mechanism.HTML5WebStorage'], ['goog.asserts', 'goog.iter.Iterator', 'goog.iter.StopIteration', 'goog.storage.mechanism.ErrorCode', 'goog.storage.mechanism.IterableMechanism']);
+goog.addDependency('storage/mechanism/ieuserdata.js', ['goog.storage.mechanism.IEUserData'], ['goog.asserts', 'goog.iter.Iterator', 'goog.iter.StopIteration', 'goog.storage.mechanism.ErrorCode', 'goog.storage.mechanism.IterableMechanism', 'goog.structs.Map', 'goog.userAgent']);
+goog.addDependency('storage/mechanism/iterablemechanism.js', ['goog.storage.mechanism.IterableMechanism'], ['goog.array', 'goog.asserts', 'goog.iter', 'goog.iter.Iterator', 'goog.storage.mechanism.Mechanism']);
+goog.addDependency('storage/mechanism/iterablemechanismtester.js', ['goog.storage.mechanism.iterableMechanismTester'], ['goog.iter.Iterator', 'goog.storage.mechanism.IterableMechanism', 'goog.testing.asserts']);
+goog.addDependency('storage/mechanism/mechanism.js', ['goog.storage.mechanism.Mechanism'], []);
+goog.addDependency('storage/mechanism/mechanismfactory.js', ['goog.storage.mechanism.mechanismfactory'], ['goog.storage.mechanism.HTML5LocalStorage', 'goog.storage.mechanism.HTML5SessionStorage', 'goog.storage.mechanism.IEUserData', 'goog.storage.mechanism.IterableMechanism', 'goog.storage.mechanism.PrefixedMechanism']);
+goog.addDependency('storage/mechanism/mechanismseparationtester.js', ['goog.storage.mechanism.mechanismSeparationTester'], ['goog.iter.Iterator', 'goog.storage.mechanism.IterableMechanism', 'goog.testing.asserts']);
+goog.addDependency('storage/mechanism/mechanismsharingtester.js', ['goog.storage.mechanism.mechanismSharingTester'], ['goog.iter.Iterator', 'goog.storage.mechanism.IterableMechanism', 'goog.testing.asserts']);
+goog.addDependency('storage/mechanism/mechanismtester.js', ['goog.storage.mechanism.mechanismTester'], ['goog.storage.mechanism.ErrorCode', 'goog.storage.mechanism.HTML5LocalStorage', 'goog.storage.mechanism.Mechanism', 'goog.testing.asserts', 'goog.userAgent.product', 'goog.userAgent.product.isVersion']);
+goog.addDependency('storage/mechanism/prefixedmechanism.js', ['goog.storage.mechanism.PrefixedMechanism'], ['goog.iter.Iterator', 'goog.storage.mechanism.IterableMechanism']);
+goog.addDependency('storage/richstorage.js', ['goog.storage.RichStorage', 'goog.storage.RichStorage.Wrapper'], ['goog.storage.ErrorCode', 'goog.storage.Storage', 'goog.storage.mechanism.Mechanism']);
+goog.addDependency('storage/storage.js', ['goog.storage.Storage'], ['goog.json', 'goog.json.Serializer', 'goog.storage.ErrorCode']);
+goog.addDependency('storage/storage_test.js', ['goog.storage.storage_test'], ['goog.storage.Storage', 'goog.structs.Map', 'goog.testing.asserts']);
+goog.addDependency('string/linkify.js', ['goog.string.linkify'], ['goog.string']);
+goog.addDependency('string/newlines.js', ['goog.string.newlines', 'goog.string.newlines.Line'], ['goog.array']);
+goog.addDependency('string/newlines_test.js', ['goog.string.newlinesTest'], ['goog.string.newlines', 'goog.testing.jsunit']);
+goog.addDependency('string/parser.js', ['goog.string.Parser'], []);
+goog.addDependency('string/path.js', ['goog.string.path'], ['goog.array', 'goog.string']);
 goog.addDependency('string/string.js', ['goog.string', 'goog.string.Unicode'], []);
-goog.addDependency('string/stringbuffer.js', ['goog.string.StringBuffer'], ['goog.userAgent.jscript']);
+goog.addDependency('string/string_test.js', ['goog.stringTest'], ['goog.functions', 'goog.object', 'goog.string', 'goog.testing.PropertyReplacer', 'goog.testing.jsunit']);
+goog.addDependency('string/stringbuffer.js', ['goog.string.StringBuffer'], []);
 goog.addDependency('string/stringformat.js', ['goog.string.format'], ['goog.string']);
-goog.addDependency('structs/avltree.js', ['goog.structs.AvlTree', 'goog.structs.AvlTree.Node'], ['goog.structs']);
+goog.addDependency('string/stringifier.js', ['goog.string.Stringifier'], []);
+goog.addDependency('structs/avltree.js', ['goog.structs.AvlTree', 'goog.structs.AvlTree.Node'], ['goog.structs.Collection']);
 goog.addDependency('structs/circularbuffer.js', ['goog.structs.CircularBuffer'], []);
-goog.addDependency('structs/heap.js', ['goog.structs.Heap'], ['goog.array', 'goog.structs.Node']);
+goog.addDependency('structs/collection.js', ['goog.structs.Collection'], []);
+goog.addDependency('structs/heap.js', ['goog.structs.Heap'], ['goog.array', 'goog.object', 'goog.structs.Node']);
 goog.addDependency('structs/inversionmap.js', ['goog.structs.InversionMap'], ['goog.array']);
 goog.addDependency('structs/linkedmap.js', ['goog.structs.LinkedMap'], ['goog.structs.Map']);
-goog.addDependency('structs/map.js', ['goog.structs.Map'], ['goog.iter.Iterator', 'goog.iter.StopIteration', 'goog.object', 'goog.structs']);
+goog.addDependency('structs/map.js', ['goog.structs.Map'], ['goog.iter.Iterator', 'goog.iter.StopIteration', 'goog.object']);
 goog.addDependency('structs/node.js', ['goog.structs.Node'], []);
 goog.addDependency('structs/pool.js', ['goog.structs.Pool'], ['goog.Disposable', 'goog.structs.Queue', 'goog.structs.Set']);
 goog.addDependency('structs/prioritypool.js', ['goog.structs.PriorityPool'], ['goog.structs.Pool', 'goog.structs.PriorityQueue']);
-goog.addDependency('structs/priorityqueue.js', ['goog.structs.PriorityQueue'], ['goog.structs', 'goog.structs.Heap']);
+goog.addDependency('structs/priorityqueue.js', ['goog.structs.PriorityQueue'], ['goog.structs.Heap']);
 goog.addDependency('structs/quadtree.js', ['goog.structs.QuadTree', 'goog.structs.QuadTree.Node', 'goog.structs.QuadTree.Point'], ['goog.math.Coordinate']);
 goog.addDependency('structs/queue.js', ['goog.structs.Queue'], ['goog.array']);
-goog.addDependency('structs/set.js', ['goog.structs.Set'], ['goog.structs', 'goog.structs.Map']);
+goog.addDependency('structs/set.js', ['goog.structs.Set'], ['goog.structs', 'goog.structs.Collection', 'goog.structs.Map']);
 goog.addDependency('structs/simplepool.js', ['goog.structs.SimplePool'], ['goog.Disposable']);
-goog.addDependency('structs/stringset.js', ['goog.structs.StringSet'], ['goog.iter']);
+goog.addDependency('structs/stringset.js', ['goog.structs.StringSet'], ['goog.asserts', 'goog.iter']);
 goog.addDependency('structs/structs.js', ['goog.structs'], ['goog.array', 'goog.object']);
 goog.addDependency('structs/treenode.js', ['goog.structs.TreeNode'], ['goog.array', 'goog.asserts', 'goog.structs.Node']);
 goog.addDependency('structs/trie.js', ['goog.structs.Trie'], ['goog.object', 'goog.structs']);
+goog.addDependency('style/bidi.js', ['goog.style.bidi'], ['goog.dom', 'goog.style', 'goog.userAgent']);
 goog.addDependency('style/cursor.js', ['goog.style.cursor'], ['goog.userAgent']);
-goog.addDependency('style/style.js', ['goog.style'], ['goog.array', 'goog.dom', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Rect', 'goog.math.Size', 'goog.object', 'goog.userAgent']);
+goog.addDependency('style/style.js', ['goog.style'], ['goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.vendor', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Rect', 'goog.math.Size', 'goog.object', 'goog.string', 'goog.userAgent']);
+goog.addDependency('style/style_test.js', ['goog.style_test'], ['goog.array', 'goog.color', 'goog.dom', 'goog.events.BrowserEvent', 'goog.math.Box', 'goog.math.Coordinate', 'goog.math.Rect', 'goog.math.Size', 'goog.object', 'goog.string', 'goog.style', 'goog.testing.ExpectedFailures', 'goog.testing.PropertyReplacer', 'goog.testing.asserts', 'goog.testing.jsunit', 'goog.userAgent', 'goog.userAgent.product', 'goog.userAgent.product.isVersion']);
+goog.addDependency('style/stylescrollbartester.js', ['goog.styleScrollbarTester'], ['goog.dom', 'goog.style', 'goog.testing.asserts']);
+goog.addDependency('style/transition.js', ['goog.style.transition', 'goog.style.transition.Css3Property'], ['goog.array', 'goog.asserts', 'goog.dom.vendor', 'goog.style', 'goog.userAgent']);
 goog.addDependency('testing/asserts.js', ['goog.testing.JsUnitException', 'goog.testing.asserts'], ['goog.testing.stacktrace']);
+goog.addDependency('testing/async/mockcontrol.js', ['goog.testing.async.MockControl'], ['goog.asserts', 'goog.async.Deferred', 'goog.debug', 'goog.testing.asserts', 'goog.testing.mockmatchers.IgnoreArgument']);
 goog.addDependency('testing/asynctestcase.js', ['goog.testing.AsyncTestCase', 'goog.testing.AsyncTestCase.ControlBreakingException'], ['goog.testing.TestCase', 'goog.testing.TestCase.Test', 'goog.testing.asserts']);
 goog.addDependency('testing/benchmark.js', ['goog.testing.benchmark'], ['goog.dom', 'goog.dom.TagName', 'goog.testing.PerformanceTable', 'goog.testing.PerformanceTimer', 'goog.testing.TestCase']);
 goog.addDependency('testing/continuationtestcase.js', ['goog.testing.ContinuationTestCase', 'goog.testing.ContinuationTestCase.Step', 'goog.testing.ContinuationTestCase.Test'], ['goog.array', 'goog.events.EventHandler', 'goog.testing.TestCase', 'goog.testing.TestCase.Test', 'goog.testing.asserts']);
+goog.addDependency('testing/deferredtestcase.js', ['goog.testing.DeferredTestCase'], ['goog.async.Deferred', 'goog.testing.AsyncTestCase', 'goog.testing.TestCase']);
 goog.addDependency('testing/dom.js', ['goog.testing.dom'], ['goog.dom', 'goog.dom.NodeIterator', 'goog.dom.NodeType', 'goog.dom.TagIterator', 'goog.dom.TagName', 'goog.dom.classes', 'goog.iter', 'goog.object', 'goog.string', 'goog.style', 'goog.testing.asserts', 'goog.userAgent']);
 goog.addDependency('testing/editor/dom.js', ['goog.testing.editor.dom'], ['goog.dom.NodeType', 'goog.dom.TagIterator', 'goog.dom.TagWalkType', 'goog.iter', 'goog.string', 'goog.testing.asserts']);
-goog.addDependency('testing/editor/fieldmock.js', ['goog.testing.editor.FieldMock'], ['goog.dom', 'goog.dom.Range', 'goog.editor.Field', 'goog.testing.LooseMock']);
-goog.addDependency('testing/editor/testhelper.js', ['goog.testing.editor.TestHelper'], ['goog.Disposable', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.testing.dom']);
+goog.addDependency('testing/editor/fieldmock.js', ['goog.testing.editor.FieldMock'], ['goog.dom', 'goog.dom.Range', 'goog.editor.Field', 'goog.testing.LooseMock', 'goog.testing.mockmatchers']);
+goog.addDependency('testing/editor/testhelper.js', ['goog.testing.editor.TestHelper'], ['goog.Disposable', 'goog.dom', 'goog.dom.Range', 'goog.editor.BrowserFeature', 'goog.editor.node', 'goog.editor.plugins.AbstractBubblePlugin', 'goog.testing.dom']);
 goog.addDependency('testing/events/eventobserver.js', ['goog.testing.events.EventObserver'], ['goog.array']);
-goog.addDependency('testing/events/events.js', ['goog.testing.events', 'goog.testing.events.Event'], ['goog.events', 'goog.events.BrowserEvent', 'goog.events.BrowserEvent.MouseButton', 'goog.events.Event', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.object', 'goog.userAgent']);
+goog.addDependency('testing/events/events.js', ['goog.testing.events', 'goog.testing.events.Event'], ['goog.Disposable', 'goog.asserts', 'goog.dom.NodeType', 'goog.events', 'goog.events.BrowserEvent', 'goog.events.BrowserFeature', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.object', 'goog.style', 'goog.userAgent']);
 goog.addDependency('testing/events/matchers.js', ['goog.testing.events.EventMatcher'], ['goog.events.Event', 'goog.testing.mockmatchers.ArgumentMatcher']);
-goog.addDependency('testing/expectedfailures.js', ['goog.testing.ExpectedFailures'], ['goog.debug.DivConsole', 'goog.debug.Logger', 'goog.dom', 'goog.dom.TagName', 'goog.events', 'goog.events.EventType', 'goog.style', 'goog.testing.JsUnitException', 'goog.testing.TestCase', 'goog.testing.asserts']);
-goog.addDependency('testing/functionmock.js', ['goog.testing', 'goog.testing.FunctionMock', 'goog.testing.GlobalFunctionMock', 'goog.testing.MethodMock'], ['goog.object', 'goog.testing.PropertyReplacer', 'goog.testing.StrictMock']);
+goog.addDependency('testing/events/onlinehandler.js', ['goog.testing.events.OnlineHandler'], ['goog.events.EventTarget', 'goog.net.NetworkStatusMonitor']);
+goog.addDependency('testing/expectedfailures.js', ['goog.testing.ExpectedFailures'], ['goog.debug.DivConsole', 'goog.dom', 'goog.dom.TagName', 'goog.events', 'goog.events.EventType', 'goog.log', 'goog.style', 'goog.testing.JsUnitException', 'goog.testing.TestCase', 'goog.testing.asserts']);
+goog.addDependency('testing/fs/blob.js', ['goog.testing.fs.Blob'], ['goog.crypt.base64']);
+goog.addDependency('testing/fs/entry.js', ['goog.testing.fs.DirectoryEntry', 'goog.testing.fs.Entry', 'goog.testing.fs.FileEntry'], ['goog.Timer', 'goog.array', 'goog.asserts', 'goog.async.Deferred', 'goog.fs.DirectoryEntry', 'goog.fs.DirectoryEntryImpl', 'goog.fs.Entry', 'goog.fs.Error', 'goog.fs.FileEntry', 'goog.functions', 'goog.object', 'goog.string', 'goog.testing.fs.File', 'goog.testing.fs.FileWriter']);
+goog.addDependency('testing/fs/file.js', ['goog.testing.fs.File'], ['goog.testing.fs.Blob']);
+goog.addDependency('testing/fs/filereader.js', ['goog.testing.fs.FileReader'], ['goog.Timer', 'goog.events.EventTarget', 'goog.fs.Error', 'goog.fs.FileReader.EventType', 'goog.fs.FileReader.ReadyState', 'goog.testing.fs.File', 'goog.testing.fs.ProgressEvent']);
+goog.addDependency('testing/fs/filesystem.js', ['goog.testing.fs.FileSystem'], ['goog.fs.FileSystem', 'goog.testing.fs.DirectoryEntry']);
+goog.addDependency('testing/fs/filewriter.js', ['goog.testing.fs.FileWriter'], ['goog.Timer', 'goog.events.Event', 'goog.events.EventTarget', 'goog.fs.Error', 'goog.fs.FileSaver.EventType', 'goog.fs.FileSaver.ReadyState', 'goog.string', 'goog.testing.fs.File', 'goog.testing.fs.ProgressEvent']);
+goog.addDependency('testing/fs/fs.js', ['goog.testing.fs'], ['goog.Timer', 'goog.array', 'goog.async.Deferred', 'goog.fs', 'goog.testing.fs.Blob', 'goog.testing.fs.FileSystem']);
+goog.addDependency('testing/fs/progressevent.js', ['goog.testing.fs.ProgressEvent'], ['goog.events.Event']);
+goog.addDependency('testing/functionmock.js', ['goog.testing', 'goog.testing.FunctionMock', 'goog.testing.GlobalFunctionMock', 'goog.testing.MethodMock'], ['goog.object', 'goog.testing.LooseMock', 'goog.testing.Mock', 'goog.testing.MockInterface', 'goog.testing.PropertyReplacer', 'goog.testing.StrictMock']);
 goog.addDependency('testing/graphics.js', ['goog.testing.graphics'], ['goog.graphics.Path.Segment', 'goog.testing.asserts']);
+goog.addDependency('testing/i18n/asserts.js', ['goog.testing.i18n.asserts'], ['goog.testing.jsunit']);
+goog.addDependency('testing/i18n/asserts_test.js', ['goog.testing.i18n.assertsTest'], ['goog.testing.ExpectedFailures', 'goog.testing.i18n.asserts']);
 goog.addDependency('testing/jsunit.js', ['goog.testing.jsunit'], ['goog.testing.TestCase', 'goog.testing.TestRunner']);
 goog.addDependency('testing/loosemock.js', ['goog.testing.LooseExpectationCollection', 'goog.testing.LooseMock'], ['goog.array', 'goog.structs.Map', 'goog.testing.Mock']);
-goog.addDependency('testing/mock.js', ['goog.testing.Mock', 'goog.testing.MockExpectation'], ['goog.array', 'goog.testing.JsUnitException', 'goog.testing.mockmatchers']);
+goog.addDependency('testing/messaging/mockmessagechannel.js', ['goog.testing.messaging.MockMessageChannel'], ['goog.messaging.AbstractChannel', 'goog.testing.asserts']);
+goog.addDependency('testing/messaging/mockmessageevent.js', ['goog.testing.messaging.MockMessageEvent'], ['goog.events.BrowserEvent', 'goog.events.EventType', 'goog.testing.events']);
+goog.addDependency('testing/messaging/mockmessageport.js', ['goog.testing.messaging.MockMessagePort'], ['goog.events.EventTarget']);
+goog.addDependency('testing/messaging/mockportnetwork.js', ['goog.testing.messaging.MockPortNetwork'], ['goog.messaging.PortNetwork', 'goog.testing.messaging.MockMessageChannel']);
+goog.addDependency('testing/mock.js', ['goog.testing.Mock', 'goog.testing.MockExpectation'], ['goog.array', 'goog.object', 'goog.testing.JsUnitException', 'goog.testing.MockInterface', 'goog.testing.mockmatchers']);
 goog.addDependency('testing/mockclassfactory.js', ['goog.testing.MockClassFactory', 'goog.testing.MockClassRecord'], ['goog.array', 'goog.object', 'goog.testing.LooseMock', 'goog.testing.StrictMock', 'goog.testing.TestCase', 'goog.testing.mockmatchers']);
-goog.addDependency('testing/mockclock.js', ['goog.testing.MockClock'], ['goog.Disposable', 'goog.testing.PropertyReplacer']);
-goog.addDependency('testing/mockcontrol.js', ['goog.testing.MockControl'], ['goog.array', 'goog.testing', 'goog.testing.LooseMock', 'goog.testing.StrictMock']);
+goog.addDependency('testing/mockclock.js', ['goog.testing.MockClock'], ['goog.Disposable', 'goog.testing.PropertyReplacer', 'goog.testing.events', 'goog.testing.events.Event']);
+goog.addDependency('testing/mockcontrol.js', ['goog.testing.MockControl'], ['goog.array', 'goog.testing', 'goog.testing.LooseMock', 'goog.testing.MockInterface', 'goog.testing.StrictMock']);
+goog.addDependency('testing/mockinterface.js', ['goog.testing.MockInterface'], []);
 goog.addDependency('testing/mockmatchers.js', ['goog.testing.mockmatchers', 'goog.testing.mockmatchers.ArgumentMatcher', 'goog.testing.mockmatchers.IgnoreArgument', 'goog.testing.mockmatchers.InstanceOf', 'goog.testing.mockmatchers.ObjectEquals', 'goog.testing.mockmatchers.RegexpMatch', 'goog.testing.mockmatchers.SaveArgument', 'goog.testing.mockmatchers.TypeOf'], ['goog.array', 'goog.dom', 'goog.testing.asserts']);
 goog.addDependency('testing/mockrandom.js', ['goog.testing.MockRandom'], ['goog.Disposable']);
 goog.addDependency('testing/mockrange.js', ['goog.testing.MockRange'], ['goog.dom.AbstractRange', 'goog.testing.LooseMock']);
+goog.addDependency('testing/mockstorage.js', ['goog.testing.MockStorage'], ['goog.structs.Map']);
 goog.addDependency('testing/mockuseragent.js', ['goog.testing.MockUserAgent'], ['goog.Disposable', 'goog.userAgent']);
-goog.addDependency('testing/multitestrunner.js', ['goog.testing.MultiTestRunner', 'goog.testing.MultiTestRunner.TestFrame'], ['goog.Timer', 'goog.array', 'goog.dom', 'goog.dom.classes', 'goog.events.EventHandler', 'goog.functions', 'goog.string', 'goog.ui.Component', 'goog.ui.ServerChart', 'goog.ui.ServerChart.ChartType', 'goog.ui.TableSorter']);
-goog.addDependency('testing/net/xhrio.js', ['goog.testing.net.XhrIo'], ['goog.array', 'goog.dom.xml', 'goog.events', 'goog.events.EventTarget', 'goog.json', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.XmlHttp', 'goog.structs.Map']);
+goog.addDependency('testing/multitestrunner.js', ['goog.testing.MultiTestRunner', 'goog.testing.MultiTestRunner.TestFrame'], ['goog.Timer', 'goog.array', 'goog.dom', 'goog.dom.classes', 'goog.events.EventHandler', 'goog.functions', 'goog.string', 'goog.ui.Component', 'goog.ui.ServerChart', 'goog.ui.TableSorter']);
+goog.addDependency('testing/net/xhrio.js', ['goog.testing.net.XhrIo'], ['goog.array', 'goog.dom.xml', 'goog.events', 'goog.events.EventTarget', 'goog.json', 'goog.net.ErrorCode', 'goog.net.EventType', 'goog.net.HttpStatus', 'goog.net.XhrIo', 'goog.net.XmlHttp', 'goog.object', 'goog.structs.Map']);
+goog.addDependency('testing/net/xhriopool.js', ['goog.testing.net.XhrIoPool'], ['goog.net.XhrIoPool', 'goog.testing.net.XhrIo']);
 goog.addDependency('testing/objectpropertystring.js', ['goog.testing.ObjectPropertyString'], []);
 goog.addDependency('testing/performancetable.js', ['goog.testing.PerformanceTable'], ['goog.dom', 'goog.testing.PerformanceTimer']);
-goog.addDependency('testing/performancetimer.js', ['goog.testing.PerformanceTimer'], ['goog.array', 'goog.math']);
+goog.addDependency('testing/performancetimer.js', ['goog.testing.PerformanceTimer', 'goog.testing.PerformanceTimer.Task'], ['goog.array', 'goog.async.Deferred', 'goog.math']);
 goog.addDependency('testing/propertyreplacer.js', ['goog.testing.PropertyReplacer'], ['goog.userAgent']);
+goog.addDependency('testing/proto2/proto2.js', ['goog.testing.proto2'], ['goog.proto2.Message', 'goog.testing.asserts']);
 goog.addDependency('testing/pseudorandom.js', ['goog.testing.PseudoRandom'], ['goog.Disposable']);
 goog.addDependency('testing/recordfunction.js', ['goog.testing.FunctionCall', 'goog.testing.recordConstructor', 'goog.testing.recordFunction'], []);
-goog.addDependency('testing/singleton.js', ['goog.testing.singleton'], ['goog.array']);
+goog.addDependency('testing/shardingtestcase.js', ['goog.testing.ShardingTestCase'], ['goog.asserts', 'goog.testing.TestCase']);
+goog.addDependency('testing/singleton.js', ['goog.testing.singleton'], []);
 goog.addDependency('testing/stacktrace.js', ['goog.testing.stacktrace', 'goog.testing.stacktrace.Frame'], []);
+goog.addDependency('testing/storage/fakemechanism.js', ['goog.testing.storage.FakeMechanism'], ['goog.storage.mechanism.IterableMechanism', 'goog.structs.Map']);
 goog.addDependency('testing/strictmock.js', ['goog.testing.StrictMock'], ['goog.array', 'goog.testing.Mock']);
-goog.addDependency('testing/style/layoutasserts.js', ['goog.testing.style.layoutasserts'], ['goog.style', 'goog.testing.asserts']);
-goog.addDependency('testing/testcase.js', ['goog.testing.TestCase', 'goog.testing.TestCase.Error', 'goog.testing.TestCase.Order', 'goog.testing.TestCase.Result', 'goog.testing.TestCase.Test'], ['goog.testing.asserts', 'goog.testing.stacktrace']);
+goog.addDependency('testing/style/layoutasserts.js', ['goog.testing.style.layoutasserts'], ['goog.style', 'goog.testing.asserts', 'goog.testing.style']);
+goog.addDependency('testing/style/style.js', ['goog.testing.style'], ['goog.dom', 'goog.math.Rect', 'goog.style']);
+goog.addDependency('testing/testcase.js', ['goog.testing.TestCase', 'goog.testing.TestCase.Error', 'goog.testing.TestCase.Order', 'goog.testing.TestCase.Result', 'goog.testing.TestCase.Test'], ['goog.object', 'goog.testing.asserts', 'goog.testing.stacktrace']);
 goog.addDependency('testing/testqueue.js', ['goog.testing.TestQueue'], []);
 goog.addDependency('testing/testrunner.js', ['goog.testing.TestRunner'], ['goog.testing.TestCase']);
 goog.addDependency('testing/ui/rendererasserts.js', ['goog.testing.ui.rendererasserts'], ['goog.testing.asserts']);
-goog.addDependency('testing/ui/rendererharness.js', ['goog.testing.ui.RendererHarness'], ['goog.Disposable', 'goog.dom.NodeType', 'goog.testing.asserts']);
+goog.addDependency('testing/ui/rendererharness.js', ['goog.testing.ui.RendererHarness'], ['goog.Disposable', 'goog.dom.NodeType', 'goog.testing.asserts', 'goog.testing.dom']);
 goog.addDependency('testing/ui/style.js', ['goog.testing.ui.style'], ['goog.array', 'goog.dom', 'goog.dom.classes', 'goog.testing.asserts']);
 goog.addDependency('timer/timer.js', ['goog.Timer'], ['goog.events.EventTarget']);
-goog.addDependency('tweak/entries.js', ['goog.tweak.BaseEntry', 'goog.tweak.BasePrimitiveSetting', 'goog.tweak.BaseSetting', 'goog.tweak.BooleanGroup', 'goog.tweak.BooleanInGroupSetting', 'goog.tweak.BooleanSetting', 'goog.tweak.ButtonAction', 'goog.tweak.NumericSetting', 'goog.tweak.StringSetting'], ['goog.array', 'goog.asserts', 'goog.debug.Logger', 'goog.object']);
-goog.addDependency('tweak/registry.js', ['goog.tweak.Registry'], ['goog.asserts', 'goog.debug.Logger', 'goog.object', 'goog.tweak.BaseEntry', 'goog.uri.utils']);
-goog.addDependency('tweak/testhelpers.js', ['goog.tweak.testhelpers'], ['goog.tweak']);
-goog.addDependency('tweak/tweak.js', ['goog.tweak', 'goog.tweak.ConfigParams'], ['goog.asserts', 'goog.tweak.BooleanGroup', 'goog.tweak.BooleanInGroupSetting', 'goog.tweak.BooleanSetting', 'goog.tweak.ButtonAction', 'goog.tweak.NumericSetting', 'goog.tweak.Registry', 'goog.tweak.StringSetting']);
-goog.addDependency('tweak/tweakui.js', ['goog.tweak.EntriesPanel', 'goog.tweak.TweakUi'], ['goog.array', 'goog.asserts', 'goog.dom.DomHelper', 'goog.object', 'goog.style', 'goog.tweak', 'goog.ui.Zippy']);
-goog.addDependency('ui/abstractspellchecker.js', ['goog.ui.AbstractSpellChecker', 'goog.ui.AbstractSpellChecker.AsyncResult'], ['goog.dom', 'goog.dom.classes', 'goog.dom.selection', 'goog.events.EventType', 'goog.math.Coordinate', 'goog.spell.SpellCheck', 'goog.structs.Set', 'goog.style', 'goog.ui.MenuItem', 'goog.ui.MenuSeparator', 'goog.ui.PopupMenu']);
-goog.addDependency('ui/activitymonitor.js', ['goog.ui.ActivityMonitor'], ['goog.dom', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventTarget']);
-goog.addDependency('ui/advancedtooltip.js', ['goog.ui.AdvancedTooltip'], ['goog.math.Coordinate', 'goog.ui.Tooltip', 'goog.userAgent']);
-goog.addDependency('ui/animatedzippy.js', ['goog.ui.AnimatedZippy'], ['goog.dom', 'goog.events', 'goog.fx.Animation', 'goog.fx.easing', 'goog.ui.Zippy', 'goog.ui.ZippyEvent']);
-goog.addDependency('ui/attachablemenu.js', ['goog.ui.AttachableMenu'], ['goog.dom.a11y', 'goog.dom.a11y.State', 'goog.events.KeyCodes', 'goog.ui.ItemEvent', 'goog.ui.MenuBase']);
-goog.addDependency('ui/autocomplete/arraymatcher.js', ['goog.ui.AutoComplete.ArrayMatcher'], ['goog.iter', 'goog.string', 'goog.ui.AutoComplete']);
-goog.addDependency('ui/autocomplete/autocomplete.js', ['goog.ui.AutoComplete', 'goog.ui.AutoComplete.EventType'], ['goog.events', 'goog.events.EventTarget']);
-goog.addDependency('ui/autocomplete/basic.js', ['goog.ui.AutoComplete.Basic'], ['goog.ui.AutoComplete', 'goog.ui.AutoComplete.ArrayMatcher', 'goog.ui.AutoComplete.InputHandler', 'goog.ui.AutoComplete.Renderer']);
-goog.addDependency('ui/autocomplete/inputhandler.js', ['goog.ui.AutoComplete.InputHandler'], ['goog.Disposable', 'goog.Timer', 'goog.dom.a11y', 'goog.dom.selection', 'goog.events', 'goog.events.EventHandler', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.string', 'goog.ui.AutoComplete']);
-goog.addDependency('ui/autocomplete/remote.js', ['goog.ui.AutoComplete.Remote'], ['goog.ui.AutoComplete', 'goog.ui.AutoComplete.InputHandler', 'goog.ui.AutoComplete.RemoteArrayMatcher', 'goog.ui.AutoComplete.Renderer']);
-goog.addDependency('ui/autocomplete/remotearraymatcher.js', ['goog.ui.AutoComplete.RemoteArrayMatcher'], ['goog.Disposable', 'goog.Uri', 'goog.events', 'goog.json', 'goog.net.XhrIo', 'goog.ui.AutoComplete']);
-goog.addDependency('ui/autocomplete/renderer.js', ['goog.ui.AutoComplete.Renderer', 'goog.ui.AutoComplete.Renderer.CustomRenderer'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.classes', 'goog.events.EventTarget', 'goog.iter', 'goog.string', 'goog.style', 'goog.ui.AutoComplete', 'goog.ui.IdGenerator', 'goog.userAgent']);
-goog.addDependency('ui/autocomplete/richinputhandler.js', ['goog.ui.AutoComplete.RichInputHandler'], ['goog.ui.AutoComplete', 'goog.ui.AutoComplete.InputHandler']);
-goog.addDependency('ui/autocomplete/richremote.js', ['goog.ui.AutoComplete.RichRemote'], ['goog.ui.AutoComplete', 'goog.ui.AutoComplete.Remote', 'goog.ui.AutoComplete.Renderer', 'goog.ui.AutoComplete.RichInputHandler', 'goog.ui.AutoComplete.RichRemoteArrayMatcher']);
-goog.addDependency('ui/autocomplete/richremotearraymatcher.js', ['goog.ui.AutoComplete.RichRemoteArrayMatcher'], ['goog.ui.AutoComplete', 'goog.ui.AutoComplete.RemoteArrayMatcher']);
-goog.addDependency('ui/basicmenu.js', ['goog.ui.BasicMenu', 'goog.ui.BasicMenu.Item', 'goog.ui.BasicMenu.Separator'], ['goog.array', 'goog.dom', 'goog.dom.a11y', 'goog.positioning', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.ui.AttachableMenu', 'goog.ui.ItemEvent']);
-goog.addDependency('ui/bidiinput.js', ['goog.ui.BidiInput'], ['goog.events', 'goog.events.InputHandler', 'goog.i18n.bidi', 'goog.ui.Component']);
-goog.addDependency('ui/bubble.js', ['goog.ui.Bubble'], ['goog.Timer', 'goog.dom', 'goog.events', 'goog.events.Event', 'goog.math.Box', 'goog.positioning', 'goog.positioning.AbsolutePosition', 'goog.positioning.AbstractPosition', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.style', 'goog.ui.Component', 'goog.ui.Popup', 'goog.ui.Popup.AnchoredPosition']);
-goog.addDependency('ui/button.js', ['goog.ui.Button', 'goog.ui.Button.Side'], ['goog.events.KeyCodes', 'goog.ui.ButtonRenderer', 'goog.ui.Control', 'goog.ui.ControlContent', 'goog.ui.NativeButtonRenderer']);
-goog.addDependency('ui/buttonrenderer.js', ['goog.ui.ButtonRenderer'], ['goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.dom.a11y.State', 'goog.ui.Component.State', 'goog.ui.ControlRenderer']);
-goog.addDependency('ui/cccbutton.js', ['goog.ui.CccButton'], ['goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.ui.DeprecatedButton', 'goog.userAgent']);
+goog.addDependency('tweak/entries.js', ['goog.tweak.BaseEntry', 'goog.tweak.BasePrimitiveSetting', 'goog.tweak.BaseSetting', 'goog.tweak.BooleanGroup', 'goog.tweak.BooleanInGroupSetting', 'goog.tweak.BooleanSetting', 'goog.tweak.ButtonAction', 'goog.tweak.NumericSetting', 'goog.tweak.StringSetting'], ['goog.array', 'goog.asserts', 'goog.log', 'goog.object']);
+goog.addDependency('tweak/registry.js', ['goog.tweak.Registry'], ['goog.asserts', 'goog.log', 'goog.object', 'goog.string', 'goog.tweak.BaseEntry', 'goog.uri.utils']);
+goog.addDependency('tweak/testhelpers.js', ['goog.tweak.testhelpers'], ['goog.tweak', 'goog.tweak.BooleanGroup', 'goog.tweak.BooleanInGroupSetting', 'goog.tweak.BooleanSetting', 'goog.tweak.ButtonAction', 'goog.tweak.NumericSetting', 'goog.tweak.Registry', 'goog.tweak.StringSetting']);
+goog.addDependency('tweak/tweak.js', ['goog.tweak', 'goog.tweak.ConfigParams'], ['goog.asserts', 'goog.tweak.BaseSetting', 'goog.tweak.BooleanGroup', 'goog.tweak.BooleanInGroupSetting', 'goog.tweak.BooleanSetting', 'goog.tweak.ButtonAction', 'goog.tweak.NumericSetting', 'goog.tweak.Registry', 'goog.tweak.StringSetting']);
+goog.addDependency('tweak/tweakui.js', ['goog.tweak.EntriesPanel', 'goog.tweak.TweakUi'], ['goog.array', 'goog.asserts', 'goog.dom.DomHelper', 'goog.object', 'goog.style', 'goog.tweak', 'goog.ui.Zippy', 'goog.userAgent']);
+goog.addDependency('ui/abstractspellchecker.js', ['goog.ui.AbstractSpellChecker', 'goog.ui.AbstractSpellChecker.AsyncResult'], ['goog.a11y.aria', 'goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.dom.selection', 'goog.events', 'goog.events.Event', 'goog.events.EventType', 'goog.math.Coordinate', 'goog.spell.SpellCheck', 'goog.structs.Set', 'goog.style', 'goog.ui.Component', 'goog.ui.MenuItem', 'goog.ui.MenuSeparator', 'goog.ui.PopupMenu']);
+goog.addDependency('ui/ac/ac.js', ['goog.ui.ac'], ['goog.ui.ac.ArrayMatcher', 'goog.ui.ac.AutoComplete', 'goog.ui.ac.InputHandler', 'goog.ui.ac.Renderer']);
+goog.addDependency('ui/ac/arraymatcher.js', ['goog.ui.ac.ArrayMatcher'], ['goog.string']);
+goog.addDependency('ui/ac/autocomplete.js', ['goog.ui.ac.AutoComplete', 'goog.ui.ac.AutoComplete.EventType'], ['goog.array', 'goog.asserts', 'goog.events', 'goog.events.EventTarget', 'goog.object']);
+goog.addDependency('ui/ac/inputhandler.js', ['goog.ui.ac.InputHandler'], ['goog.Disposable', 'goog.Timer', 'goog.a11y.aria', 'goog.dom', 'goog.dom.selection', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.string', 'goog.userAgent', 'goog.userAgent.product']);
+goog.addDependency('ui/ac/remote.js', ['goog.ui.ac.Remote'], ['goog.ui.ac.AutoComplete', 'goog.ui.ac.InputHandler', 'goog.ui.ac.RemoteArrayMatcher', 'goog.ui.ac.Renderer']);
+goog.addDependency('ui/ac/remotearraymatcher.js', ['goog.ui.ac.RemoteArrayMatcher'], ['goog.Disposable', 'goog.Uri', 'goog.events', 'goog.json', 'goog.net.EventType', 'goog.net.XhrIo']);
+goog.addDependency('ui/ac/renderer.js', ['goog.ui.ac.Renderer', 'goog.ui.ac.Renderer.CustomRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.array', 'goog.dispose', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.events', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.fx.dom.FadeInAndShow', 'goog.fx.dom.FadeOutAndHide', 'goog.positioning', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.string', 'goog.style', 'goog.ui.IdGenerator', 'goog.ui.ac.AutoComplete']);
+goog.addDependency('ui/ac/renderoptions.js', ['goog.ui.ac.RenderOptions'], []);
+goog.addDependency('ui/ac/richinputhandler.js', ['goog.ui.ac.RichInputHandler'], ['goog.ui.ac.InputHandler']);
+goog.addDependency('ui/ac/richremote.js', ['goog.ui.ac.RichRemote'], ['goog.ui.ac.AutoComplete', 'goog.ui.ac.Remote', 'goog.ui.ac.Renderer', 'goog.ui.ac.RichInputHandler', 'goog.ui.ac.RichRemoteArrayMatcher']);
+goog.addDependency('ui/ac/richremotearraymatcher.js', ['goog.ui.ac.RichRemoteArrayMatcher'], ['goog.json', 'goog.ui.ac.RemoteArrayMatcher']);
+goog.addDependency('ui/activitymonitor.js', ['goog.ui.ActivityMonitor'], ['goog.array', 'goog.asserts', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType']);
+goog.addDependency('ui/advancedtooltip.js', ['goog.ui.AdvancedTooltip'], ['goog.events', 'goog.events.EventType', 'goog.math.Box', 'goog.math.Coordinate', 'goog.style', 'goog.ui.Tooltip', 'goog.userAgent']);
+goog.addDependency('ui/animatedzippy.js', ['goog.ui.AnimatedZippy'], ['goog.dom', 'goog.events', 'goog.fx.Animation', 'goog.fx.Transition', 'goog.fx.easing', 'goog.ui.Zippy', 'goog.ui.ZippyEvent']);
+goog.addDependency('ui/attachablemenu.js', ['goog.ui.AttachableMenu'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.classes', 'goog.events.Event', 'goog.events.KeyCodes', 'goog.string', 'goog.style', 'goog.ui.ItemEvent', 'goog.ui.MenuBase', 'goog.ui.PopupBase', 'goog.userAgent']);
+goog.addDependency('ui/bidiinput.js', ['goog.ui.BidiInput'], ['goog.dom', 'goog.events', 'goog.events.InputHandler', 'goog.i18n.bidi', 'goog.ui.Component']);
+goog.addDependency('ui/bubble.js', ['goog.ui.Bubble'], ['goog.Timer', 'goog.events', 'goog.events.EventType', 'goog.math.Box', 'goog.positioning', 'goog.positioning.AbsolutePosition', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.positioning.CornerBit', 'goog.style', 'goog.ui.Component', 'goog.ui.Popup']);
+goog.addDependency('ui/button.js', ['goog.ui.Button', 'goog.ui.Button.Side'], ['goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.ui.ButtonRenderer', 'goog.ui.ButtonSide', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.NativeButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/buttonrenderer.js', ['goog.ui.ButtonRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.asserts', 'goog.ui.ButtonSide', 'goog.ui.Component', 'goog.ui.ControlRenderer']);
+goog.addDependency('ui/buttonside.js', ['goog.ui.ButtonSide'], []);
 goog.addDependency('ui/charcounter.js', ['goog.ui.CharCounter', 'goog.ui.CharCounter.Display'], ['goog.dom', 'goog.events', 'goog.events.EventTarget', 'goog.events.InputHandler']);
-goog.addDependency('ui/charpicker.js', ['goog.ui.CharPicker'], ['goog.array', 'goog.dom', 'goog.events', 'goog.events.InputHandler', 'goog.i18n.CharListDecompressor', 'goog.i18n.uChar', 'goog.structs.Set', 'goog.style', 'goog.ui.Button', 'goog.ui.ContainerScroller', 'goog.ui.FlatButtonRenderer', 'goog.ui.HoverCard', 'goog.ui.LabelInput', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.MenuItem']);
-goog.addDependency('ui/checkbox.js', ['goog.ui.Checkbox', 'goog.ui.Checkbox.State'], ['goog.array', 'goog.dom.classes', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler.EventType', 'goog.object', 'goog.ui.Component.EventType', 'goog.ui.Control', 'goog.ui.registry']);
-goog.addDependency('ui/checkboxmenuitem.js', ['goog.ui.CheckBoxMenuItem'], ['goog.ui.ControlContent', 'goog.ui.MenuItem', 'goog.ui.registry']);
+goog.addDependency('ui/charpicker.js', ['goog.ui.CharPicker'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.array', 'goog.asserts', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.i18n.CharListDecompressor', 'goog.i18n.uChar', 'goog.structs.Set', 'goog.style', 'goog.ui.Button', 'goog.ui.Component', 'goog.ui.ContainerScroller', 'goog.ui.FlatButtonRenderer', 'goog.ui.HoverCard', 'goog.ui.LabelInput', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.MenuItem', 'goog.ui.Tooltip']);
+goog.addDependency('ui/checkbox.js', ['goog.ui.Checkbox', 'goog.ui.Checkbox.State'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.ui.CheckboxRenderer', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.Control', 'goog.ui.registry']);
+goog.addDependency('ui/checkboxmenuitem.js', ['goog.ui.CheckBoxMenuItem'], ['goog.ui.MenuItem', 'goog.ui.registry']);
+goog.addDependency('ui/checkboxrenderer.js', ['goog.ui.CheckboxRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.array', 'goog.asserts', 'goog.dom.classes', 'goog.object', 'goog.ui.ControlRenderer']);
 goog.addDependency('ui/colorbutton.js', ['goog.ui.ColorButton'], ['goog.ui.Button', 'goog.ui.ColorButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/colorbuttonrenderer.js', ['goog.ui.ColorButtonRenderer'], ['goog.dom.classes', 'goog.functions', 'goog.ui.ColorMenuButtonRenderer']);
-goog.addDependency('ui/colormenubutton.js', ['goog.ui.ColorMenuButton'], ['goog.array', 'goog.object', 'goog.ui.ColorMenuButtonRenderer', 'goog.ui.ColorPalette', 'goog.ui.Component.EventType', 'goog.ui.ControlContent', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.registry']);
-goog.addDependency('ui/colormenubuttonrenderer.js', ['goog.ui.ColorMenuButtonRenderer'], ['goog.color', 'goog.dom.classes', 'goog.ui.ControlContent', 'goog.ui.MenuButtonRenderer', 'goog.userAgent']);
-goog.addDependency('ui/colorpalette.js', ['goog.ui.ColorPalette'], ['goog.array', 'goog.color', 'goog.dom', 'goog.style', 'goog.ui.Palette', 'goog.ui.PaletteRenderer']);
-goog.addDependency('ui/colorpicker.js', ['goog.ui.ColorPicker', 'goog.ui.ColorPicker.EventType'], ['goog.ui.ColorPalette', 'goog.ui.Component', 'goog.ui.Component.State']);
-goog.addDependency('ui/colorsplitbehavior.js', ['goog.ui.ColorSplitBehavior'], ['goog.ui.ColorButton', 'goog.ui.ColorMenuButton', 'goog.ui.SplitBehavior']);
-goog.addDependency('ui/combobox.js', ['goog.ui.ComboBox', 'goog.ui.ComboBoxItem'], ['goog.Timer', 'goog.debug.Logger', 'goog.dom.classes', 'goog.events', 'goog.events.InputHandler', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.ItemEvent', 'goog.ui.LabelInput', 'goog.ui.Menu', 'goog.ui.MenuItem', 'goog.ui.registry', 'goog.userAgent']);
-goog.addDependency('ui/component.js', ['goog.ui.Component', 'goog.ui.Component.Error', 'goog.ui.Component.EventType', 'goog.ui.Component.State'], ['goog.array', 'goog.dom', 'goog.dom.DomHelper', 'goog.events', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.object', 'goog.style', 'goog.ui.IdGenerator']);
-goog.addDependency('ui/container.js', ['goog.ui.Container', 'goog.ui.Container.EventType', 'goog.ui.Container.Orientation'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.State', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.Error', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.ContainerRenderer']);
-goog.addDependency('ui/containerrenderer.js', ['goog.ui.ContainerRenderer'], ['goog.array', 'goog.dom', 'goog.dom.a11y', 'goog.dom.classes', 'goog.string', 'goog.style', 'goog.ui.Separator', 'goog.ui.registry', 'goog.userAgent']);
-goog.addDependency('ui/containerscroller.js', ['goog.ui.ContainerScroller'], ['goog.Timer', 'goog.events.EventHandler', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.ui.Container.EventType']);
-goog.addDependency('ui/control.js', ['goog.ui.Control'], ['goog.array', 'goog.dom', 'goog.events.BrowserEvent.MouseButton', 'goog.events.Event', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.string', 'goog.ui.Component', 'goog.ui.Component.Error', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.ui.ControlRenderer', 'goog.ui.decorate', 'goog.ui.registry', 'goog.userAgent']);
+goog.addDependency('ui/colormenubutton.js', ['goog.ui.ColorMenuButton'], ['goog.array', 'goog.object', 'goog.ui.ColorMenuButtonRenderer', 'goog.ui.ColorPalette', 'goog.ui.Component', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.registry']);
+goog.addDependency('ui/colormenubuttonrenderer.js', ['goog.ui.ColorMenuButtonRenderer'], ['goog.color', 'goog.dom.classes', 'goog.ui.MenuButtonRenderer', 'goog.userAgent']);
+goog.addDependency('ui/colorpalette.js', ['goog.ui.ColorPalette'], ['goog.array', 'goog.color', 'goog.style', 'goog.ui.Palette', 'goog.ui.PaletteRenderer']);
+goog.addDependency('ui/colorpicker.js', ['goog.ui.ColorPicker', 'goog.ui.ColorPicker.EventType'], ['goog.ui.ColorPalette', 'goog.ui.Component']);
+goog.addDependency('ui/colorsplitbehavior.js', ['goog.ui.ColorSplitBehavior'], ['goog.ui.ColorMenuButton', 'goog.ui.SplitBehavior']);
+goog.addDependency('ui/combobox.js', ['goog.ui.ComboBox', 'goog.ui.ComboBoxItem'], ['goog.Timer', 'goog.dom', 'goog.dom.classlist', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.log', 'goog.positioning.Corner', 'goog.positioning.MenuAnchoredPosition', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.ItemEvent', 'goog.ui.LabelInput', 'goog.ui.Menu', 'goog.ui.MenuItem', 'goog.ui.MenuSeparator', 'goog.ui.registry', 'goog.userAgent']);
+goog.addDependency('ui/component.js', ['goog.ui.Component', 'goog.ui.Component.Error', 'goog.ui.Component.EventType', 'goog.ui.Component.State'], ['goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.object', 'goog.style', 'goog.ui.IdGenerator']);
+goog.addDependency('ui/container.js', ['goog.ui.Container', 'goog.ui.Container.EventType', 'goog.ui.Container.Orientation'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.object', 'goog.style', 'goog.ui.Component', 'goog.ui.ContainerRenderer', 'goog.ui.Control']);
+goog.addDependency('ui/containerrenderer.js', ['goog.ui.ContainerRenderer'], ['goog.a11y.aria', 'goog.array', 'goog.asserts', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.string', 'goog.style', 'goog.ui.registry', 'goog.userAgent']);
+goog.addDependency('ui/containerscroller.js', ['goog.ui.ContainerScroller'], ['goog.Disposable', 'goog.Timer', 'goog.events.EventHandler', 'goog.style', 'goog.ui.Component', 'goog.ui.Container']);
+goog.addDependency('ui/control.js', ['goog.ui.Control'], ['goog.array', 'goog.dom', 'goog.events.Event', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.string', 'goog.ui.Component', 'goog.ui.ControlContent', 'goog.ui.ControlRenderer', 'goog.ui.decorate', 'goog.ui.registry', 'goog.userAgent']);
 goog.addDependency('ui/controlcontent.js', ['goog.ui.ControlContent'], []);
-goog.addDependency('ui/controlrenderer.js', ['goog.ui.ControlRenderer'], ['goog.array', 'goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.State', 'goog.dom.classes', 'goog.object', 'goog.style', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.userAgent']);
-goog.addDependency('ui/css3buttonrenderer.js', ['goog.ui.Css3ButtonRenderer'], ['goog.dom', 'goog.dom.TagName', 'goog.dom.classes', 'goog.ui.Button', 'goog.ui.ButtonRenderer', 'goog.ui.ControlContent', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
+goog.addDependency('ui/controlrenderer.js', ['goog.ui.ControlRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.classes', 'goog.object', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
+goog.addDependency('ui/cookieeditor.js', ['goog.ui.CookieEditor'], ['goog.asserts', 'goog.dom', 'goog.dom.TagName', 'goog.events.EventType', 'goog.net.cookies', 'goog.string', 'goog.style', 'goog.ui.Component']);
+goog.addDependency('ui/css3buttonrenderer.js', ['goog.ui.Css3ButtonRenderer'], ['goog.dom.TagName', 'goog.dom.classes', 'goog.ui.Button', 'goog.ui.ButtonRenderer', 'goog.ui.Component', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
+goog.addDependency('ui/css3menubuttonrenderer.js', ['goog.ui.Css3MenuButtonRenderer'], ['goog.dom', 'goog.dom.TagName', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.MenuButton', 'goog.ui.MenuButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/cssnames.js', ['goog.ui.INLINE_BLOCK_CLASSNAME'], []);
-goog.addDependency('ui/custombutton.js', ['goog.ui.CustomButton'], ['goog.ui.Button', 'goog.ui.ControlContent', 'goog.ui.CustomButtonRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/custombuttonrenderer.js', ['goog.ui.CustomButtonRenderer'], ['goog.dom', 'goog.dom.classes', 'goog.string', 'goog.ui.ButtonRenderer', 'goog.ui.ControlContent', 'goog.ui.INLINE_BLOCK_CLASSNAME']);
-goog.addDependency('ui/customcolorpalette.js', ['goog.ui.CustomColorPalette'], ['goog.color', 'goog.dom', 'goog.ui.ColorPalette']);
-goog.addDependency('ui/datepicker.js', ['goog.ui.DatePicker', 'goog.ui.DatePicker.Events', 'goog.ui.DatePickerEvent'], ['goog.date', 'goog.date.Date', 'goog.date.Interval', 'goog.dom', 'goog.dom.a11y', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.i18n.DateTimeFormat', 'goog.i18n.DateTimeSymbols', 'goog.style', 'goog.ui.Component']);
+goog.addDependency('ui/custombutton.js', ['goog.ui.CustomButton'], ['goog.ui.Button', 'goog.ui.CustomButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/custombuttonrenderer.js', ['goog.ui.CustomButtonRenderer'], ['goog.a11y.aria.Role', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.string', 'goog.ui.ButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME']);
+goog.addDependency('ui/customcolorpalette.js', ['goog.ui.CustomColorPalette'], ['goog.color', 'goog.dom', 'goog.dom.classes', 'goog.ui.ColorPalette', 'goog.ui.Component']);
+goog.addDependency('ui/datepicker.js', ['goog.ui.DatePicker', 'goog.ui.DatePicker.Events', 'goog.ui.DatePickerEvent'], ['goog.a11y.aria', 'goog.asserts', 'goog.date', 'goog.date.Date', 'goog.date.Interval', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.events.Event', 'goog.events.EventType', 'goog.events.KeyHandler', 'goog.i18n.DateTimeFormat', 'goog.i18n.DateTimeSymbols', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.DefaultDatePickerRenderer', 'goog.ui.IdGenerator']);
+goog.addDependency('ui/datepickerrenderer.js', ['goog.ui.DatePickerRenderer'], []);
 goog.addDependency('ui/decorate.js', ['goog.ui.decorate'], ['goog.ui.registry']);
-goog.addDependency('ui/deprecatedbutton.js', ['goog.ui.DeprecatedButton'], ['goog.dom', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget']);
-goog.addDependency('ui/dialog.js', ['goog.ui.Dialog', 'goog.ui.Dialog.ButtonSet', 'goog.ui.Dialog.DefaultButtonKeys', 'goog.ui.Dialog.Event', 'goog.ui.Dialog.EventType'], ['goog.Timer', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.a11y', 'goog.dom.classes', 'goog.dom.iframe', 'goog.events', 'goog.events.FocusHandler', 'goog.events.KeyCodes', 'goog.fx.Dragger', 'goog.math.Rect', 'goog.structs', 'goog.structs.Map', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
-goog.addDependency('ui/dimensionpicker.js', ['goog.ui.DimensionPicker'], ['goog.events.EventType', 'goog.math.Size', 'goog.ui.Control', 'goog.ui.DimensionPickerRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/dimensionpickerrenderer.js', ['goog.ui.DimensionPickerRenderer'], ['goog.dom', 'goog.dom.TagName', 'goog.i18n.bidi', 'goog.style', 'goog.ui.ControlRenderer', 'goog.userAgent']);
-goog.addDependency('ui/drilldownrow.js', ['goog.ui.DrilldownRow'], ['goog.dom', 'goog.dom.classes', 'goog.events', 'goog.ui.Component']);
-goog.addDependency('ui/editor/abstractdialog.js', ['goog.ui.editor.AbstractDialog', 'goog.ui.editor.AbstractDialog.Builder', 'goog.ui.editor.AbstractDialog.EventType'], ['goog.dom', 'goog.dom.classes', 'goog.events.EventTarget', 'goog.ui.Dialog', 'goog.ui.Dialog.ButtonSet', 'goog.ui.Dialog.DefaultButtonKeys', 'goog.ui.Dialog.Event', 'goog.ui.Dialog.EventType']);
-goog.addDependency('ui/editor/bubble.js', ['goog.ui.editor.Bubble'], ['goog.debug.Logger', 'goog.dom', 'goog.dom.ViewportSizeMonitor', 'goog.editor.style', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.positioning', 'goog.string', 'goog.style', 'goog.ui.Component.EventType', 'goog.ui.PopupBase', 'goog.ui.PopupBase.EventType', 'goog.userAgent']);
-goog.addDependency('ui/editor/defaulttoolbar.js', ['goog.ui.editor.DefaultToolbar'], ['goog.dom', 'goog.dom.TagName', 'goog.dom.classes', 'goog.editor.Command', 'goog.string.StringBuffer', 'goog.style', 'goog.ui.ControlContent', 'goog.ui.editor.ToolbarFactory', 'goog.ui.editor.messages']);
-goog.addDependency('ui/editor/linkdialog.js', ['goog.ui.editor.LinkDialog', 'goog.ui.editor.LinkDialog.BeforeTestLinkEvent', 'goog.ui.editor.LinkDialog.EventType', 'goog.ui.editor.LinkDialog.OkEvent'], ['goog.dom', 'goog.dom.DomHelper', 'goog.dom.TagName', 'goog.dom.classes', 'goog.dom.selection', 'goog.editor.BrowserFeature', 'goog.editor.Link', 'goog.editor.focus', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.events.InputHandler.EventType', 'goog.string', 'goog.style', 'goog.ui.Button', 'goog.ui.LinkButtonRenderer', 'goog.ui.editor.AbstractDialog', 'goog.ui.editor.AbstractDialog.Builder', 'goog.ui.editor.AbstractDialog.EventType', 'goog.ui.editor.TabPane', 'goog.ui.editor.messages', 'goog.userAgent', 'goog.window']);
+goog.addDependency('ui/defaultdatepickerrenderer.js', ['goog.ui.DefaultDatePickerRenderer'], ['goog.dom', 'goog.dom.TagName', 'goog.ui.DatePickerRenderer']);
+goog.addDependency('ui/dialog.js', ['goog.ui.Dialog', 'goog.ui.Dialog.ButtonSet', 'goog.ui.Dialog.ButtonSet.DefaultButtons', 'goog.ui.Dialog.DefaultButtonCaptions', 'goog.ui.Dialog.DefaultButtonKeys', 'goog.ui.Dialog.Event', 'goog.ui.Dialog.EventType'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.fx.Dragger', 'goog.math.Rect', 'goog.structs', 'goog.structs.Map', 'goog.style', 'goog.ui.ModalPopup', 'goog.userAgent']);
+goog.addDependency('ui/dimensionpicker.js', ['goog.ui.DimensionPicker'], ['goog.events.EventType', 'goog.events.KeyCodes', 'goog.math.Size', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.DimensionPickerRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/dimensionpickerrenderer.js', ['goog.ui.DimensionPickerRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.dom', 'goog.dom.TagName', 'goog.i18n.bidi', 'goog.style', 'goog.ui.ControlRenderer', 'goog.userAgent']);
+goog.addDependency('ui/dragdropdetector.js', ['goog.ui.DragDropDetector', 'goog.ui.DragDropDetector.EventType', 'goog.ui.DragDropDetector.ImageDropEvent', 'goog.ui.DragDropDetector.LinkDropEvent'], ['goog.dom', 'goog.dom.TagName', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.math.Coordinate', 'goog.string', 'goog.style', 'goog.userAgent']);
+goog.addDependency('ui/drilldownrow.js', ['goog.ui.DrilldownRow'], ['goog.dom', 'goog.dom.classes', 'goog.ui.Component']);
+goog.addDependency('ui/editor/abstractdialog.js', ['goog.ui.editor.AbstractDialog', 'goog.ui.editor.AbstractDialog.Builder', 'goog.ui.editor.AbstractDialog.EventType'], ['goog.dom', 'goog.dom.classes', 'goog.events.EventTarget', 'goog.string', 'goog.ui.Dialog']);
+goog.addDependency('ui/editor/bubble.js', ['goog.ui.editor.Bubble'], ['goog.dom', 'goog.dom.TagName', 'goog.dom.ViewportSizeMonitor', 'goog.dom.classes', 'goog.editor.style', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.log', 'goog.math.Box', 'goog.object', 'goog.positioning', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.PopupBase', 'goog.userAgent']);
+goog.addDependency('ui/editor/defaulttoolbar.js', ['goog.ui.editor.ButtonDescriptor', 'goog.ui.editor.DefaultToolbar'], ['goog.dom', 'goog.dom.TagName', 'goog.dom.classes', 'goog.editor.Command', 'goog.style', 'goog.ui.editor.ToolbarFactory', 'goog.ui.editor.messages', 'goog.userAgent']);
+goog.addDependency('ui/editor/equationeditordialog.js', ['goog.ui.editor.EquationEditorDialog'], ['goog.editor.Command', 'goog.ui.Dialog', 'goog.ui.editor.AbstractDialog', 'goog.ui.editor.EquationEditorOkEvent', 'goog.ui.equation.TexEditor']);
+goog.addDependency('ui/editor/equationeditorokevent.js', ['goog.ui.editor.EquationEditorOkEvent'], ['goog.events.Event', 'goog.ui.editor.AbstractDialog']);
+goog.addDependency('ui/editor/linkdialog.js', ['goog.ui.editor.LinkDialog', 'goog.ui.editor.LinkDialog.BeforeTestLinkEvent', 'goog.ui.editor.LinkDialog.EventType', 'goog.ui.editor.LinkDialog.OkEvent'], ['goog.dom', 'goog.dom.TagName', 'goog.editor.BrowserFeature', 'goog.editor.Link', 'goog.editor.focus', 'goog.editor.node', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.string', 'goog.style', 'goog.ui.Button', 'goog.ui.Component', 'goog.ui.LinkButtonRenderer', 'goog.ui.editor.AbstractDialog', 'goog.ui.editor.TabPane', 'goog.ui.editor.messages', 'goog.userAgent', 'goog.window']);
 goog.addDependency('ui/editor/messages.js', ['goog.ui.editor.messages'], []);
-goog.addDependency('ui/editor/tabpane.js', ['goog.ui.editor.TabPane'], ['goog.dom.TagName', 'goog.events.EventHandler', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.Tab', 'goog.ui.TabBar']);
-goog.addDependency('ui/editor/toolbarcontroller.js', ['goog.ui.editor.ToolbarController'], ['goog.editor.Field.EventType', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.ui.Component.EventType']);
-goog.addDependency('ui/editor/toolbarfactory.js', ['goog.ui.editor.ToolbarFactory'], ['goog.array', 'goog.dom', 'goog.string', 'goog.string.Unicode', 'goog.style', 'goog.ui.Component.State', 'goog.ui.Container.Orientation', 'goog.ui.ControlContent', 'goog.ui.Option', 'goog.ui.Toolbar', 'goog.ui.ToolbarButton', 'goog.ui.ToolbarColorMenuButton', 'goog.ui.ToolbarMenuButton', 'goog.ui.ToolbarRenderer', 'goog.ui.ToolbarSelect', 'goog.userAgent']);
+goog.addDependency('ui/editor/tabpane.js', ['goog.ui.editor.TabPane'], ['goog.dom.TagName', 'goog.dom.classes', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.style', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.Tab', 'goog.ui.TabBar']);
+goog.addDependency('ui/editor/toolbarcontroller.js', ['goog.ui.editor.ToolbarController'], ['goog.editor.Field', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.ui.Component']);
+goog.addDependency('ui/editor/toolbarfactory.js', ['goog.ui.editor.ToolbarFactory'], ['goog.array', 'goog.dom', 'goog.dom.TagName', 'goog.string', 'goog.string.Unicode', 'goog.style', 'goog.ui.Component', 'goog.ui.Container', 'goog.ui.Option', 'goog.ui.Toolbar', 'goog.ui.ToolbarButton', 'goog.ui.ToolbarColorMenuButton', 'goog.ui.ToolbarMenuButton', 'goog.ui.ToolbarRenderer', 'goog.ui.ToolbarSelect', 'goog.userAgent']);
 goog.addDependency('ui/emoji/emoji.js', ['goog.ui.emoji.Emoji'], []);
-goog.addDependency('ui/emoji/emojipalette.js', ['goog.ui.emoji.EmojiPalette'], ['goog.events.Event', 'goog.events.EventType', 'goog.net.ImageLoader', 'goog.ui.Palette', 'goog.ui.emoji.Emoji', 'goog.ui.emoji.EmojiPaletteRenderer']);
-goog.addDependency('ui/emoji/emojipaletterenderer.js', ['goog.ui.emoji.EmojiPaletteRenderer'], ['goog.dom', 'goog.dom.a11y', 'goog.ui.PaletteRenderer', 'goog.ui.emoji.Emoji', 'goog.ui.emoji.SpriteInfo']);
-goog.addDependency('ui/emoji/emojipicker.js', ['goog.ui.emoji.EmojiPicker'], ['goog.debug.Logger', 'goog.dom', 'goog.ui.Component', 'goog.ui.TabPane', 'goog.ui.TabPane.TabPage', 'goog.ui.emoji.Emoji', 'goog.ui.emoji.EmojiPalette', 'goog.ui.emoji.EmojiPaletteRenderer', 'goog.ui.emoji.ProgressiveEmojiPaletteRenderer']);
-goog.addDependency('ui/emoji/popupemojipicker.js', ['goog.ui.emoji.PopupEmojiPicker'], ['goog.dom', 'goog.events.EventType', 'goog.positioning.AnchoredPosition', 'goog.ui.Component', 'goog.ui.Popup', 'goog.ui.emoji.EmojiPicker']);
-goog.addDependency('ui/emoji/progressiveemojipaletterenderer.js', ['goog.ui.emoji.ProgressiveEmojiPaletteRenderer'], ['goog.ui.emoji.EmojiPaletteRenderer']);
+goog.addDependency('ui/emoji/emojipalette.js', ['goog.ui.emoji.EmojiPalette'], ['goog.events.EventType', 'goog.net.ImageLoader', 'goog.ui.Palette', 'goog.ui.emoji.Emoji', 'goog.ui.emoji.EmojiPaletteRenderer']);
+goog.addDependency('ui/emoji/emojipaletterenderer.js', ['goog.ui.emoji.EmojiPaletteRenderer'], ['goog.a11y.aria', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.style', 'goog.ui.PaletteRenderer', 'goog.ui.emoji.Emoji']);
+goog.addDependency('ui/emoji/emojipicker.js', ['goog.ui.emoji.EmojiPicker'], ['goog.log', 'goog.style', 'goog.ui.Component', 'goog.ui.TabPane', 'goog.ui.emoji.Emoji', 'goog.ui.emoji.EmojiPalette', 'goog.ui.emoji.EmojiPaletteRenderer', 'goog.ui.emoji.ProgressiveEmojiPaletteRenderer']);
+goog.addDependency('ui/emoji/popupemojipicker.js', ['goog.ui.emoji.PopupEmojiPicker'], ['goog.events.EventType', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.ui.Component', 'goog.ui.Popup', 'goog.ui.emoji.EmojiPicker']);
+goog.addDependency('ui/emoji/progressiveemojipaletterenderer.js', ['goog.ui.emoji.ProgressiveEmojiPaletteRenderer'], ['goog.style', 'goog.ui.emoji.EmojiPaletteRenderer']);
 goog.addDependency('ui/emoji/spriteinfo.js', ['goog.ui.emoji.SpriteInfo'], []);
-goog.addDependency('ui/filteredmenu.js', ['goog.ui.FilteredMenu'], ['goog.dom', 'goog.events.InputHandler', 'goog.events.KeyCodes', 'goog.string', 'goog.ui.FilterObservingMenuItem', 'goog.ui.Menu']);
-goog.addDependency('ui/filterobservingmenuitem.js', ['goog.ui.FilterObservingMenuItem'], ['goog.ui.ControlContent', 'goog.ui.FilterObservingMenuItemRenderer', 'goog.ui.MenuItem', 'goog.ui.registry']);
+goog.addDependency('ui/equation/arrowpalette.js', ['goog.ui.equation.ArrowPalette'], ['goog.math.Size', 'goog.ui.equation.Palette']);
+goog.addDependency('ui/equation/changeevent.js', ['goog.ui.equation.ChangeEvent'], ['goog.events.Event']);
+goog.addDependency('ui/equation/comparisonpalette.js', ['goog.ui.equation.ComparisonPalette'], ['goog.math.Size', 'goog.ui.equation.Palette']);
+goog.addDependency('ui/equation/editorpane.js', ['goog.ui.equation.EditorPane'], ['goog.style', 'goog.ui.Component']);
+goog.addDependency('ui/equation/equationeditor.js', ['goog.ui.equation.EquationEditor'], ['goog.events', 'goog.ui.Component', 'goog.ui.TabBar', 'goog.ui.equation.ImageRenderer', 'goog.ui.equation.TexPane']);
+goog.addDependency('ui/equation/equationeditordialog.js', ['goog.ui.equation.EquationEditorDialog'], ['goog.dom', 'goog.dom.classes', 'goog.ui.Dialog', 'goog.ui.equation.EquationEditor', 'goog.ui.equation.PaletteManager', 'goog.ui.equation.TexEditor']);
+goog.addDependency('ui/equation/greekpalette.js', ['goog.ui.equation.GreekPalette'], ['goog.math.Size', 'goog.ui.equation.Palette']);
+goog.addDependency('ui/equation/imagerenderer.js', ['goog.ui.equation.ImageRenderer'], ['goog.dom.TagName', 'goog.dom.classes', 'goog.string', 'goog.uri.utils']);
+goog.addDependency('ui/equation/mathpalette.js', ['goog.ui.equation.MathPalette'], ['goog.math.Size', 'goog.ui.equation.Palette']);
+goog.addDependency('ui/equation/menupalette.js', ['goog.ui.equation.MenuPalette', 'goog.ui.equation.MenuPaletteRenderer'], ['goog.math.Size', 'goog.ui.PaletteRenderer', 'goog.ui.equation.Palette', 'goog.ui.equation.PaletteRenderer']);
+goog.addDependency('ui/equation/palette.js', ['goog.ui.equation.Palette', 'goog.ui.equation.PaletteEvent', 'goog.ui.equation.PaletteRenderer'], ['goog.dom', 'goog.dom.TagName', 'goog.events.Event', 'goog.ui.Palette', 'goog.ui.PaletteRenderer']);
+goog.addDependency('ui/equation/palettemanager.js', ['goog.ui.equation.PaletteManager'], ['goog.Timer', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.ui.equation.ArrowPalette', 'goog.ui.equation.ComparisonPalette', 'goog.ui.equation.GreekPalette', 'goog.ui.equation.MathPalette', 'goog.ui.equation.MenuPalette', 'goog.ui.equation.Palette', 'goog.ui.equation.SymbolPalette']);
+goog.addDependency('ui/equation/symbolpalette.js', ['goog.ui.equation.SymbolPalette'], ['goog.math.Size', 'goog.ui.equation.Palette']);
+goog.addDependency('ui/equation/texeditor.js', ['goog.ui.equation.TexEditor'], ['goog.ui.Component', 'goog.ui.equation.ImageRenderer', 'goog.ui.equation.TexPane']);
+goog.addDependency('ui/equation/texpane.js', ['goog.ui.equation.TexPane'], ['goog.Timer', 'goog.dom', 'goog.dom.TagName', 'goog.dom.selection', 'goog.events', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.style', 'goog.ui.equation.ChangeEvent', 'goog.ui.equation.EditorPane', 'goog.ui.equation.ImageRenderer', 'goog.ui.equation.Palette', 'goog.ui.equation.PaletteEvent']);
+goog.addDependency('ui/filteredmenu.js', ['goog.ui.FilteredMenu'], ['goog.dom', 'goog.events', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.events.KeyCodes', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.FilterObservingMenuItem', 'goog.ui.Menu', 'goog.userAgent']);
+goog.addDependency('ui/filterobservingmenuitem.js', ['goog.ui.FilterObservingMenuItem'], ['goog.ui.FilterObservingMenuItemRenderer', 'goog.ui.MenuItem', 'goog.ui.registry']);
 goog.addDependency('ui/filterobservingmenuitemrenderer.js', ['goog.ui.FilterObservingMenuItemRenderer'], ['goog.ui.MenuItemRenderer']);
-goog.addDependency('ui/flatbuttonrenderer.js', ['goog.ui.FlatButtonRenderer'], ['goog.dom.classes', 'goog.ui.Button', 'goog.ui.ButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
-goog.addDependency('ui/flatmenubuttonrenderer.js', ['goog.ui.FlatMenuButtonRenderer'], ['goog.style', 'goog.ui.ControlContent', 'goog.ui.FlatButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.MenuRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/flatbuttonrenderer.js', ['goog.ui.FlatButtonRenderer'], ['goog.a11y.aria.Role', 'goog.dom.classes', 'goog.ui.Button', 'goog.ui.ButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
+goog.addDependency('ui/flatmenubuttonrenderer.js', ['goog.ui.FlatMenuButtonRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.FlatButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.MenuRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/formpost.js', ['goog.ui.FormPost'], ['goog.array', 'goog.dom.TagName', 'goog.string', 'goog.string.StringBuffer', 'goog.ui.Component']);
-goog.addDependency('ui/gauge.js', ['goog.ui.Gauge', 'goog.ui.GaugeColoredRange'], ['goog.dom', 'goog.dom.a11y', 'goog.fx.Animation', 'goog.fx.easing', 'goog.graphics', 'goog.graphics.Font', 'goog.graphics.SolidFill', 'goog.ui.Component', 'goog.ui.GaugeTheme']);
+goog.addDependency('ui/gauge.js', ['goog.ui.Gauge', 'goog.ui.GaugeColoredRange'], ['goog.a11y.aria', 'goog.asserts', 'goog.events', 'goog.fx.Animation', 'goog.fx.Transition', 'goog.fx.easing', 'goog.graphics', 'goog.graphics.Font', 'goog.graphics.Path', 'goog.graphics.SolidFill', 'goog.math', 'goog.ui.Component', 'goog.ui.GaugeTheme']);
 goog.addDependency('ui/gaugetheme.js', ['goog.ui.GaugeTheme'], ['goog.graphics.LinearGradient', 'goog.graphics.SolidFill', 'goog.graphics.Stroke']);
-goog.addDependency('ui/hovercard.js', ['goog.ui.HoverCard', 'goog.ui.HoverCard.EventType', 'goog.ui.HoverCard.TriggerEvent'], ['goog.dom', 'goog.events', 'goog.ui.AdvancedTooltip']);
-goog.addDependency('ui/hsvapalette.js', ['goog.ui.HsvaPalette'], ['goog.array', 'goog.color', 'goog.color.alpha', 'goog.ui.Component.EventType', 'goog.ui.HsvPalette']);
-goog.addDependency('ui/hsvpalette.js', ['goog.ui.HsvPalette'], ['goog.color', 'goog.dom', 'goog.dom.DomHelper', 'goog.events', 'goog.events.Event', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.userAgent']);
+goog.addDependency('ui/hovercard.js', ['goog.ui.HoverCard', 'goog.ui.HoverCard.EventType', 'goog.ui.HoverCard.TriggerEvent'], ['goog.array', 'goog.dom', 'goog.events', 'goog.events.Event', 'goog.events.EventType', 'goog.ui.AdvancedTooltip', 'goog.ui.PopupBase', 'goog.ui.Tooltip']);
+goog.addDependency('ui/hsvapalette.js', ['goog.ui.HsvaPalette'], ['goog.array', 'goog.color.alpha', 'goog.dom', 'goog.dom.TagName', 'goog.events', 'goog.events.EventType', 'goog.style', 'goog.ui.Component', 'goog.ui.HsvPalette']);
+goog.addDependency('ui/hsvpalette.js', ['goog.ui.HsvPalette'], ['goog.color', 'goog.dom.TagName', 'goog.events', 'goog.events.EventType', 'goog.events.InputHandler', 'goog.style', 'goog.style.bidi', 'goog.ui.Component', 'goog.userAgent']);
 goog.addDependency('ui/idgenerator.js', ['goog.ui.IdGenerator'], []);
 goog.addDependency('ui/idletimer.js', ['goog.ui.IdleTimer'], ['goog.Timer', 'goog.events', 'goog.events.EventTarget', 'goog.structs.Set', 'goog.ui.ActivityMonitor']);
-goog.addDependency('ui/iframemask.js', ['goog.ui.IframeMask'], ['goog.Disposable', 'goog.Timer', 'goog.dom', 'goog.dom.DomHelper', 'goog.dom.iframe', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.style']);
-goog.addDependency('ui/imagelessbuttonrenderer.js', ['goog.ui.ImagelessButtonRenderer'], ['goog.ui.Button', 'goog.ui.ControlContent', 'goog.ui.CustomButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
-goog.addDependency('ui/imagelessroundedcorner.js', ['goog.ui.AbstractImagelessRoundedCorner', 'goog.ui.CanvasRoundedCorner', 'goog.ui.ImagelessRoundedCorner', 'goog.ui.VmlRoundedCorner'], ['goog.dom.DomHelper', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.graphics.VmlGraphics', 'goog.userAgent']);
-goog.addDependency('ui/inputdatepicker.js', ['goog.ui.InputDatePicker'], ['goog.date.DateTime', 'goog.dom', 'goog.i18n.DateTimeParse', 'goog.string', 'goog.ui.Component', 'goog.ui.PopupDatePicker']);
+goog.addDependency('ui/iframemask.js', ['goog.ui.IframeMask'], ['goog.Disposable', 'goog.Timer', 'goog.dom', 'goog.dom.iframe', 'goog.events.EventHandler', 'goog.style']);
+goog.addDependency('ui/imagelessbuttonrenderer.js', ['goog.ui.ImagelessButtonRenderer'], ['goog.dom.classes', 'goog.ui.Button', 'goog.ui.Component', 'goog.ui.CustomButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
+goog.addDependency('ui/imagelessmenubuttonrenderer.js', ['goog.ui.ImagelessMenuButtonRenderer'], ['goog.dom', 'goog.dom.TagName', 'goog.dom.classes', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.MenuButton', 'goog.ui.MenuButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/inputdatepicker.js', ['goog.ui.InputDatePicker'], ['goog.date.DateTime', 'goog.dom', 'goog.string', 'goog.ui.Component', 'goog.ui.DatePicker', 'goog.ui.PopupBase', 'goog.ui.PopupDatePicker']);
 goog.addDependency('ui/itemevent.js', ['goog.ui.ItemEvent'], ['goog.events.Event']);
-goog.addDependency('ui/keyboardshortcuthandler.js', ['goog.ui.KeyboardShortcutEvent', 'goog.ui.KeyboardShortcutHandler', 'goog.ui.KeyboardShortcutHandler.EventType'], ['goog.Timer', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.events.KeyCodes', 'goog.events.KeyNames', 'goog.object']);
-goog.addDependency('ui/labelinput.js', ['goog.ui.LabelInput'], ['goog.Timer', 'goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.ui.Component']);
+goog.addDependency('ui/keyboardshortcuthandler.js', ['goog.ui.KeyboardShortcutEvent', 'goog.ui.KeyboardShortcutHandler', 'goog.ui.KeyboardShortcutHandler.EventType'], ['goog.Timer', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyNames', 'goog.object', 'goog.userAgent']);
+goog.addDependency('ui/labelinput.js', ['goog.ui.LabelInput'], ['goog.Timer', 'goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.dom.classlist', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.ui.Component', 'goog.userAgent']);
 goog.addDependency('ui/linkbuttonrenderer.js', ['goog.ui.LinkButtonRenderer'], ['goog.ui.Button', 'goog.ui.FlatButtonRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/media/flashobject.js', ['goog.ui.media.FlashObject', 'goog.ui.media.FlashObject.ScriptAccessLevel', 'goog.ui.media.FlashObject.Wmodes'], ['goog.asserts', 'goog.debug.Logger', 'goog.events.EventHandler', 'goog.string', 'goog.structs.Map', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.Error', 'goog.userAgent', 'goog.userAgent.flash']);
-goog.addDependency('ui/media/flickr.js', ['goog.ui.media.FlickrSet', 'goog.ui.media.FlickrSetModel'], ['goog.object', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaModel.Player', 'goog.ui.media.MediaRenderer']);
-goog.addDependency('ui/media/media.js', ['goog.ui.media.Media', 'goog.ui.media.MediaRenderer'], ['goog.style', 'goog.ui.Component.State', 'goog.ui.Control', 'goog.ui.ControlRenderer']);
-goog.addDependency('ui/media/mediamodel.js', ['goog.ui.media.MediaModel', 'goog.ui.media.MediaModel.Category', 'goog.ui.media.MediaModel.MimeType', 'goog.ui.media.MediaModel.Player', 'goog.ui.media.MediaModel.Thumbnail'], []);
+goog.addDependency('ui/media/flashobject.js', ['goog.ui.media.FlashObject', 'goog.ui.media.FlashObject.ScriptAccessLevel', 'goog.ui.media.FlashObject.Wmodes'], ['goog.asserts', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.log', 'goog.object', 'goog.string', 'goog.structs.Map', 'goog.style', 'goog.ui.Component', 'goog.userAgent', 'goog.userAgent.flash']);
+goog.addDependency('ui/media/flickr.js', ['goog.ui.media.FlickrSet', 'goog.ui.media.FlickrSetModel'], ['goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaRenderer']);
+goog.addDependency('ui/media/googlevideo.js', ['goog.ui.media.GoogleVideo', 'goog.ui.media.GoogleVideoModel'], ['goog.string', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaRenderer']);
+goog.addDependency('ui/media/media.js', ['goog.ui.media.Media', 'goog.ui.media.MediaRenderer'], ['goog.style', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.ControlRenderer']);
+goog.addDependency('ui/media/mediamodel.js', ['goog.ui.media.MediaModel', 'goog.ui.media.MediaModel.Category', 'goog.ui.media.MediaModel.Credit', 'goog.ui.media.MediaModel.Credit.Role', 'goog.ui.media.MediaModel.Credit.Scheme', 'goog.ui.media.MediaModel.Medium', 'goog.ui.media.MediaModel.MimeType', 'goog.ui.media.MediaModel.Player', 'goog.ui.media.MediaModel.SubTitle', 'goog.ui.media.MediaModel.Thumbnail'], ['goog.array']);
 goog.addDependency('ui/media/mp3.js', ['goog.ui.media.Mp3'], ['goog.string', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaRenderer']);
 goog.addDependency('ui/media/photo.js', ['goog.ui.media.Photo'], ['goog.ui.media.Media', 'goog.ui.media.MediaRenderer']);
-goog.addDependency('ui/media/picasa.js', ['goog.ui.media.PicasaAlbum', 'goog.ui.media.PicasaAlbumModel'], ['goog.object', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaModel.Player', 'goog.ui.media.MediaRenderer']);
-goog.addDependency('ui/media/vimeo.js', ['goog.ui.media.Vimeo', 'goog.ui.media.VimeoModel'], ['goog.string', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaModel.Player', 'goog.ui.media.MediaRenderer']);
-goog.addDependency('ui/media/youtube.js', ['goog.ui.media.Youtube', 'goog.ui.media.YoutubeModel'], ['goog.string', 'goog.ui.Component.Error', 'goog.ui.Component.State', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaModel.Player', 'goog.ui.media.MediaModel.Thumbnail', 'goog.ui.media.MediaRenderer']);
-goog.addDependency('ui/menu.js', ['goog.ui.Menu', 'goog.ui.Menu.EventType'], ['goog.string', 'goog.style', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.Container', 'goog.ui.Container.Orientation', 'goog.ui.MenuItem', 'goog.ui.MenuRenderer', 'goog.ui.MenuSeparator']);
-goog.addDependency('ui/menubase.js', ['goog.ui.MenuBase'], ['goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.ui.Popup']);
-goog.addDependency('ui/menubutton.js', ['goog.ui.MenuButton'], ['goog.Timer', 'goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.State', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler.EventType', 'goog.math.Box', 'goog.math.Rect', 'goog.positioning.Corner', 'goog.positioning.MenuAnchoredPosition', 'goog.style', 'goog.ui.Button', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.ui.Menu', 'goog.ui.MenuButtonRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/menubuttonrenderer.js', ['goog.ui.MenuButtonRenderer'], ['goog.dom', 'goog.style', 'goog.ui.CustomButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.Menu', 'goog.ui.MenuRenderer', 'goog.userAgent']);
-goog.addDependency('ui/menuitem.js', ['goog.ui.MenuItem'], ['goog.ui.Component.State', 'goog.ui.Control', 'goog.ui.ControlContent', 'goog.ui.MenuItemRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/menuitemrenderer.js', ['goog.ui.MenuItemRenderer'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.dom.classes', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.ui.ControlRenderer']);
-goog.addDependency('ui/menurenderer.js', ['goog.ui.MenuRenderer'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.dom.a11y.State', 'goog.ui.ContainerRenderer', 'goog.ui.Separator']);
+goog.addDependency('ui/media/picasa.js', ['goog.ui.media.PicasaAlbum', 'goog.ui.media.PicasaAlbumModel'], ['goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaRenderer']);
+goog.addDependency('ui/media/vimeo.js', ['goog.ui.media.Vimeo', 'goog.ui.media.VimeoModel'], ['goog.string', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaRenderer']);
+goog.addDependency('ui/media/youtube.js', ['goog.ui.media.Youtube', 'goog.ui.media.YoutubeModel'], ['goog.string', 'goog.ui.Component', 'goog.ui.media.FlashObject', 'goog.ui.media.Media', 'goog.ui.media.MediaModel', 'goog.ui.media.MediaRenderer']);
+goog.addDependency('ui/menu.js', ['goog.ui.Menu', 'goog.ui.Menu.EventType'], ['goog.math.Coordinate', 'goog.string', 'goog.style', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.Container', 'goog.ui.Container.Orientation', 'goog.ui.MenuHeader', 'goog.ui.MenuItem', 'goog.ui.MenuRenderer', 'goog.ui.MenuSeparator']);
+goog.addDependency('ui/menubar.js', ['goog.ui.menuBar'], ['goog.ui.Container', 'goog.ui.MenuBarRenderer']);
+goog.addDependency('ui/menubardecorator.js', ['goog.ui.menuBarDecorator'], ['goog.ui.MenuBarRenderer', 'goog.ui.menuBar', 'goog.ui.registry']);
+goog.addDependency('ui/menubarrenderer.js', ['goog.ui.MenuBarRenderer'], ['goog.a11y.aria.Role', 'goog.ui.Container', 'goog.ui.ContainerRenderer']);
+goog.addDependency('ui/menubase.js', ['goog.ui.MenuBase'], ['goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyHandler', 'goog.ui.Popup']);
+goog.addDependency('ui/menubutton.js', ['goog.ui.MenuButton'], ['goog.Timer', 'goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.math.Box', 'goog.math.Rect', 'goog.positioning', 'goog.positioning.Corner', 'goog.positioning.MenuAnchoredPosition', 'goog.positioning.Overflow', 'goog.style', 'goog.ui.Button', 'goog.ui.Component', 'goog.ui.Menu', 'goog.ui.MenuButtonRenderer', 'goog.ui.registry', 'goog.userAgent', 'goog.userAgent.product']);
+goog.addDependency('ui/menubuttonrenderer.js', ['goog.ui.MenuButtonRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.string', 'goog.style', 'goog.ui.Component', 'goog.ui.CustomButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.Menu', 'goog.ui.MenuRenderer', 'goog.userAgent']);
+goog.addDependency('ui/menuheader.js', ['goog.ui.MenuHeader'], ['goog.ui.Component', 'goog.ui.Control', 'goog.ui.MenuHeaderRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/menuheaderrenderer.js', ['goog.ui.MenuHeaderRenderer'], ['goog.ui.ControlRenderer']);
+goog.addDependency('ui/menuitem.js', ['goog.ui.MenuItem'], ['goog.array', 'goog.dom', 'goog.dom.classes', 'goog.math.Coordinate', 'goog.string', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.MenuItemRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/menuitemrenderer.js', ['goog.ui.MenuItemRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.dom', 'goog.dom.classes', 'goog.ui.Component', 'goog.ui.ControlRenderer']);
+goog.addDependency('ui/menurenderer.js', ['goog.ui.MenuRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.ui.ContainerRenderer', 'goog.ui.Separator']);
 goog.addDependency('ui/menuseparator.js', ['goog.ui.MenuSeparator'], ['goog.ui.MenuSeparatorRenderer', 'goog.ui.Separator', 'goog.ui.registry']);
 goog.addDependency('ui/menuseparatorrenderer.js', ['goog.ui.MenuSeparatorRenderer'], ['goog.dom', 'goog.dom.classes', 'goog.ui.ControlContent', 'goog.ui.ControlRenderer']);
 goog.addDependency('ui/mockactivitymonitor.js', ['goog.ui.MockActivityMonitor'], ['goog.events.EventType', 'goog.ui.ActivityMonitor']);
-goog.addDependency('ui/nativebuttonrenderer.js', ['goog.ui.NativeButtonRenderer'], ['goog.dom.classes', 'goog.events.EventType', 'goog.ui.ButtonRenderer', 'goog.ui.Component.State']);
-goog.addDependency('ui/offlineinstalldialog.js', ['goog.ui.OfflineInstallDialog', 'goog.ui.OfflineInstallDialog.ButtonKeyType', 'goog.ui.OfflineInstallDialog.EnableScreen', 'goog.ui.OfflineInstallDialog.InstallScreen', 'goog.ui.OfflineInstallDialog.InstallingGearsScreen', 'goog.ui.OfflineInstallDialog.ScreenType', 'goog.ui.OfflineInstallDialog.UpgradeScreen', 'goog.ui.OfflineInstallDialogScreen'], ['goog.Disposable', 'goog.dom.classes', 'goog.gears', 'goog.string', 'goog.string.StringBuffer', 'goog.ui.Dialog', 'goog.ui.Dialog.ButtonSet', 'goog.ui.Dialog.EventType', 'goog.window']);
-goog.addDependency('ui/offlinestatuscard.js', ['goog.ui.OfflineStatusCard', 'goog.ui.OfflineStatusCard.EventType'], ['goog.dom', 'goog.events.EventType', 'goog.gears.StatusType', 'goog.structs.Map', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.ui.ProgressBar']);
-goog.addDependency('ui/offlinestatuscomponent.js', ['goog.ui.OfflineStatusComponent', 'goog.ui.OfflineStatusComponent.StatusClassNames'], ['goog.dom.classes', 'goog.events.EventType', 'goog.gears.StatusType', 'goog.positioning', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.ui.Component', 'goog.ui.Popup']);
-goog.addDependency('ui/option.js', ['goog.ui.Option'], ['goog.ui.Component.EventType', 'goog.ui.ControlContent', 'goog.ui.MenuItem', 'goog.ui.registry']);
-goog.addDependency('ui/palette.js', ['goog.ui.Palette'], ['goog.array', 'goog.dom', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.math.Size', 'goog.ui.Component.Error', 'goog.ui.Component.EventType', 'goog.ui.Control', 'goog.ui.PaletteRenderer', 'goog.ui.SelectionModel']);
-goog.addDependency('ui/paletterenderer.js', ['goog.ui.PaletteRenderer'], ['goog.array', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.a11y', 'goog.dom.classes', 'goog.style', 'goog.ui.ControlRenderer', 'goog.userAgent']);
-goog.addDependency('ui/plaintextspellchecker.js', ['goog.ui.PlainTextSpellChecker'], ['goog.Timer', 'goog.dom', 'goog.dom.a11y', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.style', 'goog.ui.AbstractSpellChecker', 'goog.ui.AbstractSpellChecker.AsyncResult', 'goog.ui.Component.EventType', 'goog.userAgent']);
-goog.addDependency('ui/popup.js', ['goog.ui.Popup', 'goog.ui.Popup.AbsolutePosition', 'goog.ui.Popup.AnchoredPosition', 'goog.ui.Popup.AnchoredViewPortPosition', 'goog.ui.Popup.ClientPosition', 'goog.ui.Popup.Corner', 'goog.ui.Popup.Overflow', 'goog.ui.Popup.ViewPortClientPosition', 'goog.ui.Popup.ViewPortPosition'], ['goog.math.Box', 'goog.positioning', 'goog.positioning.AbsolutePosition', 'goog.positioning.AnchoredPosition', 'goog.positioning.AnchoredViewportPosition', 'goog.positioning.ClientPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus', 'goog.positioning.ViewportClientPosition', 'goog.positioning.ViewportPosition', 'goog.style', 'goog.ui.PopupBase']);
-goog.addDependency('ui/popupbase.js', ['goog.ui.PopupBase', 'goog.ui.PopupBase.EventType', 'goog.ui.PopupBase.Type'], ['goog.Timer', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.style', 'goog.userAgent']);
-goog.addDependency('ui/popupcolorpicker.js', ['goog.ui.PopupColorPicker'], ['goog.dom.classes', 'goog.events.EventType', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.ui.ColorPicker', 'goog.ui.ColorPicker.EventType', 'goog.ui.Component', 'goog.ui.Popup']);
-goog.addDependency('ui/popupdatepicker.js', ['goog.ui.PopupDatePicker'], ['goog.events.EventType', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.style', 'goog.ui.Component', 'goog.ui.DatePicker', 'goog.ui.DatePicker.Events', 'goog.ui.Popup', 'goog.ui.PopupBase.EventType']);
+goog.addDependency('ui/mockactivitymonitor_test.js', ['goog.ui.MockActivityMonitorTest'], ['goog.events', 'goog.functions', 'goog.testing.jsunit', 'goog.testing.recordFunction', 'goog.ui.ActivityMonitor', 'goog.ui.MockActivityMonitor']);
+goog.addDependency('ui/modalpopup.js', ['goog.ui.ModalPopup'], ['goog.Timer', 'goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.classes', 'goog.dom.iframe', 'goog.events', 'goog.events.EventType', 'goog.events.FocusHandler', 'goog.fx.Transition', 'goog.style', 'goog.ui.Component', 'goog.ui.PopupBase', 'goog.userAgent']);
+goog.addDependency('ui/nativebuttonrenderer.js', ['goog.ui.NativeButtonRenderer'], ['goog.dom.classes', 'goog.events.EventType', 'goog.ui.ButtonRenderer', 'goog.ui.Component']);
+goog.addDependency('ui/offlineinstalldialog.js', ['goog.ui.OfflineInstallDialog', 'goog.ui.OfflineInstallDialog.ButtonKeyType', 'goog.ui.OfflineInstallDialog.EnableScreen', 'goog.ui.OfflineInstallDialog.InstallScreen', 'goog.ui.OfflineInstallDialog.InstallingGearsScreen', 'goog.ui.OfflineInstallDialog.ScreenType', 'goog.ui.OfflineInstallDialog.UpgradeScreen', 'goog.ui.OfflineInstallDialogScreen'], ['goog.Disposable', 'goog.dom.classes', 'goog.gears', 'goog.string', 'goog.string.StringBuffer', 'goog.ui.Dialog', 'goog.window']);
+goog.addDependency('ui/offlinestatuscard.js', ['goog.ui.OfflineStatusCard', 'goog.ui.OfflineStatusCard.EventType'], ['goog.dom', 'goog.events.EventType', 'goog.gears.StatusType', 'goog.structs.Map', 'goog.style', 'goog.ui.Component', 'goog.ui.ProgressBar']);
+goog.addDependency('ui/offlinestatuscomponent.js', ['goog.ui.OfflineStatusComponent', 'goog.ui.OfflineStatusComponent.StatusClassNames'], ['goog.dom.classes', 'goog.events.EventType', 'goog.gears.StatusType', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.ui.Component', 'goog.ui.OfflineStatusCard', 'goog.ui.Popup']);
+goog.addDependency('ui/option.js', ['goog.ui.Option'], ['goog.ui.Component', 'goog.ui.MenuItem', 'goog.ui.registry']);
+goog.addDependency('ui/palette.js', ['goog.ui.Palette'], ['goog.array', 'goog.dom', 'goog.events', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.math.Size', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.PaletteRenderer', 'goog.ui.SelectionModel']);
+goog.addDependency('ui/paletterenderer.js', ['goog.ui.PaletteRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.array', 'goog.dom', 'goog.dom.NodeIterator', 'goog.dom.NodeType', 'goog.dom.TagName', 'goog.dom.classes', 'goog.iter', 'goog.style', 'goog.ui.ControlRenderer', 'goog.userAgent']);
+goog.addDependency('ui/plaintextspellchecker.js', ['goog.ui.PlainTextSpellChecker'], ['goog.Timer', 'goog.a11y.aria', 'goog.asserts', 'goog.dom', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.spell.SpellCheck', 'goog.style', 'goog.ui.AbstractSpellChecker', 'goog.ui.Component', 'goog.userAgent']);
+goog.addDependency('ui/popup.js', ['goog.ui.Popup', 'goog.ui.Popup.AbsolutePosition', 'goog.ui.Popup.AnchoredPosition', 'goog.ui.Popup.AnchoredViewPortPosition', 'goog.ui.Popup.ClientPosition', 'goog.ui.Popup.Corner', 'goog.ui.Popup.Overflow', 'goog.ui.Popup.ViewPortClientPosition', 'goog.ui.Popup.ViewPortPosition'], ['goog.math.Box', 'goog.positioning.AbsolutePosition', 'goog.positioning.AnchoredPosition', 'goog.positioning.AnchoredViewportPosition', 'goog.positioning.ClientPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.positioning.ViewportClientPosition', 'goog.positioning.ViewportPosition', 'goog.style', 'goog.ui.PopupBase']);
+goog.addDependency('ui/popupbase.js', ['goog.ui.PopupBase', 'goog.ui.PopupBase.EventType', 'goog.ui.PopupBase.Type'], ['goog.Timer', 'goog.dom', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.fx.Transition', 'goog.style', 'goog.userAgent']);
+goog.addDependency('ui/popupcolorpicker.js', ['goog.ui.PopupColorPicker'], ['goog.dom.classes', 'goog.events.EventType', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.ui.ColorPicker', 'goog.ui.Component', 'goog.ui.Popup']);
+goog.addDependency('ui/popupdatepicker.js', ['goog.ui.PopupDatePicker'], ['goog.events.EventType', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.style', 'goog.ui.Component', 'goog.ui.DatePicker', 'goog.ui.Popup', 'goog.ui.PopupBase']);
 goog.addDependency('ui/popupmenu.js', ['goog.ui.PopupMenu'], ['goog.events.EventType', 'goog.positioning.AnchoredViewportPosition', 'goog.positioning.Corner', 'goog.positioning.MenuAnchoredPosition', 'goog.positioning.ViewportClientPosition', 'goog.structs', 'goog.structs.Map', 'goog.style', 'goog.ui.Component.EventType', 'goog.ui.Menu', 'goog.ui.PopupBase', 'goog.userAgent']);
-goog.addDependency('ui/progressbar.js', ['goog.ui.ProgressBar', 'goog.ui.ProgressBar.Orientation'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.classes', 'goog.events', 'goog.events.EventType', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.ui.RangeModel', 'goog.userAgent']);
-goog.addDependency('ui/prompt.js', ['goog.ui.Prompt'], ['goog.Timer', 'goog.dom', 'goog.events', 'goog.ui.Component.Error', 'goog.ui.Dialog', 'goog.ui.Dialog.ButtonSet', 'goog.ui.Dialog.DefaultButtonKeys', 'goog.ui.Dialog.EventType', 'goog.userAgent']);
-goog.addDependency('ui/rangemodel.js', ['goog.ui.RangeModel'], ['goog.events.EventTarget', 'goog.ui.Component.EventType']);
-goog.addDependency('ui/ratings.js', ['goog.ui.Ratings', 'goog.ui.Ratings.EventType'], ['goog.dom.a11y', 'goog.dom.classes', 'goog.events.EventType', 'goog.ui.Component']);
+goog.addDependency('ui/progressbar.js', ['goog.ui.ProgressBar', 'goog.ui.ProgressBar.Orientation'], ['goog.a11y.aria', 'goog.asserts', 'goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.EventType', 'goog.ui.Component', 'goog.ui.RangeModel', 'goog.userAgent']);
+goog.addDependency('ui/prompt.js', ['goog.ui.Prompt'], ['goog.Timer', 'goog.dom', 'goog.events', 'goog.events.EventType', 'goog.functions', 'goog.ui.Component', 'goog.ui.Dialog', 'goog.userAgent']);
+goog.addDependency('ui/rangemodel.js', ['goog.ui.RangeModel'], ['goog.events.EventTarget', 'goog.ui.Component']);
+goog.addDependency('ui/ratings.js', ['goog.ui.Ratings', 'goog.ui.Ratings.EventType'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom.classes', 'goog.events.EventType', 'goog.ui.Component']);
 goog.addDependency('ui/registry.js', ['goog.ui.registry'], ['goog.dom.classes']);
-goog.addDependency('ui/richtextspellchecker.js', ['goog.ui.RichTextSpellChecker'], ['goog.Timer', 'goog.dom', 'goog.dom.NodeType', 'goog.events', 'goog.events.EventType', 'goog.string.StringBuffer', 'goog.ui.AbstractSpellChecker', 'goog.ui.AbstractSpellChecker.AsyncResult']);
-goog.addDependency('ui/roundedcorners.js', ['goog.ui.RoundedCorners', 'goog.ui.RoundedCorners.Corners'], ['goog.Uri', 'goog.color', 'goog.dom', 'goog.math.Size', 'goog.string', 'goog.style', 'goog.userAgent']);
-goog.addDependency('ui/roundedpanel.js', ['goog.ui.BaseRoundedPanel', 'goog.ui.CssRoundedPanel', 'goog.ui.GraphicsRoundedPanel', 'goog.ui.RoundedPanel', 'goog.ui.RoundedPanel.Corner'], ['goog.dom', 'goog.dom.classes', 'goog.graphics', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.math.Coordinate', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
-goog.addDependency('ui/roundedtabrenderer.js', ['goog.ui.RoundedTabRenderer'], ['goog.dom', 'goog.ui.Tab', 'goog.ui.TabBar.Location', 'goog.ui.TabRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/scrollfloater.js', ['goog.ui.ScrollFloater'], ['goog.dom', 'goog.dom.classes', 'goog.events.EventType', 'goog.object', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
-goog.addDependency('ui/select.js', ['goog.ui.Select'], ['goog.events.EventType', 'goog.ui.Component.EventType', 'goog.ui.ControlContent', 'goog.ui.MenuButton', 'goog.ui.SelectionModel', 'goog.ui.registry']);
-goog.addDependency('ui/selectionmenubutton.js', ['goog.ui.SelectionMenuButton', 'goog.ui.SelectionMenuButton.SelectionState'], ['goog.ui.Component.EventType', 'goog.ui.Menu', 'goog.ui.MenuButton', 'goog.ui.MenuItem']);
+goog.addDependency('ui/richtextspellchecker.js', ['goog.ui.RichTextSpellChecker'], ['goog.Timer', 'goog.dom', 'goog.dom.NodeType', 'goog.events', 'goog.events.EventType', 'goog.spell.SpellCheck', 'goog.string.StringBuffer', 'goog.ui.AbstractSpellChecker']);
+goog.addDependency('ui/roundedpanel.js', ['goog.ui.BaseRoundedPanel', 'goog.ui.CssRoundedPanel', 'goog.ui.GraphicsRoundedPanel', 'goog.ui.RoundedPanel', 'goog.ui.RoundedPanel.Corner'], ['goog.dom', 'goog.dom.classes', 'goog.graphics', 'goog.graphics.Path', 'goog.graphics.SolidFill', 'goog.graphics.Stroke', 'goog.math', 'goog.math.Coordinate', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
+goog.addDependency('ui/roundedtabrenderer.js', ['goog.ui.RoundedTabRenderer'], ['goog.dom', 'goog.ui.Tab', 'goog.ui.TabBar', 'goog.ui.TabRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/scrollfloater.js', ['goog.ui.ScrollFloater', 'goog.ui.ScrollFloater.EventType'], ['goog.array', 'goog.dom', 'goog.dom.classes', 'goog.events.EventType', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
+goog.addDependency('ui/select.js', ['goog.ui.Select'], ['goog.a11y.aria.Role', 'goog.events.EventType', 'goog.ui.Component', 'goog.ui.MenuButton', 'goog.ui.MenuItem', 'goog.ui.SelectionModel', 'goog.ui.registry']);
+goog.addDependency('ui/selectionmenubutton.js', ['goog.ui.SelectionMenuButton', 'goog.ui.SelectionMenuButton.SelectionState'], ['goog.events.EventType', 'goog.style', 'goog.ui.Component', 'goog.ui.MenuButton', 'goog.ui.MenuItem', 'goog.ui.registry']);
 goog.addDependency('ui/selectionmodel.js', ['goog.ui.SelectionModel'], ['goog.array', 'goog.events.EventTarget', 'goog.events.EventType']);
-goog.addDependency('ui/separator.js', ['goog.ui.Separator'], ['goog.dom.a11y', 'goog.ui.Component.State', 'goog.ui.Control', 'goog.ui.MenuSeparatorRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/separator.js', ['goog.ui.Separator'], ['goog.a11y.aria', 'goog.asserts', 'goog.ui.Component', 'goog.ui.Control', 'goog.ui.MenuSeparatorRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/serverchart.js', ['goog.ui.ServerChart', 'goog.ui.ServerChart.AxisDisplayType', 'goog.ui.ServerChart.ChartType', 'goog.ui.ServerChart.EncodingType', 'goog.ui.ServerChart.Event', 'goog.ui.ServerChart.LegendPosition', 'goog.ui.ServerChart.MaximumValue', 'goog.ui.ServerChart.MultiAxisAlignment', 'goog.ui.ServerChart.MultiAxisType', 'goog.ui.ServerChart.UriParam', 'goog.ui.ServerChart.UriTooLongEvent'], ['goog.Uri', 'goog.array', 'goog.asserts', 'goog.events.Event', 'goog.string', 'goog.ui.Component']);
-goog.addDependency('ui/slider.js', ['goog.ui.Slider', 'goog.ui.Slider.Orientation'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.ui.SliderBase', 'goog.ui.SliderBase.Orientation']);
-goog.addDependency('ui/sliderbase.js', ['goog.ui.SliderBase', 'goog.ui.SliderBase.Orientation'], ['goog.Timer', 'goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.dom.a11y.State', 'goog.dom.classes', 'goog.events', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.events.MouseWheelHandler', 'goog.events.MouseWheelHandler.EventType', 'goog.fx.Animation.EventType', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType', 'goog.fx.dom.SlideFrom', 'goog.math', 'goog.math.Coordinate', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.ui.RangeModel']);
-goog.addDependency('ui/splitbehavior.js', ['goog.ui.SplitBehavior', 'goog.ui.SplitBehavior.DefaultHandlers'], ['goog.Disposable', 'goog.array', 'goog.dispose', 'goog.dom', 'goog.dom.DomHelper', 'goog.dom.classes', 'goog.events', 'goog.events.EventHandler', 'goog.events.EventType', 'goog.string', 'goog.ui.Button.Side', 'goog.ui.Component', 'goog.ui.Component.Error', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.decorate', 'goog.ui.registry']);
-goog.addDependency('ui/splitpane.js', ['goog.ui.SplitPane', 'goog.ui.SplitPane.Orientation'], ['goog.dom', 'goog.dom.classes', 'goog.events.EventType', 'goog.fx.Dragger', 'goog.fx.Dragger.EventType', 'goog.math.Rect', 'goog.math.Size', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.userAgent']);
-goog.addDependency('ui/style/app/buttonrenderer.js', ['goog.ui.style.app.ButtonRenderer'], ['goog.ui.Button', 'goog.ui.ControlContent', 'goog.ui.CustomButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
-goog.addDependency('ui/style/app/menubuttonrenderer.js', ['goog.ui.style.app.MenuButtonRenderer'], ['goog.array', 'goog.dom', 'goog.dom.a11y.Role', 'goog.style', 'goog.ui.ControlContent', 'goog.ui.Menu', 'goog.ui.MenuRenderer', 'goog.ui.style.app.ButtonRenderer']);
+goog.addDependency('ui/slider.js', ['goog.ui.Slider', 'goog.ui.Slider.Orientation'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.dom', 'goog.ui.SliderBase']);
+goog.addDependency('ui/sliderbase.js', ['goog.ui.SliderBase', 'goog.ui.SliderBase.AnimationFactory', 'goog.ui.SliderBase.Orientation'], ['goog.Timer', 'goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.array', 'goog.asserts', 'goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.events.KeyHandler', 'goog.events.MouseWheelHandler', 'goog.fx.AnimationParallelQueue', 'goog.fx.Dragger', 'goog.fx.Transition', 'goog.fx.dom.ResizeHeight', 'goog.fx.dom.ResizeWidth', 'goog.fx.dom.Slide', 'goog.math', 'goog.math.Coordinate', 'goog.style', 'goog.style.bidi', 'goog.ui.Component', 'goog.ui.RangeModel']);
+goog.addDependency('ui/splitbehavior.js', ['goog.ui.SplitBehavior', 'goog.ui.SplitBehavior.DefaultHandlers'], ['goog.Disposable', 'goog.dispose', 'goog.dom', 'goog.dom.NodeType', 'goog.dom.classes', 'goog.events.EventHandler', 'goog.ui.ButtonSide', 'goog.ui.Component', 'goog.ui.decorate', 'goog.ui.registry']);
+goog.addDependency('ui/splitpane.js', ['goog.ui.SplitPane', 'goog.ui.SplitPane.Orientation'], ['goog.dom', 'goog.dom.classes', 'goog.events.EventType', 'goog.fx.Dragger', 'goog.math.Rect', 'goog.math.Size', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
+goog.addDependency('ui/style/app/buttonrenderer.js', ['goog.ui.style.app.ButtonRenderer'], ['goog.dom.classes', 'goog.ui.Button', 'goog.ui.CustomButtonRenderer', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.registry']);
+goog.addDependency('ui/style/app/menubuttonrenderer.js', ['goog.ui.style.app.MenuButtonRenderer'], ['goog.a11y.aria.Role', 'goog.array', 'goog.dom', 'goog.style', 'goog.ui.Menu', 'goog.ui.MenuRenderer', 'goog.ui.style.app.ButtonRenderer']);
 goog.addDependency('ui/style/app/primaryactionbuttonrenderer.js', ['goog.ui.style.app.PrimaryActionButtonRenderer'], ['goog.ui.Button', 'goog.ui.registry', 'goog.ui.style.app.ButtonRenderer']);
-goog.addDependency('ui/submenu.js', ['goog.ui.SubMenu'], ['goog.Timer', 'goog.dom', 'goog.dom.classes', 'goog.events.KeyCodes', 'goog.positioning.AnchoredViewportPosition', 'goog.positioning.Corner', 'goog.style', 'goog.ui.Component', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.ui.Menu', 'goog.ui.MenuItem', 'goog.ui.SubMenuRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/submenurenderer.js', ['goog.ui.SubMenuRenderer'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.State', 'goog.dom.classes', 'goog.style', 'goog.ui.Menu', 'goog.ui.MenuItemRenderer']);
-goog.addDependency('ui/tab.js', ['goog.ui.Tab'], ['goog.ui.Component.State', 'goog.ui.Control', 'goog.ui.ControlContent', 'goog.ui.TabRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/submenu.js', ['goog.ui.SubMenu'], ['goog.Timer', 'goog.dom', 'goog.dom.classes', 'goog.events.KeyCodes', 'goog.positioning.AnchoredViewportPosition', 'goog.positioning.Corner', 'goog.style', 'goog.ui.Component', 'goog.ui.Menu', 'goog.ui.MenuItem', 'goog.ui.SubMenuRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/submenurenderer.js', ['goog.ui.SubMenuRenderer'], ['goog.a11y.aria', 'goog.a11y.aria.State', 'goog.asserts', 'goog.dom', 'goog.dom.classes', 'goog.style', 'goog.ui.Menu', 'goog.ui.MenuItemRenderer']);
+goog.addDependency('ui/tab.js', ['goog.ui.Tab'], ['goog.ui.Component', 'goog.ui.Control', 'goog.ui.TabRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/tabbar.js', ['goog.ui.TabBar', 'goog.ui.TabBar.Location'], ['goog.ui.Component.EventType', 'goog.ui.Container', 'goog.ui.Container.Orientation', 'goog.ui.Tab', 'goog.ui.TabBarRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/tabbarrenderer.js', ['goog.ui.TabBarRenderer'], ['goog.dom.a11y.Role', 'goog.object', 'goog.ui.ContainerRenderer']);
-goog.addDependency('ui/tablesorter.js', ['goog.ui.TableSorter', 'goog.ui.TableSorter.EventType'], ['goog.array', 'goog.dom', 'goog.dom.TagName', 'goog.dom.classes', 'goog.events', 'goog.events.EventType', 'goog.ui.Component']);
+goog.addDependency('ui/tabbarrenderer.js', ['goog.ui.TabBarRenderer'], ['goog.a11y.aria.Role', 'goog.object', 'goog.ui.ContainerRenderer']);
+goog.addDependency('ui/tablesorter.js', ['goog.ui.TableSorter', 'goog.ui.TableSorter.EventType'], ['goog.array', 'goog.dom', 'goog.dom.TagName', 'goog.dom.classes', 'goog.events.EventType', 'goog.functions', 'goog.ui.Component']);
 goog.addDependency('ui/tabpane.js', ['goog.ui.TabPane', 'goog.ui.TabPane.Events', 'goog.ui.TabPane.TabLocation', 'goog.ui.TabPane.TabPage', 'goog.ui.TabPaneEvent'], ['goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.style']);
-goog.addDependency('ui/tabrenderer.js', ['goog.ui.TabRenderer'], ['goog.dom.a11y.Role', 'goog.ui.Component.State', 'goog.ui.ControlRenderer']);
-goog.addDependency('ui/textarea.js', ['goog.ui.Textarea'], ['goog.Timer', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.style', 'goog.ui.Control', 'goog.ui.TextareaRenderer', 'goog.userAgent', 'goog.userAgent.product']);
-goog.addDependency('ui/textarearenderer.js', ['goog.ui.TextareaRenderer'], ['goog.ui.Component.State', 'goog.ui.ControlRenderer']);
-goog.addDependency('ui/togglebutton.js', ['goog.ui.ToggleButton'], ['goog.ui.Button', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.ui.CustomButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/tabrenderer.js', ['goog.ui.TabRenderer'], ['goog.a11y.aria.Role', 'goog.ui.Component', 'goog.ui.ControlRenderer']);
+goog.addDependency('ui/textarea.js', ['goog.ui.Textarea', 'goog.ui.Textarea.EventType'], ['goog.dom', 'goog.events.EventType', 'goog.style', 'goog.ui.Control', 'goog.ui.TextareaRenderer', 'goog.userAgent']);
+goog.addDependency('ui/textarearenderer.js', ['goog.ui.TextareaRenderer'], ['goog.dom.TagName', 'goog.ui.Component', 'goog.ui.ControlRenderer']);
+goog.addDependency('ui/togglebutton.js', ['goog.ui.ToggleButton'], ['goog.ui.Button', 'goog.ui.Component', 'goog.ui.CustomButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/toolbar.js', ['goog.ui.Toolbar'], ['goog.ui.Container', 'goog.ui.ToolbarRenderer']);
-goog.addDependency('ui/toolbarbutton.js', ['goog.ui.ToolbarButton'], ['goog.ui.Button', 'goog.ui.ControlContent', 'goog.ui.ToolbarButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/toolbarbutton.js', ['goog.ui.ToolbarButton'], ['goog.ui.Button', 'goog.ui.ToolbarButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/toolbarbuttonrenderer.js', ['goog.ui.ToolbarButtonRenderer'], ['goog.ui.CustomButtonRenderer']);
-goog.addDependency('ui/toolbarcolormenubutton.js', ['goog.ui.ToolbarColorMenuButton'], ['goog.ui.ColorMenuButton', 'goog.ui.ControlContent', 'goog.ui.ToolbarColorMenuButtonRenderer', 'goog.ui.registry']);
-goog.addDependency('ui/toolbarcolormenubuttonrenderer.js', ['goog.ui.ToolbarColorMenuButtonRenderer'], ['goog.dom.classes', 'goog.ui.ColorMenuButtonRenderer', 'goog.ui.ControlContent', 'goog.ui.MenuButtonRenderer', 'goog.ui.ToolbarMenuButtonRenderer']);
-goog.addDependency('ui/toolbarmenubutton.js', ['goog.ui.ToolbarMenuButton'], ['goog.ui.ControlContent', 'goog.ui.MenuButton', 'goog.ui.ToolbarMenuButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/toolbarcolormenubutton.js', ['goog.ui.ToolbarColorMenuButton'], ['goog.ui.ColorMenuButton', 'goog.ui.ToolbarColorMenuButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/toolbarcolormenubuttonrenderer.js', ['goog.ui.ToolbarColorMenuButtonRenderer'], ['goog.dom.classes', 'goog.ui.ColorMenuButtonRenderer', 'goog.ui.MenuButtonRenderer', 'goog.ui.ToolbarMenuButtonRenderer']);
+goog.addDependency('ui/toolbarmenubutton.js', ['goog.ui.ToolbarMenuButton'], ['goog.ui.MenuButton', 'goog.ui.ToolbarMenuButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/toolbarmenubuttonrenderer.js', ['goog.ui.ToolbarMenuButtonRenderer'], ['goog.ui.MenuButtonRenderer']);
-goog.addDependency('ui/toolbarrenderer.js', ['goog.ui.ToolbarRenderer'], ['goog.dom.a11y.Role', 'goog.ui.Container.Orientation', 'goog.ui.ContainerRenderer', 'goog.ui.Separator', 'goog.ui.ToolbarSeparatorRenderer']);
-goog.addDependency('ui/toolbarselect.js', ['goog.ui.ToolbarSelect'], ['goog.ui.ControlContent', 'goog.ui.Select', 'goog.ui.ToolbarMenuButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/toolbarrenderer.js', ['goog.ui.ToolbarRenderer'], ['goog.a11y.aria.Role', 'goog.ui.Container', 'goog.ui.ContainerRenderer', 'goog.ui.Separator', 'goog.ui.ToolbarSeparatorRenderer']);
+goog.addDependency('ui/toolbarselect.js', ['goog.ui.ToolbarSelect'], ['goog.ui.Select', 'goog.ui.ToolbarMenuButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/toolbarseparator.js', ['goog.ui.ToolbarSeparator'], ['goog.ui.Separator', 'goog.ui.ToolbarSeparatorRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/toolbarseparatorrenderer.js', ['goog.ui.ToolbarSeparatorRenderer'], ['goog.dom.classes', 'goog.ui.INLINE_BLOCK_CLASSNAME', 'goog.ui.MenuSeparatorRenderer']);
-goog.addDependency('ui/toolbartogglebutton.js', ['goog.ui.ToolbarToggleButton'], ['goog.ui.ControlContent', 'goog.ui.ToggleButton', 'goog.ui.ToolbarButtonRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/toolbartogglebutton.js', ['goog.ui.ToolbarToggleButton'], ['goog.ui.ToggleButton', 'goog.ui.ToolbarButtonRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/tooltip.js', ['goog.ui.Tooltip', 'goog.ui.Tooltip.CursorTooltipPosition', 'goog.ui.Tooltip.ElementTooltipPosition', 'goog.ui.Tooltip.State'], ['goog.Timer', 'goog.array', 'goog.dom', 'goog.events', 'goog.events.EventType', 'goog.math.Box', 'goog.math.Coordinate', 'goog.positioning', 'goog.positioning.AnchoredPosition', 'goog.positioning.Corner', 'goog.positioning.Overflow', 'goog.positioning.OverflowStatus', 'goog.positioning.ViewportPosition', 'goog.structs.Set', 'goog.style', 'goog.ui.Popup', 'goog.ui.PopupBase']);
-goog.addDependency('ui/tree/basenode.js', ['goog.ui.tree.BaseNode', 'goog.ui.tree.BaseNode.EventType'], ['goog.Timer', 'goog.asserts', 'goog.dom.a11y', 'goog.events.KeyCodes', 'goog.string', 'goog.string.StringBuffer', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
-goog.addDependency('ui/tree/treecontrol.js', ['goog.ui.tree.TreeControl'], ['goog.debug.Logger', 'goog.dom.a11y', 'goog.dom.classes', 'goog.events.EventType', 'goog.events.FocusHandler', 'goog.events.KeyHandler', 'goog.events.KeyHandler.EventType', 'goog.ui.tree.BaseNode', 'goog.ui.tree.TreeNode', 'goog.ui.tree.TypeAhead', 'goog.userAgent']);
+goog.addDependency('ui/tree/basenode.js', ['goog.ui.tree.BaseNode', 'goog.ui.tree.BaseNode.EventType'], ['goog.Timer', 'goog.a11y.aria', 'goog.asserts', 'goog.events.KeyCodes', 'goog.string', 'goog.string.StringBuffer', 'goog.style', 'goog.ui.Component', 'goog.userAgent']);
+goog.addDependency('ui/tree/treecontrol.js', ['goog.ui.tree.TreeControl'], ['goog.a11y.aria', 'goog.asserts', 'goog.dom.classes', 'goog.events.EventType', 'goog.events.FocusHandler', 'goog.events.KeyHandler', 'goog.log', 'goog.ui.tree.BaseNode', 'goog.ui.tree.TreeNode', 'goog.ui.tree.TypeAhead', 'goog.userAgent']);
 goog.addDependency('ui/tree/treenode.js', ['goog.ui.tree.TreeNode'], ['goog.ui.tree.BaseNode']);
 goog.addDependency('ui/tree/typeahead.js', ['goog.ui.tree.TypeAhead', 'goog.ui.tree.TypeAhead.Offset'], ['goog.array', 'goog.events.KeyCodes', 'goog.string', 'goog.structs.Trie']);
-goog.addDependency('ui/tristatemenuitem.js', ['goog.ui.TriStateMenuItem', 'goog.ui.TriStateMenuItem.State'], ['goog.dom.classes', 'goog.ui.Component.EventType', 'goog.ui.Component.State', 'goog.ui.ControlContent', 'goog.ui.MenuItem', 'goog.ui.TriStateMenuItemRenderer', 'goog.ui.registry']);
+goog.addDependency('ui/tristatemenuitem.js', ['goog.ui.TriStateMenuItem', 'goog.ui.TriStateMenuItem.State'], ['goog.dom.classes', 'goog.ui.Component', 'goog.ui.MenuItem', 'goog.ui.TriStateMenuItemRenderer', 'goog.ui.registry']);
 goog.addDependency('ui/tristatemenuitemrenderer.js', ['goog.ui.TriStateMenuItemRenderer'], ['goog.dom.classes', 'goog.ui.MenuItemRenderer']);
-goog.addDependency('ui/twothumbslider.js', ['goog.ui.TwoThumbSlider'], ['goog.dom', 'goog.dom.a11y', 'goog.dom.a11y.Role', 'goog.ui.SliderBase']);
-goog.addDependency('ui/zippy.js', ['goog.ui.Zippy', 'goog.ui.ZippyEvent'], ['goog.dom', 'goog.dom.classes', 'goog.events', 'goog.events.Event', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.style']);
-goog.addDependency('uri/uri.js', ['goog.Uri', 'goog.Uri.QueryData'], ['goog.array', 'goog.string', 'goog.structs', 'goog.structs.Map', 'goog.uri.utils', 'goog.uri.utils.ComponentIndex']);
-goog.addDependency('uri/utils.js', ['goog.uri.utils', 'goog.uri.utils.ComponentIndex'], ['goog.asserts', 'goog.string']);
+goog.addDependency('ui/twothumbslider.js', ['goog.ui.TwoThumbSlider'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.dom', 'goog.ui.SliderBase']);
+goog.addDependency('ui/zippy.js', ['goog.ui.Zippy', 'goog.ui.Zippy.Events', 'goog.ui.ZippyEvent'], ['goog.a11y.aria', 'goog.a11y.aria.Role', 'goog.a11y.aria.State', 'goog.dom', 'goog.dom.classes', 'goog.events.Event', 'goog.events.EventHandler', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events.KeyCodes', 'goog.style']);
+goog.addDependency('uri/uri.js', ['goog.Uri', 'goog.Uri.QueryData'], ['goog.array', 'goog.string', 'goog.structs', 'goog.structs.Map', 'goog.uri.utils', 'goog.uri.utils.ComponentIndex', 'goog.uri.utils.StandardQueryParam']);
+goog.addDependency('uri/uri_test.js', ['goog.UriTest'], ['goog.Uri', 'goog.testing.jsunit']);
+goog.addDependency('uri/utils.js', ['goog.uri.utils', 'goog.uri.utils.ComponentIndex', 'goog.uri.utils.QueryArray', 'goog.uri.utils.QueryValue', 'goog.uri.utils.StandardQueryParam'], ['goog.asserts', 'goog.string', 'goog.userAgent']);
 goog.addDependency('useragent/adobereader.js', ['goog.userAgent.adobeReader'], ['goog.string', 'goog.userAgent']);
 goog.addDependency('useragent/flash.js', ['goog.userAgent.flash'], ['goog.string']);
 goog.addDependency('useragent/iphoto.js', ['goog.userAgent.iphoto'], ['goog.string', 'goog.userAgent']);
@@ -1930,15 +2476,30 @@ goog.addDependency('useragent/platform.js', ['goog.userAgent.platform'], ['goog.
 goog.addDependency('useragent/product.js', ['goog.userAgent.product'], ['goog.userAgent']);
 goog.addDependency('useragent/product_isversion.js', ['goog.userAgent.product.isVersion'], ['goog.userAgent.product']);
 goog.addDependency('useragent/useragent.js', ['goog.userAgent'], ['goog.string']);
-goog.addDependency('window/window.js', ['goog.window'], ['goog.string']);
-
-goog.addDependency('../../third_party/closure/goog/caja/string/html/htmlparser.js', ['goog.string.html.HtmlParser', 'goog.string.html.HtmlParser.EFlags', 'goog.string.html.HtmlParser.Elements', 'goog.string.html.HtmlParser.Entities', 'goog.string.html.HtmlSaxHandler'], []);
-goog.addDependency('../../third_party/closure/goog/caja/string/html/htmlsanitizer.js', ['goog.string.html.HtmlSanitizer', 'goog.string.html.HtmlSanitizer.AttributeType', 'goog.string.html.HtmlSanitizer.Attributes', 'goog.string.html.htmlSanitize'], ['goog.string.StringBuffer', 'goog.string.html.HtmlParser', 'goog.string.html.HtmlParser.EFlags', 'goog.string.html.HtmlParser.Elements', 'goog.string.html.HtmlSaxHandler']);
-goog.addDependency('../../third_party/closure/goog/dojo/dom/query.js', ['goog.dom.query'], ['goog.array', 'goog.dom', 'goog.functions', 'goog.string', 'goog.userAgent']);
-goog.addDependency('../../third_party/closure/goog/jpeg_encoder/jpeg_encoder_basic.js', ['goog.crypt.JpegEncoder'], ['goog.crypt.base64']);
-goog.addDependency('../../third_party/closure/goog/loremipsum/text/loremipsum.js', ['goog.text.LoremIpsum'], ['goog.array', 'goog.math', 'goog.string', 'goog.structs.Map', 'goog.structs.Set']);
-goog.addDependency('../../third_party/closure/goog/mochikit/async/deferred.js', ['goog.async.Deferred', 'goog.async.Deferred.AlreadyCalledError', 'goog.async.Deferred.CancelledError'], ['goog.Timer', 'goog.asserts', 'goog.debug.Error']);
-goog.addDependency('../../third_party/closure/goog/mochikit/async/deferredlist.js', ['goog.async.DeferredList'], ['goog.array', 'goog.async.Deferred']);
+goog.addDependency('vec/float32array.js', ['goog.vec.Float32Array'], []);
+goog.addDependency('vec/float64array.js', ['goog.vec.Float64Array'], []);
+goog.addDependency('vec/mat3.js', ['goog.vec.Mat3'], ['goog.vec']);
+goog.addDependency('vec/mat3d.js', ['goog.vec.mat3d', 'goog.vec.mat3d.Type'], ['goog.vec']);
+goog.addDependency('vec/mat3f.js', ['goog.vec.mat3f', 'goog.vec.mat3f.Type'], ['goog.vec']);
+goog.addDependency('vec/mat4.js', ['goog.vec.Mat4'], ['goog.vec', 'goog.vec.Vec3', 'goog.vec.Vec4']);
+goog.addDependency('vec/mat4d.js', ['goog.vec.mat4d', 'goog.vec.mat4d.Type'], ['goog.vec', 'goog.vec.vec3d', 'goog.vec.vec4d']);
+goog.addDependency('vec/mat4f.js', ['goog.vec.mat4f', 'goog.vec.mat4f.Type'], ['goog.vec', 'goog.vec.vec3f', 'goog.vec.vec4f']);
+goog.addDependency('vec/matrix3.js', ['goog.vec.Matrix3'], []);
+goog.addDependency('vec/matrix4.js', ['goog.vec.Matrix4'], ['goog.vec', 'goog.vec.Vec3', 'goog.vec.Vec4']);
+goog.addDependency('vec/quaternion.js', ['goog.vec.Quaternion'], ['goog.vec', 'goog.vec.Vec3', 'goog.vec.Vec4']);
+goog.addDependency('vec/ray.js', ['goog.vec.Ray'], ['goog.vec.Vec3']);
+goog.addDependency('vec/vec.js', ['goog.vec', 'goog.vec.AnyType', 'goog.vec.ArrayType', 'goog.vec.Float32', 'goog.vec.Float64', 'goog.vec.Number'], ['goog.vec.Float32Array', 'goog.vec.Float64Array']);
+goog.addDependency('vec/vec2.js', ['goog.vec.Vec2'], ['goog.vec']);
+goog.addDependency('vec/vec2d.js', ['goog.vec.vec2d', 'goog.vec.vec2d.Type'], ['goog.vec']);
+goog.addDependency('vec/vec2f.js', ['goog.vec.vec2f', 'goog.vec.vec2f.Type'], ['goog.vec']);
+goog.addDependency('vec/vec3.js', ['goog.vec.Vec3'], ['goog.vec']);
+goog.addDependency('vec/vec3d.js', ['goog.vec.vec3d', 'goog.vec.vec3d.Type'], ['goog.vec']);
+goog.addDependency('vec/vec3f.js', ['goog.vec.vec3f', 'goog.vec.vec3f.Type'], ['goog.vec']);
+goog.addDependency('vec/vec4.js', ['goog.vec.Vec4'], ['goog.vec']);
+goog.addDependency('vec/vec4d.js', ['goog.vec.vec4d', 'goog.vec.vec4d.Type'], ['goog.vec']);
+goog.addDependency('vec/vec4f.js', ['goog.vec.vec4f', 'goog.vec.vec4f.Type'], ['goog.vec']);
+goog.addDependency('webgl/webgl.js', ['goog.webgl'], []);
+goog.addDependency('window/window.js', ['goog.window'], ['goog.string', 'goog.userAgent']);
 // Copyright 2006 The Closure Library Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -1955,8 +2516,6 @@ goog.addDependency('../../third_party/closure/goog/mochikit/async/deferredlist.j
 
 /**
  * @fileoverview Utilities for string manipulation.
-*
-*
  */
 
 
@@ -2026,6 +2585,18 @@ goog.string.caseInsensitiveEndsWith = function(str, suffix) {
 
 
 /**
+ * Case-insensitive equality checker.
+ * @param {string} str1 First string to check.
+ * @param {string} str2 Second string to check.
+ * @return {boolean} True if {@code str1} and {@code str2} are the same string,
+ *     ignoring case.
+ */
+goog.string.caseInsensitiveEquals = function(str1, str2) {
+  return str1.toLowerCase() == str2.toLowerCase();
+};
+
+
+/**
  * Does simple python-style string substitution.
  * subs("foo%s hot%s", "bar", "dog") becomes "foobar hotdog".
  * @param {string} str The string containing the pattern.
@@ -2034,18 +2605,18 @@ goog.string.caseInsensitiveEndsWith = function(str, suffix) {
  *     {@code %s} has been replaced an argument from {@code var_args}.
  */
 goog.string.subs = function(str, var_args) {
-  // This appears to be slow, but testing shows it compares more or less
-  // equivalent to the regex.exec method.
-  for (var i = 1; i < arguments.length; i++) {
-    // We cast to String in case an argument is a Function.  Replacing $&, for
-    // example, with $$$& stops the replace from subsituting the whole match
-    // into the resultant string.  $$$& in the first replace becomes $$& in the
-    //  second, which leaves $& in the resultant string.  Also:
-    // $$, $`, $', $n $nn
-    var replacement = String(arguments[i]).replace(/\$/g, '$$$$');
-    str = str.replace(/\%s/, replacement);
+  var splitParts = str.split('%s');
+  var returnString = '';
+
+  var subsArguments = Array.prototype.slice.call(arguments, 1);
+  while (subsArguments.length &&
+         // Replace up to the last split part. We are inserting in the
+         // positions between split parts.
+         splitParts.length > 1) {
+    returnString += splitParts.shift() + subsArguments.shift();
   }
-  return str;
+
+  return returnString + splitParts.join('%s'); // Join unused '%s'
 };
 
 
@@ -2079,9 +2650,10 @@ goog.string.isEmpty = function(str) {
 
 
 /**
- * Checks if a string is null, empty or contains only whitespaces.
+ * Checks if a string is null, undefined, empty or contains only whitespaces.
  * @param {*} str The string to check.
- * @return {boolean} True if{@code str} is null, empty, or whitespace only.
+ * @return {boolean} True if{@code str} is null, undefined, empty, or
+ *     whitespace only.
  */
 goog.string.isEmptySafe = function(str) {
   return goog.string.isEmpty(goog.string.makeSafe(str));
@@ -2191,6 +2763,19 @@ goog.string.normalizeWhitespace = function(str) {
  */
 goog.string.normalizeSpaces = function(str) {
   return str.replace(/\xa0|[ \t]+/g, ' ');
+};
+
+
+/**
+ * Removes the breaking spaces from the left and right of the string and
+ * collapses the sequences of breaking spaces in the middle into single spaces.
+ * The original and the result strings render the same way in HTML.
+ * @param {string} str A string in which to collapse spaces.
+ * @return {string} Copy of the string with normalized breaking spaces.
+ */
+goog.string.collapseBreakingSpaces = function(str) {
+  return str.replace(/[\t\r\n ]+/g, ' ').replace(
+      /^[\t\r\n ]+|[\t\r\n ]+$/g, '');
 };
 
 
@@ -2333,13 +2918,6 @@ goog.string.numerateCompare = function(str1, str2) {
 
 
 /**
- * Regular expression used for determining if a string needs to be encoded.
- * @type {RegExp}
- * @private
- */
-goog.string.encodeUriRegExp_ = /^[a-zA-Z0-9\-_.!~*'()]*$/;
-
-/**
  * URL-encodes a string
  * @param {*} str The string to url-encode.
  * @return {string} An encoded copy of {@code str} that is safe for urls.
@@ -2347,15 +2925,7 @@ goog.string.encodeUriRegExp_ = /^[a-zA-Z0-9\-_.!~*'()]*$/;
  *     of URLs *will* be encoded.
  */
 goog.string.urlEncode = function(str) {
-  str = String(str);
-  // Checking if the search matches before calling encodeURIComponent avoids an
-  // extra allocation in IE6. This adds about 10us time in FF and a similiar
-  // over head in IE6 for lower working set apps, but for large working set
-  // apps like Gmail, it saves about 70us per call.
-  if (!goog.string.encodeUriRegExp_.test(str)) {
-    return encodeURIComponent(str);
-  }
-  return str;
+  return encodeURIComponent(String(str));
 };
 
 
@@ -2503,9 +3073,7 @@ goog.string.unescapeEntities = function(str) {
     // We are careful not to use a DOM if we do not have one. We use the []
     // notation so that the JSCompiler will not complain about these objects and
     // fields in the case where we have no DOM.
-    // If the string contains < then there could be a script tag in there and in
-    // that case we fall back to a non DOM solution as well.
-    if ('document' in goog.global && !goog.string.contains(str, '<')) {
+    if ('document' in goog.global) {
       return goog.string.unescapeEntitiesUsingDom_(str);
     } else {
       // Fall back on pure XML entities
@@ -2517,23 +3085,45 @@ goog.string.unescapeEntities = function(str) {
 
 
 /**
- * Unescapes an HTML string using a DOM. Don't use this function directly, it
- * should only be used by unescapeEntities. If used directly you will be
- * vulnerable to XSS attacks.
+ * Unescapes an HTML string using a DOM to resolve non-XML, non-numeric
+ * entities. This function is XSS-safe and whitespace-preserving.
  * @private
  * @param {string} str The string to unescape.
  * @return {string} The unescaped {@code str} string.
  */
 goog.string.unescapeEntitiesUsingDom_ = function(str) {
-  var el = goog.global['document']['createElement']('a');
-  el['innerHTML'] = str;
-  // Accesing the function directly triggers some virus scanners.
-  if (el[goog.string.NORMALIZE_FN_]) {
-    el[goog.string.NORMALIZE_FN_]();
-  }
-  str = el['firstChild']['nodeValue'];
-  el['innerHTML'] = '';
-  return str;
+  var seen = {'&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"'};
+  var div = document.createElement('div');
+  // Match as many valid entity characters as possible. If the actual entity
+  // happens to be shorter, it will still work as innerHTML will return the
+  // trailing characters unchanged. Since the entity characters do not include
+  // open angle bracket, there is no chance of XSS from the innerHTML use.
+  // Since no whitespace is passed to innerHTML, whitespace is preserved.
+  return str.replace(goog.string.HTML_ENTITY_PATTERN_, function(s, entity) {
+    // Check for cached entity.
+    var value = seen[s];
+    if (value) {
+      return value;
+    }
+    // Check for numeric entity.
+    if (entity.charAt(0) == '#') {
+      // Prefix with 0 so that hex entities (e.g. &#x10) parse as hex numbers.
+      var n = Number('0' + entity.substr(1));
+      if (!isNaN(n)) {
+        value = String.fromCharCode(n);
+      }
+    }
+    // Fall back to innerHTML otherwise.
+    if (!value) {
+      // Append a non-entity character to avoid a bug in Webkit that parses
+      // an invalid entity at the end of innerHTML text as the empty string.
+      div.innerHTML = s + ' ';
+      // Then remove the trailing character from the result.
+      value = div.firstChild.nodeValue.slice(0, -1);
+    }
+    // Cache and return.
+    return seen[s] = value;
+  });
 };
 
 
@@ -2556,6 +3146,7 @@ goog.string.unescapePureXmlEntities_ = function(str) {
         return '"';
       default:
         if (entity.charAt(0) == '#') {
+          // Prefix with 0 so that hex entities (e.g. &#x10) parse as hex.
           var n = Number('0' + entity.substr(1));
           if (!isNaN(n)) {
             return String.fromCharCode(n);
@@ -2567,13 +3158,15 @@ goog.string.unescapePureXmlEntities_ = function(str) {
   });
 };
 
+
 /**
- * String name for the node.normalize function. Anti-virus programs use this as
- * a signature for some viruses so we need a work around (temporary).
+ * Regular expression that matches an HTML entity.
+ * See also HTML5: Tokenization / Tokenizing character references.
  * @private
- * @type {string}
+ * @type {!RegExp}
  */
-goog.string.NORMALIZE_FN_ = 'normalize';
+goog.string.HTML_ENTITY_PATTERN_ = /&([^;\s<&]+);?/g;
+
 
 /**
  * Do escaping of whitespace to preserve spatial formatting. We use character
@@ -2648,15 +3241,25 @@ goog.string.truncate = function(str, chars, opt_protectEscapedCharacters) {
  * @param {number} chars Max number of characters.
  * @param {boolean=} opt_protectEscapedCharacters Whether to protect escaped
  *     characters from being cutoff in the middle.
+ * @param {number=} opt_trailingChars Optional number of trailing characters to
+ *     leave at the end of the string, instead of truncating as close to the
+ *     middle as possible.
  * @return {string} A truncated copy of {@code str}.
  */
 goog.string.truncateMiddle = function(str, chars,
-    opt_protectEscapedCharacters) {
+    opt_protectEscapedCharacters, opt_trailingChars) {
   if (opt_protectEscapedCharacters) {
     str = goog.string.unescapeEntities(str);
   }
 
-  if (str.length > chars) {
+  if (opt_trailingChars && str.length > chars) {
+    if (opt_trailingChars > chars) {
+      opt_trailingChars = chars;
+    }
+    var endPoint = str.length - opt_trailingChars;
+    var startPoint = chars - opt_trailingChars;
+    str = str.substring(0, startPoint) + '...' + str.substring(endPoint);
+  } else if (str.length > chars) {
     // Favor the beginning of the string:
     var half = Math.floor(chars / 2);
     var endPos = str.length - half;
@@ -2725,7 +3328,7 @@ goog.string.quote = function(s) {
 
 
 /**
- * Takes a string and returns the escaped string for that charater.
+ * Takes a string and returns the escaped string for that character.
  * @param {string} str The string to escape.
  * @return {string} An escaped string representing {@code str}.
  */
@@ -2784,7 +3387,7 @@ goog.string.escapeChar = function(c) {
  * @param {string} s The string to build the map from.
  * @return {Object} The map of characters used.
  */
-// TODO(user): It seems like we should have a generic goog.array.toMap. But do
+// TODO(arv): It seems like we should have a generic goog.array.toMap. But do
 //            we want a dependency on goog.array in goog.string?
 goog.string.toMap = function(s) {
   var rv = {};
@@ -2796,13 +3399,25 @@ goog.string.toMap = function(s) {
 
 
 /**
- * Checks whether a string contains a given character.
+ * Checks whether a string contains a given substring.
  * @param {string} s The string to test.
  * @param {string} ss The substring to test for.
  * @return {boolean} True if {@code s} contains {@code ss}.
  */
 goog.string.contains = function(s, ss) {
   return s.indexOf(ss) != -1;
+};
+
+
+/**
+ * Returns the non-overlapping occurrences of ss in s.
+ * If either s or ss evalutes to false, then returns zero.
+ * @param {string} s The string to look in.
+ * @param {string} ss The string to look for.
+ * @return {number} Number of occurrences of ss in s.
+ */
+goog.string.countOf = function(s, ss) {
+  return s && ss ? s.split(ss).length - 1 : 0;
 };
 
 
@@ -2860,7 +3475,7 @@ goog.string.removeAll = function(s, ss) {
  */
 goog.string.regExpEscape = function(s) {
   return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').
-                   replace(/\x08/g, '\\x08');
+      replace(/\x08/g, '\\x08');
 };
 
 
@@ -2940,8 +3555,9 @@ goog.string.buildString = function(var_args) {
  * @return {string} A random string, e.g. sn1s7vb4gcic.
  */
 goog.string.getRandomString = function() {
-  return Math.floor(Math.random() * 2147483648).toString(36) +
-         (Math.floor(Math.random() * 2147483648) ^ goog.now()).toString(36);
+  var x = 2147483648;
+  return Math.floor(Math.random() * x).toString(36) +
+         Math.abs(Math.floor(Math.random() * x) ^ goog.now()).toString(36);
 };
 
 
@@ -2994,7 +3610,7 @@ goog.string.compareVersions = function(version1, version2) {
           goog.string.compareElements_(v1Comp[2].length == 0,
               v2Comp[2].length == 0) ||
           goog.string.compareElements_(v1Comp[2], v2Comp[2]);
-    // Stop as soon as an inequality is discovered.
+      // Stop as soon as an inequality is discovered.
     } while (order == 0);
   }
 
@@ -3089,6 +3705,179 @@ goog.string.toNumber = function(str) {
   }
   return num;
 };
+
+
+/**
+ * Returns whether the given string is lower camel case (e.g. "isFooBar").
+ *
+ * Note that this assumes the string is entirely letters.
+ * @see http://en.wikipedia.org/wiki/CamelCase#Variations_and_synonyms
+ *
+ * @param {string} str String to test.
+ * @return {boolean} Whether the string is lower camel case.
+ */
+goog.string.isLowerCamelCase = function(str) {
+  return /^[a-z]+([A-Z][a-z]*)*$/.test(str);
+};
+
+
+/**
+ * Returns whether the given string is upper camel case (e.g. "FooBarBaz").
+ *
+ * Note that this assumes the string is entirely letters.
+ * @see http://en.wikipedia.org/wiki/CamelCase#Variations_and_synonyms
+ *
+ * @param {string} str String to test.
+ * @return {boolean} Whether the string is upper camel case.
+ */
+goog.string.isUpperCamelCase = function(str) {
+  return /^([A-Z][a-z]*)+$/.test(str);
+};
+
+
+/**
+ * Converts a string from selector-case to camelCase (e.g. from
+ * "multi-part-string" to "multiPartString"), useful for converting
+ * CSS selectors and HTML dataset keys to their equivalent JS properties.
+ * @param {string} str The string in selector-case form.
+ * @return {string} The string in camelCase form.
+ */
+goog.string.toCamelCase = function(str) {
+  return String(str).replace(/\-([a-z])/g, function(all, match) {
+    return match.toUpperCase();
+  });
+};
+
+
+/**
+ * Converts a string from camelCase to selector-case (e.g. from
+ * "multiPartString" to "multi-part-string"), useful for converting JS
+ * style and dataset properties to equivalent CSS selectors and HTML keys.
+ * @param {string} str The string in camelCase form.
+ * @return {string} The string in selector-case form.
+ */
+goog.string.toSelectorCase = function(str) {
+  return String(str).replace(/([A-Z])/g, '-$1').toLowerCase();
+};
+
+
+/**
+ * Converts a string into TitleCase. First character of the string is always
+ * capitalized in addition to the first letter of every subsequent word.
+ * Words are delimited by one or more whitespaces by default. Custom delimiters
+ * can optionally be specified to replace the default, which doesn't preserve
+ * whitespace delimiters and instead must be explicitly included if needed.
+ *
+ * Default delimiter => " ":
+ *    goog.string.toTitleCase('oneTwoThree')    => 'OneTwoThree'
+ *    goog.string.toTitleCase('one two three')  => 'One Two Three'
+ *    goog.string.toTitleCase('  one   two   ') => '  One   Two   '
+ *    goog.string.toTitleCase('one_two_three')  => 'One_two_three'
+ *    goog.string.toTitleCase('one-two-three')  => 'One-two-three'
+ *
+ * Custom delimiter => "_-.":
+ *    goog.string.toTitleCase('oneTwoThree', '_-.')       => 'OneTwoThree'
+ *    goog.string.toTitleCase('one two three', '_-.')     => 'One two three'
+ *    goog.string.toTitleCase('  one   two   ', '_-.')    => '  one   two   '
+ *    goog.string.toTitleCase('one_two_three', '_-.')     => 'One_Two_Three'
+ *    goog.string.toTitleCase('one-two-three', '_-.')     => 'One-Two-Three'
+ *    goog.string.toTitleCase('one...two...three', '_-.') => 'One...Two...Three'
+ *    goog.string.toTitleCase('one. two. three', '_-.')   => 'One. two. three'
+ *    goog.string.toTitleCase('one-two.three', '_-.')     => 'One-Two.Three'
+ *
+ * @param {string} str String value in camelCase form.
+ * @param {string=} opt_delimiters Custom delimiter character set used to
+ *      distinguish words in the string value. Each character represents a
+ *      single delimiter. When provided, default whitespace delimiter is
+ *      overridden and must be explicitly included if needed.
+ * @return {string} String value in TitleCase form.
+ */
+goog.string.toTitleCase = function(str, opt_delimiters) {
+  var delimiters = goog.isString(opt_delimiters) ?
+      goog.string.regExpEscape(opt_delimiters) : '\\s';
+
+  // For IE8, we need to prevent using an empty character set. Otherwise,
+  // incorrect matching will occur.
+  delimiters = delimiters ? '|[' + delimiters + ']+' : '';
+
+  var regexp = new RegExp('(^' + delimiters + ')([a-z])', 'g');
+  return str.replace(regexp, function(all, p1, p2) {
+    return p1 + p2.toUpperCase();
+  });
+};
+
+
+/**
+ * Parse a string in decimal or hexidecimal ('0xFFFF') form.
+ *
+ * To parse a particular radix, please use parseInt(string, radix) directly. See
+ * https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/parseInt
+ *
+ * This is a wrapper for the built-in parseInt function that will only parse
+ * numbers as base 10 or base 16.  Some JS implementations assume strings
+ * starting with "0" are intended to be octal. ES3 allowed but discouraged
+ * this behavior. ES5 forbids it.  This function emulates the ES5 behavior.
+ *
+ * For more information, see Mozilla JS Reference: http://goo.gl/8RiFj
+ *
+ * @param {string|number|null|undefined} value The value to be parsed.
+ * @return {number} The number, parsed. If the string failed to parse, this
+ *     will be NaN.
+ */
+goog.string.parseInt = function(value) {
+  // Force finite numbers to strings.
+  if (isFinite(value)) {
+    value = String(value);
+  }
+
+  if (goog.isString(value)) {
+    // If the string starts with '0x' or '-0x', parse as hex.
+    return /^\s*-?0x/i.test(value) ?
+        parseInt(value, 16) : parseInt(value, 10);
+  }
+
+  return NaN;
+};
+
+
+/**
+ * Splits a string on a separator a limited number of times.
+ *
+ * This implementation is more similar to Python or Java, where the limit
+ * parameter specifies the maximum number of splits rather than truncating
+ * the number of results.
+ *
+ * See http://docs.python.org/2/library/stdtypes.html#str.split
+ * See JavaDoc: http://goo.gl/F2AsY
+ * See Mozilla reference: http://goo.gl/dZdZs
+ *
+ * @param {string} str String to split.
+ * @param {string} separator The separator.
+ * @param {number} limit The limit to the number of splits. The resulting array
+ *     will have a maximum length of limit+1.  Negative numbers are the same
+ *     as zero.
+ * @return {!Array.<string>} The string, split.
+ */
+
+goog.string.splitLimit = function(str, separator, limit) {
+  var parts = str.split(separator);
+  var returnVal = [];
+
+  // Only continue doing this while we haven't hit the limit and we have
+  // parts left.
+  while (limit > 0 && parts.length) {
+    returnVal.push(parts.shift());
+    limit--;
+  }
+
+  // If there are remaining parts, append them to the end.
+  if (parts.length) {
+    returnVal.push(parts.join(separator));
+  }
+
+  return returnVal;
+};
+
 // Copyright 2009 The Closure Library Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -3105,9 +3894,11 @@ goog.string.toNumber = function(str) {
 
 /**
  * @fileoverview Provides a base class for custom Error objects such that the
- * stack is corectly maintained.
+ * stack is correctly maintained.
  *
-*
+ * You should never need to throw goog.debug.Error(msg) directly, Error(msg) is
+ * sufficient.
+ *
  */
 
 goog.provide('goog.debug.Error');
@@ -3123,7 +3914,11 @@ goog.provide('goog.debug.Error');
 goog.debug.Error = function(opt_msg) {
 
   // Ensure there is a stack trace.
-  this.stack = new Error().stack || '';
+  if (Error.captureStackTrace) {
+    Error.captureStackTrace(this, goog.debug.Error);
+  } else {
+    this.stack = new Error().stack || '';
+  }
 
   if (opt_msg) {
     this.message = String(opt_msg);
@@ -3132,7 +3927,7 @@ goog.debug.Error = function(opt_msg) {
 goog.inherits(goog.debug.Error, Error);
 
 
-/** @inheritDoc */
+/** @override */
 goog.debug.Error.prototype.name = 'CustomError';
 // Copyright 2008 The Closure Library Authors. All Rights Reserved.
 //
@@ -3156,8 +3951,17 @@ goog.debug.Error.prototype.name = 'CustomError';
  * for type-inference. For example, <code>goog.asserts.assert(foo)</code>
  * will restrict <code>foo</code> to a truthy value.
  *
-*
- * @author agrieve@google.com (Andrew Grieve)
+ * The compiler has an option to disable asserts. So code like:
+ * <code>
+ * var x = goog.asserts.assert(foo()); goog.asserts.assert(bar());
+ * </code>
+ * will be transformed into:
+ * <code>
+ * var x = foo();
+ * </code>
+ * The compiler will leave in foo() (because its return value is used),
+ * but it will remove bar() because it assumes it does not have side-effects.
+ *
  */
 
 goog.provide('goog.asserts');
@@ -3166,15 +3970,12 @@ goog.provide('goog.asserts.AssertionError');
 goog.require('goog.debug.Error');
 goog.require('goog.string');
 
-// TODO(nicksantos): Add return values for all these functions, so that they
-// can be chained like:
-// eatNumber(goog.asserts.isNumber(foo));
-// for more lisp-y asserts.
 
 /**
  * @define {boolean} Whether to strip out asserts or to leave them in.
  */
-goog.asserts.ENABLE_ASSERTS = goog.DEBUG;
+goog.define('goog.asserts.ENABLE_ASSERTS', goog.DEBUG);
+
 
 
 /**
@@ -3201,7 +4002,7 @@ goog.asserts.AssertionError = function(messagePattern, messageArgs) {
 goog.inherits(goog.asserts.AssertionError, goog.debug.Error);
 
 
-/** @inheritDoc */
+/** @override */
 goog.asserts.AssertionError.prototype.name = 'AssertionError';
 
 
@@ -3239,6 +4040,7 @@ goog.asserts.doAssertFailure_ =
  * @param {*} condition The condition to check.
  * @param {string=} opt_message Error message in case of failure.
  * @param {...*} var_args The items to substitute into the failure message.
+ * @return {*} The value of the condition.
  * @throws {goog.asserts.AssertionError} When the condition evaluates to false.
  */
 goog.asserts.assert = function(condition, opt_message, var_args) {
@@ -3246,6 +4048,7 @@ goog.asserts.assert = function(condition, opt_message, var_args) {
     goog.asserts.doAssertFailure_('', null, opt_message,
         Array.prototype.slice.call(arguments, 2));
   }
+  return condition;
 };
 
 
@@ -3286,8 +4089,9 @@ goog.asserts.fail = function(opt_message, var_args) {
  */
 goog.asserts.assertNumber = function(value, opt_message, var_args) {
   if (goog.asserts.ENABLE_ASSERTS && !goog.isNumber(value)) {
-    goog.asserts.doAssertFailure_('Expected number but got %s.', [value],
-         opt_message, Array.prototype.slice.call(arguments, 2));
+    goog.asserts.doAssertFailure_('Expected number but got %s: %s.',
+        [goog.typeOf(value), value], opt_message,
+        Array.prototype.slice.call(arguments, 2));
   }
   return /** @type {number} */ (value);
 };
@@ -3303,8 +4107,9 @@ goog.asserts.assertNumber = function(value, opt_message, var_args) {
  */
 goog.asserts.assertString = function(value, opt_message, var_args) {
   if (goog.asserts.ENABLE_ASSERTS && !goog.isString(value)) {
-    goog.asserts.doAssertFailure_('Expected string but got %s.', [value],
-         opt_message, Array.prototype.slice.call(arguments, 2));
+    goog.asserts.doAssertFailure_('Expected string but got %s: %s.',
+        [goog.typeOf(value), value], opt_message,
+        Array.prototype.slice.call(arguments, 2));
   }
   return /** @type {string} */ (value);
 };
@@ -3321,8 +4126,9 @@ goog.asserts.assertString = function(value, opt_message, var_args) {
  */
 goog.asserts.assertFunction = function(value, opt_message, var_args) {
   if (goog.asserts.ENABLE_ASSERTS && !goog.isFunction(value)) {
-    goog.asserts.doAssertFailure_('Expected function but got %s.', [value],
-         opt_message, Array.prototype.slice.call(arguments, 2));
+    goog.asserts.doAssertFailure_('Expected function but got %s: %s.',
+        [goog.typeOf(value), value], opt_message,
+        Array.prototype.slice.call(arguments, 2));
   }
   return /** @type {!Function} */ (value);
 };
@@ -3338,8 +4144,9 @@ goog.asserts.assertFunction = function(value, opt_message, var_args) {
  */
 goog.asserts.assertObject = function(value, opt_message, var_args) {
   if (goog.asserts.ENABLE_ASSERTS && !goog.isObject(value)) {
-    goog.asserts.doAssertFailure_('Expected object but got %s.', [value],
-         opt_message, Array.prototype.slice.call(arguments, 2));
+    goog.asserts.doAssertFailure_('Expected object but got %s: %s.',
+        [goog.typeOf(value), value],
+        opt_message, Array.prototype.slice.call(arguments, 2));
   }
   return /** @type {!Object} */ (value);
 };
@@ -3355,30 +4162,701 @@ goog.asserts.assertObject = function(value, opt_message, var_args) {
  */
 goog.asserts.assertArray = function(value, opt_message, var_args) {
   if (goog.asserts.ENABLE_ASSERTS && !goog.isArray(value)) {
-    goog.asserts.doAssertFailure_('Expected array but got %s.', [value],
-         opt_message, Array.prototype.slice.call(arguments, 2));
+    goog.asserts.doAssertFailure_('Expected array but got %s: %s.',
+        [goog.typeOf(value), value], opt_message,
+        Array.prototype.slice.call(arguments, 2));
   }
   return /** @type {!Array} */ (value);
 };
 
 
 /**
+ * Checks if the value is a boolean if goog.asserts.ENABLE_ASSERTS is true.
+ * @param {*} value The value to check.
+ * @param {string=} opt_message Error message in case of failure.
+ * @param {...*} var_args The items to substitute into the failure message.
+ * @return {boolean} The value, guaranteed to be a boolean when asserts are
+ *     enabled.
+ * @throws {goog.asserts.AssertionError} When the value is not a boolean.
+ */
+goog.asserts.assertBoolean = function(value, opt_message, var_args) {
+  if (goog.asserts.ENABLE_ASSERTS && !goog.isBoolean(value)) {
+    goog.asserts.doAssertFailure_('Expected boolean but got %s: %s.',
+        [goog.typeOf(value), value], opt_message,
+        Array.prototype.slice.call(arguments, 2));
+  }
+  return /** @type {boolean} */ (value);
+};
+
+
+/**
  * Checks if the value is an instance of the user-defined type if
  * goog.asserts.ENABLE_ASSERTS is true.
+ *
+ * The compiler may tighten the type returned by this function.
+ *
  * @param {*} value The value to check.
- * @param {!Function} type A user-defined constructor.
+ * @param {function(new: T, ...)} type A user-defined constructor.
  * @param {string=} opt_message Error message in case of failure.
  * @param {...*} var_args The items to substitute into the failure message.
  * @throws {goog.asserts.AssertionError} When the value is not an instance of
  *     type.
+ * @return {!T}
+ * @template T
  */
 goog.asserts.assertInstanceof = function(value, type, opt_message, var_args) {
   if (goog.asserts.ENABLE_ASSERTS && !(value instanceof type)) {
     goog.asserts.doAssertFailure_('instanceof check failed.', null,
-         opt_message, Array.prototype.slice.call(arguments, 3));
+        opt_message, Array.prototype.slice.call(arguments, 3));
+  }
+  return value;
+};
+
+
+/**
+ * Checks that no enumerable keys are present in Object.prototype. Such keys
+ * would break most code that use {@code for (var ... in ...)} loops.
+ */
+goog.asserts.assertObjectPrototypeIsIntact = function() {
+  for (var key in Object.prototype) {
+    goog.asserts.fail(key + ' should not be enumerable in Object.prototype.');
+  }
+};
+// Copyright 2006 The Closure Library Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS-IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/**
+ * @fileoverview Utilities for manipulating objects/maps/hashes.
+ */
+
+goog.provide('goog.object');
+
+
+/**
+ * Calls a function for each element in an object/map/hash.
+ *
+ * @param {Object.<K,V>} obj The object over which to iterate.
+ * @param {function(this:T,V,?,Object.<K,V>):?} f The function to call
+ *     for every element. This function takes 3 arguments (the element, the
+ *     index and the object) and the return value is ignored.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @template T,K,V
+ */
+goog.object.forEach = function(obj, f, opt_obj) {
+  for (var key in obj) {
+    f.call(opt_obj, obj[key], key, obj);
   }
 };
 
+
+/**
+ * Calls a function for each element in an object/map/hash. If that call returns
+ * true, adds the element to a new object.
+ *
+ * @param {Object.<K,V>} obj The object over which to iterate.
+ * @param {function(this:T,V,?,Object.<K,V>):boolean} f The function to call
+ *     for every element. This
+ *     function takes 3 arguments (the element, the index and the object)
+ *     and should return a boolean. If the return value is true the
+ *     element is added to the result object. If it is false the
+ *     element is not included.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {!Object.<K,V>} a new object in which only elements that passed the
+ *     test are present.
+ * @template T,K,V
+ */
+goog.object.filter = function(obj, f, opt_obj) {
+  var res = {};
+  for (var key in obj) {
+    if (f.call(opt_obj, obj[key], key, obj)) {
+      res[key] = obj[key];
+    }
+  }
+  return res;
+};
+
+
+/**
+ * For every element in an object/map/hash calls a function and inserts the
+ * result into a new object.
+ *
+ * @param {Object.<K,V>} obj The object over which to iterate.
+ * @param {function(this:T,V,?,Object.<K,V>):R} f The function to call
+ *     for every element. This function
+ *     takes 3 arguments (the element, the index and the object)
+ *     and should return something. The result will be inserted
+ *     into a new object.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {!Object.<K,R>} a new object with the results from f.
+ * @template T,K,V,R
+ */
+goog.object.map = function(obj, f, opt_obj) {
+  var res = {};
+  for (var key in obj) {
+    res[key] = f.call(opt_obj, obj[key], key, obj);
+  }
+  return res;
+};
+
+
+/**
+ * Calls a function for each element in an object/map/hash. If any
+ * call returns true, returns true (without checking the rest). If
+ * all calls return false, returns false.
+ *
+ * @param {Object.<K,V>} obj The object to check.
+ * @param {function(this:T,V,?,Object.<K,V>):boolean} f The function to
+ *     call for every element. This function
+ *     takes 3 arguments (the element, the index and the object) and should
+ *     return a boolean.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {boolean} true if any element passes the test.
+ * @template T,K,V
+ */
+goog.object.some = function(obj, f, opt_obj) {
+  for (var key in obj) {
+    if (f.call(opt_obj, obj[key], key, obj)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+
+/**
+ * Calls a function for each element in an object/map/hash. If
+ * all calls return true, returns true. If any call returns false, returns
+ * false at this point and does not continue to check the remaining elements.
+ *
+ * @param {Object.<K,V>} obj The object to check.
+ * @param {?function(this:T,V,?,Object.<K,V>):boolean} f The function to
+ *     call for every element. This function
+ *     takes 3 arguments (the element, the index and the object) and should
+ *     return a boolean.
+ * @param {T=} opt_obj This is used as the 'this' object within f.
+ * @return {boolean} false if any element fails the test.
+ * @template T,K,V
+ */
+goog.object.every = function(obj, f, opt_obj) {
+  for (var key in obj) {
+    if (!f.call(opt_obj, obj[key], key, obj)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+
+/**
+ * Returns the number of key-value pairs in the object map.
+ *
+ * @param {Object} obj The object for which to get the number of key-value
+ *     pairs.
+ * @return {number} The number of key-value pairs in the object map.
+ */
+goog.object.getCount = function(obj) {
+  // JS1.5 has __count__ but it has been deprecated so it raises a warning...
+  // in other words do not use. Also __count__ only includes the fields on the
+  // actual object and not in the prototype chain.
+  var rv = 0;
+  for (var key in obj) {
+    rv++;
+  }
+  return rv;
+};
+
+
+/**
+ * Returns one key from the object map, if any exists.
+ * For map literals the returned key will be the first one in most of the
+ * browsers (a know exception is Konqueror).
+ *
+ * @param {Object} obj The object to pick a key from.
+ * @return {string|undefined} The key or undefined if the object is empty.
+ */
+goog.object.getAnyKey = function(obj) {
+  for (var key in obj) {
+    return key;
+  }
+};
+
+
+/**
+ * Returns one value from the object map, if any exists.
+ * For map literals the returned value will be the first one in most of the
+ * browsers (a know exception is Konqueror).
+ *
+ * @param {Object.<K,V>} obj The object to pick a value from.
+ * @return {V|undefined} The value or undefined if the object is empty.
+ * @template K,V
+ */
+goog.object.getAnyValue = function(obj) {
+  for (var key in obj) {
+    return obj[key];
+  }
+};
+
+
+/**
+ * Whether the object/hash/map contains the given object as a value.
+ * An alias for goog.object.containsValue(obj, val).
+ *
+ * @param {Object.<K,V>} obj The object in which to look for val.
+ * @param {V} val The object for which to check.
+ * @return {boolean} true if val is present.
+ * @template K,V
+ */
+goog.object.contains = function(obj, val) {
+  return goog.object.containsValue(obj, val);
+};
+
+
+/**
+ * Returns the values of the object/map/hash.
+ *
+ * @param {Object.<K,V>} obj The object from which to get the values.
+ * @return {!Array.<V>} The values in the object/map/hash.
+ * @template K,V
+ */
+goog.object.getValues = function(obj) {
+  var res = [];
+  var i = 0;
+  for (var key in obj) {
+    res[i++] = obj[key];
+  }
+  return res;
+};
+
+
+/**
+ * Returns the keys of the object/map/hash.
+ *
+ * @param {Object} obj The object from which to get the keys.
+ * @return {!Array.<string>} Array of property keys.
+ */
+goog.object.getKeys = function(obj) {
+  var res = [];
+  var i = 0;
+  for (var key in obj) {
+    res[i++] = key;
+  }
+  return res;
+};
+
+
+/**
+ * Get a value from an object multiple levels deep.  This is useful for
+ * pulling values from deeply nested objects, such as JSON responses.
+ * Example usage: getValueByKeys(jsonObj, 'foo', 'entries', 3)
+ *
+ * @param {!Object} obj An object to get the value from.  Can be array-like.
+ * @param {...(string|number|!Array.<number|string>)} var_args A number of keys
+ *     (as strings, or numbers, for array-like objects).  Can also be
+ *     specified as a single array of keys.
+ * @return {*} The resulting value.  If, at any point, the value for a key
+ *     is undefined, returns undefined.
+ */
+goog.object.getValueByKeys = function(obj, var_args) {
+  var isArrayLike = goog.isArrayLike(var_args);
+  var keys = isArrayLike ? var_args : arguments;
+
+  // Start with the 2nd parameter for the variable parameters syntax.
+  for (var i = isArrayLike ? 0 : 1; i < keys.length; i++) {
+    obj = obj[keys[i]];
+    if (!goog.isDef(obj)) {
+      break;
+    }
+  }
+
+  return obj;
+};
+
+
+/**
+ * Whether the object/map/hash contains the given key.
+ *
+ * @param {Object} obj The object in which to look for key.
+ * @param {*} key The key for which to check.
+ * @return {boolean} true If the map contains the key.
+ */
+goog.object.containsKey = function(obj, key) {
+  return key in obj;
+};
+
+
+/**
+ * Whether the object/map/hash contains the given value. This is O(n).
+ *
+ * @param {Object.<K,V>} obj The object in which to look for val.
+ * @param {V} val The value for which to check.
+ * @return {boolean} true If the map contains the value.
+ * @template K,V
+ */
+goog.object.containsValue = function(obj, val) {
+  for (var key in obj) {
+    if (obj[key] == val) {
+      return true;
+    }
+  }
+  return false;
+};
+
+
+/**
+ * Searches an object for an element that satisfies the given condition and
+ * returns its key.
+ * @param {Object.<K,V>} obj The object to search in.
+ * @param {function(this:T,V,string,Object.<K,V>):boolean} f The
+ *      function to call for every element. Takes 3 arguments (the value,
+ *     the key and the object) and should return a boolean.
+ * @param {T=} opt_this An optional "this" context for the function.
+ * @return {string|undefined} The key of an element for which the function
+ *     returns true or undefined if no such element is found.
+ * @template T,K,V
+ */
+goog.object.findKey = function(obj, f, opt_this) {
+  for (var key in obj) {
+    if (f.call(opt_this, obj[key], key, obj)) {
+      return key;
+    }
+  }
+  return undefined;
+};
+
+
+/**
+ * Searches an object for an element that satisfies the given condition and
+ * returns its value.
+ * @param {Object.<K,V>} obj The object to search in.
+ * @param {function(this:T,V,string,Object.<K,V>):boolean} f The function
+ *     to call for every element. Takes 3 arguments (the value, the key
+ *     and the object) and should return a boolean.
+ * @param {T=} opt_this An optional "this" context for the function.
+ * @return {V} The value of an element for which the function returns true or
+ *     undefined if no such element is found.
+ * @template T,K,V
+ */
+goog.object.findValue = function(obj, f, opt_this) {
+  var key = goog.object.findKey(obj, f, opt_this);
+  return key && obj[key];
+};
+
+
+/**
+ * Whether the object/map/hash is empty.
+ *
+ * @param {Object} obj The object to test.
+ * @return {boolean} true if obj is empty.
+ */
+goog.object.isEmpty = function(obj) {
+  for (var key in obj) {
+    return false;
+  }
+  return true;
+};
+
+
+/**
+ * Removes all key value pairs from the object/map/hash.
+ *
+ * @param {Object} obj The object to clear.
+ */
+goog.object.clear = function(obj) {
+  for (var i in obj) {
+    delete obj[i];
+  }
+};
+
+
+/**
+ * Removes a key-value pair based on the key.
+ *
+ * @param {Object} obj The object from which to remove the key.
+ * @param {*} key The key to remove.
+ * @return {boolean} Whether an element was removed.
+ */
+goog.object.remove = function(obj, key) {
+  var rv;
+  if ((rv = key in obj)) {
+    delete obj[key];
+  }
+  return rv;
+};
+
+
+/**
+ * Adds a key-value pair to the object. Throws an exception if the key is
+ * already in use. Use set if you want to change an existing pair.
+ *
+ * @param {Object.<K,V>} obj The object to which to add the key-value pair.
+ * @param {string} key The key to add.
+ * @param {V} val The value to add.
+ * @template K,V
+ */
+goog.object.add = function(obj, key, val) {
+  if (key in obj) {
+    throw Error('The object already contains the key "' + key + '"');
+  }
+  goog.object.set(obj, key, val);
+};
+
+
+/**
+ * Returns the value for the given key.
+ *
+ * @param {Object.<K,V>} obj The object from which to get the value.
+ * @param {string} key The key for which to get the value.
+ * @param {R=} opt_val The value to return if no item is found for the given
+ *     key (default is undefined).
+ * @return {V|R|undefined} The value for the given key.
+ * @template K,V,R
+ */
+goog.object.get = function(obj, key, opt_val) {
+  if (key in obj) {
+    return obj[key];
+  }
+  return opt_val;
+};
+
+
+/**
+ * Adds a key-value pair to the object/map/hash.
+ *
+ * @param {Object.<K,V>} obj The object to which to add the key-value pair.
+ * @param {string} key The key to add.
+ * @param {V} value The value to add.
+ * @template K,V
+ */
+goog.object.set = function(obj, key, value) {
+  obj[key] = value;
+};
+
+
+/**
+ * Adds a key-value pair to the object/map/hash if it doesn't exist yet.
+ *
+ * @param {Object.<K,V>} obj The object to which to add the key-value pair.
+ * @param {string} key The key to add.
+ * @param {V} value The value to add if the key wasn't present.
+ * @return {V} The value of the entry at the end of the function.
+ * @template K,V
+ */
+goog.object.setIfUndefined = function(obj, key, value) {
+  return key in obj ? obj[key] : (obj[key] = value);
+};
+
+
+/**
+ * Does a flat clone of the object.
+ *
+ * @param {Object.<K,V>} obj Object to clone.
+ * @return {!Object.<K,V>} Clone of the input object.
+ * @template K,V
+ */
+goog.object.clone = function(obj) {
+  // We cannot use the prototype trick because a lot of methods depend on where
+  // the actual key is set.
+
+  var res = {};
+  for (var key in obj) {
+    res[key] = obj[key];
+  }
+  return res;
+  // We could also use goog.mixin but I wanted this to be independent from that.
+};
+
+
+/**
+ * Clones a value. The input may be an Object, Array, or basic type. Objects and
+ * arrays will be cloned recursively.
+ *
+ * WARNINGS:
+ * <code>goog.object.unsafeClone</code> does not detect reference loops. Objects
+ * that refer to themselves will cause infinite recursion.
+ *
+ * <code>goog.object.unsafeClone</code> is unaware of unique identifiers, and
+ * copies UIDs created by <code>getUid</code> into cloned results.
+ *
+ * @param {*} obj The value to clone.
+ * @return {*} A clone of the input value.
+ */
+goog.object.unsafeClone = function(obj) {
+  var type = goog.typeOf(obj);
+  if (type == 'object' || type == 'array') {
+    if (obj.clone) {
+      return obj.clone();
+    }
+    var clone = type == 'array' ? [] : {};
+    for (var key in obj) {
+      clone[key] = goog.object.unsafeClone(obj[key]);
+    }
+    return clone;
+  }
+
+  return obj;
+};
+
+
+/**
+ * Returns a new object in which all the keys and values are interchanged
+ * (keys become values and values become keys). If multiple keys map to the
+ * same value, the chosen transposed value is implementation-dependent.
+ *
+ * @param {Object} obj The object to transpose.
+ * @return {!Object} The transposed object.
+ */
+goog.object.transpose = function(obj) {
+  var transposed = {};
+  for (var key in obj) {
+    transposed[obj[key]] = key;
+  }
+  return transposed;
+};
+
+
+/**
+ * The names of the fields that are defined on Object.prototype.
+ * @type {Array.<string>}
+ * @private
+ */
+goog.object.PROTOTYPE_FIELDS_ = [
+  'constructor',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toLocaleString',
+  'toString',
+  'valueOf'
+];
+
+
+/**
+ * Extends an object with another object.
+ * This operates 'in-place'; it does not create a new Object.
+ *
+ * Example:
+ * var o = {};
+ * goog.object.extend(o, {a: 0, b: 1});
+ * o; // {a: 0, b: 1}
+ * goog.object.extend(o, {c: 2});
+ * o; // {a: 0, b: 1, c: 2}
+ *
+ * @param {Object} target  The object to modify.
+ * @param {...Object} var_args The objects from which values will be copied.
+ */
+goog.object.extend = function(target, var_args) {
+  var key, source;
+  for (var i = 1; i < arguments.length; i++) {
+    source = arguments[i];
+    for (key in source) {
+      target[key] = source[key];
+    }
+
+    // For IE the for-in-loop does not contain any properties that are not
+    // enumerable on the prototype object (for example isPrototypeOf from
+    // Object.prototype) and it will also not include 'replace' on objects that
+    // extend String and change 'replace' (not that it is common for anyone to
+    // extend anything except Object).
+
+    for (var j = 0; j < goog.object.PROTOTYPE_FIELDS_.length; j++) {
+      key = goog.object.PROTOTYPE_FIELDS_[j];
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+};
+
+
+/**
+ * Creates a new object built from the key-value pairs provided as arguments.
+ * @param {...*} var_args If only one argument is provided and it is an array
+ *     then this is used as the arguments,  otherwise even arguments are used as
+ *     the property names and odd arguments are used as the property values.
+ * @return {!Object} The new object.
+ * @throws {Error} If there are uneven number of arguments or there is only one
+ *     non array argument.
+ */
+goog.object.create = function(var_args) {
+  var argLength = arguments.length;
+  if (argLength == 1 && goog.isArray(arguments[0])) {
+    return goog.object.create.apply(null, arguments[0]);
+  }
+
+  if (argLength % 2) {
+    throw Error('Uneven number of arguments');
+  }
+
+  var rv = {};
+  for (var i = 0; i < argLength; i += 2) {
+    rv[arguments[i]] = arguments[i + 1];
+  }
+  return rv;
+};
+
+
+/**
+ * Creates a new object where the property names come from the arguments but
+ * the value is always set to true
+ * @param {...*} var_args If only one argument is provided and it is an array
+ *     then this is used as the arguments,  otherwise the arguments are used
+ *     as the property names.
+ * @return {!Object} The new object.
+ */
+goog.object.createSet = function(var_args) {
+  var argLength = arguments.length;
+  if (argLength == 1 && goog.isArray(arguments[0])) {
+    return goog.object.createSet.apply(null, arguments[0]);
+  }
+
+  var rv = {};
+  for (var i = 0; i < argLength; i++) {
+    rv[arguments[i]] = true;
+  }
+  return rv;
+};
+
+
+/**
+ * Creates an immutable view of the underlying object, if the browser
+ * supports immutable objects.
+ *
+ * In default mode, writes to this view will fail silently. In strict mode,
+ * they will throw an error.
+ *
+ * @param {!Object.<K,V>} obj An object.
+ * @return {!Object.<K,V>} An immutable view of that object, or the
+ *     original object if this browser does not support immutables.
+ * @template K,V
+ */
+goog.object.createImmutableView = function(obj) {
+  var result = obj;
+  if (Object.isFrozen && !Object.isFrozen(obj)) {
+    result = Object.create(obj);
+    Object.freeze(result);
+  }
+  return result;
+};
+
+
+/**
+ * @param {!Object} obj An object.
+ * @return {boolean} Whether this is an immutable view of the object.
+ */
+goog.object.isImmutableView = function(obj) {
+  return !!Object.isFrozen && Object.isFrozen(obj);
+};
 /**
  * Base namespace for Skulpt. This is the only symbol that Skulpt adds to the
  * global namespace. Other user accessible symbols are noted and described
@@ -3420,16 +4898,12 @@ goog.exportSymbol("Sk.reset", Sk.reset);
  *
  * Any variables that aren't set will be left alone.
  */
-Sk.configure = function(options)
-{
-    // added by allevato
+Sk.configure = function (options) {
+	'use strict';
     Sk.reset();
 
     Sk.output = options["output"] || Sk.output;
     goog.asserts.assert(typeof Sk.output === "function");
-
-    Sk.input = options["input"] || Sk.input;
-    goog.asserts.assert(typeof Sk.input === "function");
 
     Sk.debugout = options["debugout"] || Sk.debugout;
     goog.asserts.assert(typeof Sk.debugout === "function");
@@ -3439,6 +4913,10 @@ Sk.configure = function(options)
 
     Sk.urlTransformer = options["transformUrl"] || Sk.urlTransformer;
     goog.asserts.assert(typeof Sk.urlTransformer === "function");
+
+    Sk.timeoutMsg = options["timeoutMsg"] || Sk.timeoutMsg;
+    goog.asserts.assert(typeof Sk.timeoutMsg === "function");
+    goog.exportSymbol("Sk.timeoutMsg", Sk.timeoutMsg);
 
     Sk.sysargv = options["sysargv"] || Sk.sysargv;
     goog.asserts.assert(goog.isArrayLike(Sk.sysargv));
@@ -3456,8 +4934,19 @@ Sk.configure = function(options)
     Sk.suspendInterval = options["suspendInterval"] || 100;
     goog.asserts.assert(typeof Sk.suspendInterval === "number");
 
-    if (options["syspath"])
-    {
+    Sk.python3 = options["python3"] || Sk.python3;
+    goog.asserts.assert(typeof Sk.python3 === "boolean");
+
+    Sk.inputfun = options["inputfun"] || Sk.inputfun;
+    goog.asserts.assert(typeof Sk.inputfun === "function");
+
+    Sk.throwSystemExit = options["systemexit"] || false;
+    goog.asserts.assert(typeof Sk.throwSystemExit === "boolean");
+	
+	Sk.retainGlobals = options["retainglobals"] || false;
+	goog.asserts.assert(typeof Sk.throwSystemExit === "boolean");
+	
+    if (options["syspath"]) {
         Sk.syspath = options["syspath"];
         goog.asserts.assert(goog.isArrayLike(Sk.syspath));
         // assume that if we're changing syspath we want to force reimports.
@@ -3471,20 +4960,21 @@ Sk.configure = function(options)
 goog.exportSymbol("Sk.configure", Sk.configure);
 
 /*
- * Replacable output redirection (called from print, etc).
- */
-Sk.output = function(x) {};
+*	Replaceable message for message timeouts
+*/
+Sk.timeoutMsg = function () { return "Program exceeded run time limit."; };
+goog.exportSymbol("Sk.timeoutMsg", Sk.timeoutMsg);
 
 /*
- * Replacable input redirection (called from input, etc).
+ * Replacable output redirection (called from print, etc).
  */
-Sk.input = function(x) { return prompt(x); };
+Sk.output = function (x) {};
 
 /*
  * Replacable function to load modules with (called via import, etc.)
  * todo; this should be an async api
  */
-Sk.read = function(x) { throw "Sk.read has not been implemented"; };
+Sk.read = function (x) { throw "Sk.read has not been implemented"; };
 
 /*
  * Transform a URL. This is used by modules that make web requests,
@@ -3510,8 +5000,7 @@ goog.exportSymbol("Sk.transformUrl", Sk.transformUrl);
 Sk.sysargv = [];
 
 // lame function for sys module
-Sk.getSysArgv = function()
-{
+Sk.getSysArgv = function () {
     return Sk.sysargv;
 };
 goog.exportSymbol("Sk.getSysArgv", Sk.getSysArgv);
@@ -3523,7 +5012,7 @@ goog.exportSymbol("Sk.getSysArgv", Sk.getSysArgv);
  */
 Sk.syspath = [];
 
-Sk.inBrowser = goog.global.document !== undefined;
+Sk.inBrowser = goog.global['document'] !== undefined;
 
 /**
  * Internal function used for debug output.
@@ -3699,28 +5188,35 @@ goog.exportSymbol("Sk.cancelInBrowser", Sk.cancelInBrowser);
 
 (function() {
     // set up some sane defaults based on availability
-    if (goog.global.write !== undefined) Sk.output = goog.global.write;
-    else if (goog.global.console !== undefined && goog.global.console.log !== undefined) Sk.output = function (x) {goog.global.console.log(x);};
-    else if (goog.global.print !== undefined) Sk.output = goog.global.print;
-
-    if (goog.global.print !== undefined) Sk.debugout = goog.global.print;
+    if (goog.global['write'] !== undefined) {
+		Sk.output = goog.global['write']; 
+	} else if (goog.global['console'] !== undefined && goog.global['console']['log'] !== undefined) {
+		Sk.output = function (x) {goog.global['console']['log'](x);};
+	} else if (goog.global['print'] !== undefined) { 
+		Sk.output = goog.global['print'];
+	}
+    if (goog.global['print'] !== undefined) {
+		Sk.debugout = goog.global['print'];
+	}
 }());
 
 // override for closure to load stuff from the command line.
-if (!Sk.inBrowser)
-{
-    goog.writeScriptTag_ = function(src)
-    {
-        if (!goog.dependencies_.written[src])
-        {
-            goog.dependencies_.written[src] = true;
-            goog.global.eval(goog.global.read("support/closure-library/closure/goog/" + src));
-        }
+if (!Sk.inBrowser) {
+    goog.global.CLOSURE_IMPORT_SCRIPT = function(src) {
+        goog.global['eval'](goog.global['read']("support/closure-library/closure/goog/" + src));
+        return true;
     };
 }
 
-goog.require("goog.asserts");
+Sk.python3 = false;
+/*
+ * Replacable input redirection (called from input, etc).
+ */
+Sk.inputfun = function (args) { return prompt(args); };
 
+goog.exportSymbol("Sk.python3",Sk.python3)
+goog.exportSymbol("Sk.inputfun",Sk.inputfun)
+goog.require("goog.asserts");
 // builtins are supposed to come from the __builtin__ module, but we don't do
 // that yet.
 Sk.builtin = {};
@@ -3728,110 +5224,569 @@ Sk.builtin = {};
 // todo; these should all be func objects too, otherwise str() of them won't
 // work, etc.
 
-Sk.builtin.range = function(start, stop, step)
+Sk.builtin.range = function range(start, stop, step)
 {
     var ret = [];
-    var s = new Sk.builtin.slice(start, stop, step);
-    s.sssiter$(0, function(i) { ret.push(i); });
+    var i;
+
+    Sk.builtin.pyCheckArgs("range", arguments, 1, 3);
+    Sk.builtin.pyCheckType("start", "integer", Sk.builtin.checkInt(start));
+    if (stop !== undefined) {
+        Sk.builtin.pyCheckType("stop", "integer", Sk.builtin.checkInt(stop));
+    }
+    if (step !== undefined) {
+        Sk.builtin.pyCheckType("step", "integer", Sk.builtin.checkInt(step));
+    }
+
+    start = Sk.builtin.asnum$(start);
+    stop = Sk.builtin.asnum$(stop);
+    step = Sk.builtin.asnum$(step);
+
+    if ((stop === undefined) && (step === undefined)) {
+        stop = start;
+        start = 0;
+        step = 1;
+    } else if (step === undefined) {
+        step = 1;
+    }
+
+    if (step === 0) {
+        throw new Sk.builtin.ValueError("range() step argument must not be zero");
+    }
+
+    if (step > 0) {
+        for (i=start; i<stop; i+=step) {
+            ret.push(new Sk.builtin.nmber(i, Sk.builtin.nmber.int$));
+        }
+    } else {
+        for (i=start; i>stop; i+=step) {
+            ret.push(new Sk.builtin.nmber(i, Sk.builtin.nmber.int$));
+        }
+    }
+
     return new Sk.builtin.list(ret);
 };
 
-Sk.builtin.len = function(item)
-{
-    if (item.sq$length)
-        return item.sq$length();
-    
-    if (item.mp$length)
-        return item.mp$length();
+Sk.builtin.asnum$ = function(a) {
+	if (a === undefined) return a;
+	if (a === null) return a;
+	if (a.constructor === Sk.builtin.none) return null;
+	if (a.constructor === Sk.builtin.bool) {
+	    if (a.v)
+		return 1;
+	    return 0;
+	}
+	if (typeof a === "number") return a;
+	if (typeof a === "string") return a;
+	if (a.constructor === Sk.builtin.nmber) return a.v;
+	if (a.constructor === Sk.builtin.lng) {
+	    if (a.cantBeInt())
+		return a.str$(10, true);
+	    return a.toInt$();
+	}
+	if (a.constructor === Sk.builtin.biginteger) {
+	    if ((a.trueCompare(new Sk.builtin.biginteger(Sk.builtin.lng.threshold$)) > 0)
+		|| (a.trueCompare(new Sk.builtin.biginteger(-Sk.builtin.lng.threshold$)) < 0)) {
+		return a.toString();
+	    }
+	    return a.intValue();
+	}
 
-    throw new Sk.builtin.TypeError("object of type '" + item.tp$name + "' has no len()");
+	return a;
+};
+
+goog.exportSymbol("Sk.builtin.asnum$", Sk.builtin.asnum$);
+
+Sk.builtin.assk$ = function(a, b) {
+	return new Sk.builtin.nmber(a, b);
+}
+goog.exportSymbol("Sk.builtin.assk$", Sk.builtin.assk$);
+
+Sk.builtin.asnum$nofloat = function(a) {
+	if (a === undefined) return a;
+	if (a === null) return a;
+	if (a.constructor === Sk.builtin.none) return null;
+	if (a.constructor === Sk.builtin.bool) {
+	    if (a.v)
+		return 1;
+	    return 0;
+	}
+	if (typeof a === "number") a = a.toString();
+	if (a.constructor === Sk.builtin.nmber) a = a.v.toString();
+	if (a.constructor === Sk.builtin.lng)   a = a.str$(10, true);
+	if (a.constructor === Sk.builtin.biginteger) a = a.toString();
+
+//	Sk.debugout("INITIAL: " + a);
+
+	//	If not a float, great, just return this
+	if (a.indexOf('.') < 0 && a.indexOf('e') < 0 && a.indexOf('E') < 0)
+		return a;
+
+	var expon=0;
+	var mantissa;
+
+	if (a.indexOf('e') >= 0) {
+		mantissa = a.substr(0,a.indexOf('e'));
+		expon = a.substr(a.indexOf('e')+1);
+	} else if (a.indexOf('E') >= 0) {
+		mantissa = a.substr(0,a.indexOf('e'));
+		expon = a.substr(a.indexOf('E')+1);
+	} else {
+		mantissa = a;
+	}
+
+//	Sk.debugout("e:" + expon);
+
+	expon = parseInt(expon, 10);
+
+//	Sk.debugout("MANTISSA:" + mantissa);
+//	Sk.debugout("EXPONENT:" + expon);
+
+	var decimal = mantissa.indexOf('.');
+
+//	Sk.debugout("DECIMAL: " + decimal);
+
+	//	Simplest case, no decimal
+	if (decimal < 0) {
+		if (expon >= 0) {
+			// Just add more zeroes and we're done
+			while (expon-- > 0)
+				mantissa += "0";
+			return mantissa;
+		} else {
+			if (mantissa.length > -expon)
+				return mantissa.substr(0,mantissa.length + expon);
+			else
+				return 0;
+		}
+	}
+
+	//	Negative exponent OR decimal (neg or pos exp)
+	if (decimal == 0)
+		mantissa = mantissa.substr(1);
+	else if (decimal < mantissa.length)
+		mantissa = mantissa.substr(0,decimal) + mantissa.substr(decimal+1);
+	else
+		mantissa = mantissa.substr(0,decimal);
+
+//	Sk.debugout("NO DECIMAL: " + mantissa);
+
+	decimal = decimal + expon;
+
+//	Sk.debugout("MOVE DECIM: " + decimal);
+
+	while (decimal > mantissa.length)
+		mantissa += "0";
+
+//	Sk.debugout("PADDED    : " + mantissa);
+
+	if (decimal <= 0) {
+		mantissa = 0;
+	} else {
+		mantissa = mantissa.substr(0,decimal);
+	}
+
+//	Sk.debugout("LENGTH: " + mantissa.length);
+//	Sk.debugout("RETURN: " + mantissa);
+
+	return mantissa;
+}
+goog.exportSymbol("Sk.builtin.asnum$nofloat", Sk.builtin.asnum$nofloat);
+
+Sk.builtin.round = function round(number, ndigits)
+{
+    var result, multiplier;
+    // todo; delegate to x.__round__(n)
+
+    // todo; throw if wrong num of args
+
+    Sk.builtin.pyCheckArgs("round", arguments, 1, 2);
+    if (!Sk.builtin.checkNumber(number)) {
+	throw new Sk.builtin.TypeError("a float is required");
+    }
+    if ((ndigits !== undefined) && !Sk.misceval.isIndex(ndigits)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(ndigits) + "' object cannot be interpreted as an index");
+    };
+
+    if (ndigits === undefined) {
+        ndigits = 0;
+    };
+
+    number = Sk.builtin.asnum$(number);
+    ndigits = Sk.misceval.asIndex(ndigits);
+
+        // TODO Might be some precision problems here? Should
+        // look into coming up with a better way.
+    multiplier = Math.pow(10, ndigits);
+    result = Math.round(number * multiplier) / multiplier;
+
+    return new Sk.builtin.nmber(result, Sk.builtin.nmber.float$);
+};
+
+Sk.builtin.len = function len(item)
+{
+    Sk.builtin.pyCheckArgs("len", arguments, 1, 1);
+
+    if (item.sq$length)
+        return new Sk.builtin.nmber(item.sq$length(), Sk.builtin.nmber.int$);
+
+    if (item.mp$length)
+        return new Sk.builtin.nmber(item.mp$length(), Sk.builtin.nmber.int$);
+
+    if (item.tp$length)
+		return new Sk.builtin.nmber(item.tp$length(), Sk.builtin.nmber.int$);
+
+    throw new Sk.builtin.TypeError("object of type '" + Sk.abstr.typeName(item) + "' has no len()");
 };
 
 Sk.builtin.min = function min()
 {
-    // todo; throw if no args
-    arguments = Sk.misceval.arrayFromArguments(arguments);
-    var lowest = arguments[0];
-    for (var i = 1; i < arguments.length; ++i)
+    Sk.builtin.pyCheckArgs("min", arguments, 1);
+
+    var args = Sk.misceval.arrayFromArguments(arguments);
+    var lowest = args[0];
+
+    if (lowest === undefined)
     {
-        if (Sk.misceval.richCompareBool(arguments[i], lowest, 'Lt'))
-            lowest = arguments[i];
+        throw new Sk.builtin.ValueError("min() arg is an empty sequence");
+    }
+
+    for (var i = 1; i < args.length; ++i)
+    {
+        if (Sk.misceval.richCompareBool(args[i], lowest, 'Lt'))
+            lowest = args[i];
     }
     return lowest;
 };
 
 Sk.builtin.max = function max()
 {
-    // todo; throw if no args
-    arguments = Sk.misceval.arrayFromArguments(arguments);
-    var highest = arguments[0];
-    for (var i = 1; i < arguments.length; ++i)
+    Sk.builtin.pyCheckArgs("max", arguments, 1);
+
+    var args = Sk.misceval.arrayFromArguments(arguments);
+    var highest = args[0];
+
+    if (highest === undefined)
     {
-        if (Sk.misceval.richCompareBool(arguments[i], highest, 'Gt'))
-            highest = arguments[i];
+        throw new Sk.builtin.ValueError("max() arg is an empty sequence");
+    }
+
+    for (var i = 1; i < args.length; ++i)
+    {
+        if (Sk.misceval.richCompareBool(args[i], highest, 'Gt'))
+            highest = args[i];
     }
     return highest;
 };
 
+Sk.builtin.any = function any(iter)
+{
+    var it, i;
+
+    Sk.builtin.pyCheckArgs("any", arguments, 1);
+    if (!Sk.builtin.checkIterable(iter)) {
+		throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(iter)
+			+ "' object is not iterable");
+    }
+
+    it = iter.tp$iter();
+    for (i = it.tp$iternext(); i !== undefined; i = it.tp$iternext()) {
+        if (Sk.misceval.isTrue(i)) {
+            return Sk.builtin.bool.true$;
+        }
+    }
+
+    return Sk.builtin.bool.false$;
+}
+
+Sk.builtin.all = function all(iter)
+{
+    var it, i;
+
+    Sk.builtin.pyCheckArgs("all", arguments, 1);
+     if (!Sk.builtin.checkIterable(iter)) {
+	throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(iter)
+				       + "' object is not iterable");
+    }
+
+    it = iter.tp$iter();
+    for (i = it.tp$iternext(); i !== undefined; i = it.tp$iternext()) {
+        if (!Sk.misceval.isTrue(i)) {
+            return Sk.builtin.bool.false$;
+        }
+    }
+
+    return Sk.builtin.bool.true$;
+}
+
 Sk.builtin.sum = function sum(iter,start)
 {
-    var tot = 0;
-    if (iter instanceof Sk.builtin.list) {
-        iter = iter.v;
-    } else {
-        throw "TypeError: an iterable is required";   
-    }
+    var tot;
+    var it, i;
+    var has_float;
+
+    Sk.builtin.pyCheckArgs("sum", arguments, 1, 2);
+    Sk.builtin.pyCheckType("iter", "iterable", Sk.builtin.checkIterable(iter));
+    if (start !== undefined && Sk.builtin.checkString(start)) {
+	throw new Sk.builtin.TypeError("sum() can't sum strings [use ''.join(seq) instead]");
+    };
+
     if (start === undefined ) {
-        start = 0;
+	tot = new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
     }
-    for (var i = start; i < iter.length; ++i) {
-        if (typeof iter[i] !== "number")
-        {
-            throw "TypeError: an number is required";
-        }
-        tot = tot + iter[i];
+    else {
+	tot = start;
     }
+
+    it = iter.tp$iter();
+    for (i = it.tp$iternext(); i !== undefined; i = it.tp$iternext()) {
+	if (i.skType === Sk.builtin.nmber.float$) {
+	    has_float = true;
+	    if (tot.skType !== Sk.builtin.nmber.float$) {
+		tot = new Sk.builtin.nmber(Sk.builtin.asnum$(tot),
+					   Sk.builtin.nmber.float$)
+	    }
+	} else if (i instanceof Sk.builtin.lng) {
+	    if (!has_float) {
+		if (!(tot instanceof Sk.builtin.lng)) {
+		    tot = new Sk.builtin.lng(tot)
+		}
+	    }
+	}
+
+	if (tot.nb$add(i) !== undefined) {
+	    tot = tot.nb$add(i);
+	} else {
+	    throw new Sk.builtin.TypeError("unsupported operand type(s) for +: '"
+					   + Sk.abstr.typeName(tot) + "' and '"
+					   + Sk.abstr.typeName(i)+"'");
+	}
+    }
+
     return tot;
 };
 
+Sk.builtin.zip = function zip()
+{
+    if (arguments.length === 0)
+    {
+        return new Sk.builtin.list([]);
+    }
+
+    var iters = [];
+    for (var i = 0; i < arguments.length; i++)
+    {
+        if (arguments[i].tp$iter)
+        {
+            iters.push(arguments[i].tp$iter());
+        }
+        else
+        {
+            throw "TypeError: argument " + i + " must support iteration";
+        }
+    }
+    var res = [];
+    var done = false;
+    while (!done)
+    {
+        var tup = [];
+        for (i = 0; i < arguments.length; i++)
+        {
+            var el = iters[i].tp$iternext();
+            if (el === undefined)
+            {
+                done = true;
+                break;
+            }
+            tup.push(el);
+        }
+        if (!done)
+        {
+            res.push(new Sk.builtin.tuple(tup));
+        }
+    }
+    return new Sk.builtin.list(res);
+}
+
 Sk.builtin.abs = function abs(x)
 {
-    return Math.abs(x);
+    Sk.builtin.pyCheckArgs("abs", arguments, 1, 1);
+    Sk.builtin.pyCheckType("x", "number", Sk.builtin.checkNumber(x));
+
+    return new Sk.builtin.nmber(Math.abs(Sk.builtin.asnum$(x)),x.skType);
 };
 
 Sk.builtin.ord = function ord(x)
 {
-    if (x.constructor !== Sk.builtin.str || x.v.length !== 1)
+    Sk.builtin.pyCheckArgs("ord", arguments, 1, 1);
+
+    if (!Sk.builtin.checkString(x))
     {
-        throw "ord() expected string of length 1";
+        throw new Sk.builtin.TypeError("ord() expected a string of length 1, but " + Sk.abstr.typeName(x) + " found");
     }
-    return (x.v).charCodeAt(0);
+    else if (x.v.length !== 1) {
+	throw new Sk.builtin.TypeError("ord() expected a character, but string of length " + x.v.length + " found");
+    }
+    return new Sk.builtin.nmber((x.v).charCodeAt(0), Sk.builtin.nmber.int$);
 };
 
 Sk.builtin.chr = function chr(x)
 {
-    if (typeof x !== "number")
-    {
-        throw "TypeError: an integer is required";
+    Sk.builtin.pyCheckArgs("chr", arguments, 1, 1);
+    if (!Sk.builtin.checkInt(x)) {
+	throw new Sk.builtin.TypeError("an integer is required");
     }
+	x = Sk.builtin.asnum$(x);
+
+
+    if ((x < 0) || (x > 255))
+    {
+        throw new Sk.builtin.ValueError("chr() arg not in range(256)");
+    }
+
     return new Sk.builtin.str(String.fromCharCode(x));
+};
+
+Sk.builtin.int2str_ = function helper_(x, radix, prefix)
+{
+    var str = '';
+    if (x instanceof Sk.builtin.lng) {
+	var suffix = '';
+	if (radix !== 2)
+	    suffix = 'L';
+
+	str = x.str$(radix, false);
+	if (x.nb$isnegative()) {
+	    return new Sk.builtin.str('-'+prefix+str+suffix);
+	}
+	return new Sk.builtin.str(prefix+str+suffix);
+    } else {
+	x = Sk.misceval.asIndex(x);
+	str = x.toString(radix);
+	if (x < 0) {
+	    return new Sk.builtin.str('-'+prefix+str.slice(1));
+	}
+	return new Sk.builtin.str(prefix+str);
+    }
+};
+
+Sk.builtin.hex = function hex(x)
+{
+    Sk.builtin.pyCheckArgs("hex", arguments, 1, 1);
+    if (!Sk.misceval.isIndex(x)) {
+	throw new Sk.builtin.TypeError("hex() argument can't be converted to hex");
+    }
+    return Sk.builtin.int2str_(x, 16, "0x");
+};
+
+Sk.builtin.oct = function oct(x)
+{
+    Sk.builtin.pyCheckArgs("oct", arguments, 1, 1);
+    if (!Sk.misceval.isIndex(x)) {
+	throw new Sk.builtin.TypeError("oct() argument can't be converted to hex");
+    }
+    return Sk.builtin.int2str_(x, 8, "0");
+};
+
+Sk.builtin.bin = function bin(x)
+{
+    Sk.builtin.pyCheckArgs("bin", arguments, 1, 1);
+    if (!Sk.misceval.isIndex(x)) {
+	throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' object can't be interpreted as an index");
+    }
+    return Sk.builtin.int2str_(x, 2, "0b");
 };
 
 Sk.builtin.dir = function dir(x)
 {
-    var names = [];
-    for (var k in x.constructor.prototype)
-    {
-        var s;
+    Sk.builtin.pyCheckArgs("dir", arguments, 1, 1);
+
+    var getName = function (k) {
+        var s = null;
+        var internal = ["__bases__", "__mro__", "__class__"];
+        if (internal.indexOf(k) !== -1)
+            return null;
         if (k.indexOf('$') !== -1)
             s = Sk.builtin.dir.slotNameToRichName(k);
         else if (k.charAt(k.length - 1) !== '_')
             s = k;
+        else if (k.charAt(0) === '_')
+            s = k;
+        return s;
+    };
+
+    var names = [];
+    var k;
+    var s;
+    var i;
+    var mro;
+    var base;
+    var prop;
+
+    // Add all object properties
+    for (k in x.constructor.prototype)
+    {
+        s = getName(k);
         if (s)
             names.push(new Sk.builtin.str(s));
     }
+
+    // Add all attributes
+    if (x['$d'])
+    {
+        if (x['$d'].tp$iter)
+        {
+            // Dictionary
+            var it = x['$d'].tp$iter();
+            var i;
+            for (i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+            {
+                s = new Sk.builtin.str(i);
+                s = getName(s.v);
+                if (s)
+                    names.push(new Sk.builtin.str(s));
+            }
+        }
+        else
+        {
+            // Object
+            for (s in x['$d'])
+            {
+                names.push(new Sk.builtin.str(s));
+            }
+        }
+    }
+
+    // Add all class attributes
+    mro = x.tp$mro;
+    if (mro)
+    {
+        mro = x.tp$mro;
+        for (i = 0; i < mro.v.length; ++i)
+        {
+            base = mro.v[i];
+            for (prop in base)
+            {
+                if (base.hasOwnProperty(prop))
+                {
+                    s = getName(prop);
+                    if (s)
+                        names.push(new Sk.builtin.str(s));
+                }
+            }
+        }
+    }
+
+    // Sort results
     names.sort(function(a, b) { return (a.v > b.v) - (a.v < b.v); });
-    return new Sk.builtin.list(names);
+
+    // Get rid of duplicates before returning, as duplicates should
+    //  only occur when they are shadowed
+    var last = function(value, index, self) {
+	// Returns true iff the value is not the same as the next value
+	return value !== self[index+1];
+    };
+    return new Sk.builtin.list(names.filter(last));
 };
 
 Sk.builtin.dir.slotNameToRichName = function(k)
@@ -3845,94 +5800,159 @@ Sk.builtin.dir.slotNameToRichName = function(k)
 
 Sk.builtin.repr = function repr(x)
 {
+    Sk.builtin.pyCheckArgs("repr", arguments, 1, 1);
+
     return Sk.misceval.objectRepr(x);
 };
 
 Sk.builtin.open = function open(filename, mode, bufsize)
 {
-    if (mode === undefined) mode = "r";
+    Sk.builtin.pyCheckArgs("open", arguments, 1, 3);
+    if (mode === undefined) mode = new Sk.builtin.str("r");
     if (mode.v !== "r" && mode.v !== "rb") throw "todo; haven't implemented non-read opens";
     return new Sk.builtin.file(filename, mode, bufsize);
 };
 
-Sk.builtin.isinstance = function(obj, type)
+Sk.builtin.isinstance = function isinstance(obj, type)
 {
-    if (obj.ob$type === type) return true;
+    Sk.builtin.pyCheckArgs("isinstance", arguments, 2, 2);
+    if (!Sk.builtin.checkClass(type) && !(type instanceof Sk.builtin.tuple)) {
+	throw new Sk.builtin.TypeError("isinstance() arg 2 must be a class, type, or tuple of classes and types");
+    }
 
+    if (type === Sk.builtin.int_.prototype.ob$type) {
+	if ((obj.tp$name === 'number') && (obj.skType === Sk.builtin.nmber.int$)) {
+            return Sk.builtin.bool.true$;
+        }
+        else {
+            return Sk.builtin.bool.false$;
+        }
+    }
+
+    if (type === Sk.builtin.float_.prototype.ob$type) {
+        if ((obj.tp$name === 'number') && (obj.skType === Sk.builtin.nmber.float$)) {
+            return Sk.builtin.bool.true$;
+        }
+        else {
+            return Sk.builtin.bool.false$;
+        }
+    }
+
+    if (type === Sk.builtin.none.prototype.ob$type) {
+        if (obj instanceof Sk.builtin.none) {
+            return Sk.builtin.bool.true$;
+        }
+        else {
+            return Sk.builtin.bool.false$;
+        }
+    }
+
+    // Normal case
+    if (obj.ob$type === type) return Sk.builtin.bool.true$;
+
+    // Handle tuple type argument
     if (type instanceof Sk.builtin.tuple)
     {
         for (var i = 0; i < type.v.length; ++i)
         {
-            if (Sk.builtin.isinstance(obj, type.v[i]))
-                return true;
+            if (Sk.misceval.isTrue(Sk.builtin.isinstance(obj, type.v[i])))
+                return Sk.builtin.bool.true$;
         }
-        return false;
+        return Sk.builtin.bool.false$;
     }
 
     var issubclass = function(klass, base)
     {
-        if (klass === base) return true;
-        if (klass['$d'] === undefined) return false;
+        if (klass === base) return Sk.builtin.bool.true$;
+        if (klass['$d'] === undefined) return Sk.builtin.bool.false$;
         var bases = klass['$d'].mp$subscript(Sk.builtin.type.basesStr_);
         for (var i = 0; i < bases.v.length; ++i)
         {
-            if (issubclass(bases.v[i], base))
-                return true;
+            if (Sk.misceval.isTrue(issubclass(bases.v[i], base)))
+                return Sk.builtin.bool.true$;
         }
-        return false;
+        return Sk.builtin.bool.false$;
     };
 
     return issubclass(obj.ob$type, type);
 };
-
 Sk.builtin.hashCount = 0;
 Sk.builtin.hash = function hash(value)
 {
-    if (value instanceof Object && value.tp$hash !== undefined)
+    Sk.builtin.pyCheckArgs("hash", arguments, 1, 1);
+
+    // Useless object to get compiler to allow check for __hash__ property
+    var junk = {__hash__: function() {return 0;}}
+
+    if ((value instanceof Object) && (value.tp$hash !== undefined))
     {
         if (value.$savedHash_) return value.$savedHash_;
-        value.$savedHash_ = 'custom ' + value.tp$hash();
+        value.$savedHash_ = value.tp$hash();
         return value.$savedHash_;
     }
-
-    if (value instanceof Object)
+    else if ((value instanceof Object) && (value.__hash__ !== undefined))
+    {
+        return Sk.misceval.callsim(value.__hash__, value);
+    }
+    else if (value instanceof Sk.builtin.bool)
+    {
+	   if (value.v){
+	       return new Sk.builtin.nmber(1, Sk.builtin.nmber.int$);
+       }
+	   return new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
+    }
+    else if (value instanceof Sk.builtin.none)
+    {
+	   return new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
+    }
+    else if (value instanceof Object)
     {
         if (value.__id === undefined)
         {
             Sk.builtin.hashCount += 1;
-            value.__id = 'object ' + Sk.builtin.hashCount;
+            value.__id = Sk.builtin.hashCount;
         }
-        return value.__id;
+        return new Sk.builtin.nmber(value.__id, Sk.builtin.nmber.int$);
     }
-    return (typeof value) + ' ' + String(value);
+    else if (typeof value === "number" || value === null
+             || value === true || value === false)
+    {
+	   throw new Sk.builtin.TypeError("unsupported Javascript type");
+    }
 
+    return new Sk.builtin.str((typeof value) + ' ' + String(value));
     // todo; throw properly for unhashable types
 };
 
-Sk.builtin.getattr = function(obj, name, default_)
+Sk.builtin.getattr = function getattr(obj, name, default_)
 {
+    Sk.builtin.pyCheckArgs("getattr", arguments, 2, 3);
+    if (!Sk.builtin.checkString(name)) {
+	throw new Sk.builtin.TypeError("attribute name must be string");
+    }
+
     var ret = obj.tp$getattr(name.v);
     if (ret === undefined)
     {
         if (default_ !== undefined)
             return default_;
         else
-            throw new Sk.builtin.AttributeError();
+            throw new Sk.builtin.AttributeError("'" + Sk.abstr.typeName(obj) + "' object has no attribute '" + name.v + "'");
     }
     return ret;
 };
 
-Sk.builtin.input = function(obj, name, default_)
-{
-    // AJA: We want to be able to configure input() function just as we do
-    // output; no reason to force it to use window.prompt
-    var x = Sk.input(obj.v);
+Sk.builtin.raw_input = function(prompt) {
+	prompt = prompt ? prompt.v : "";
+	var x = Sk.inputfun(prompt);
     return new Sk.builtin.str(x);
 };
 
+Sk.builtin.input = Sk.builtin.raw_input;
+
 Sk.builtin.jseval = function jseval(evalcode)
 {
-    goog.global.eval(evalcode);
+    goog.global['eval'](evalcode);
 };
 
 Sk.builtin.jsmillis = function jsmillis()
@@ -3941,43 +5961,447 @@ Sk.builtin.jsmillis = function jsmillis()
 	return now.valueOf();
 };
 
-// Added by allevato
-Sk.builtin.round = function round()
-{
-    // todo; delegate to x.__round__(n)
-
-    // todo; throw if wrong num of args
-    arguments = Sk.misceval.arrayFromArguments(arguments);
-    var value = arguments[0];
-    var places = arguments[1] || 0;
-
-    if (places == 0)
-    {
-        return Math.round(value);
-    }
-    else
-    {
-        // TODO Might be some precision problems here? Should
-        // look into coming up with a better way.
-        var factor = Math.pow(10, places);
-        return Math.round(value * factor) / factor;
-    }
-};
-
-// Added by allevato
 Sk.builtin.globals = function()
 {
   var gbl = Sk._frames[Sk._frames.length - 1].ctx['$gbl'];
   return Sk.ffi.varTableToDict(gbl);
 };
 
-// Added by allevato
 Sk.builtin.locals = function()
 {
   // FIXME Needs fixes in the compiler
   var loc = Sk._frames[Sk._frames.length - 1].ctx['$loc'];
   return Sk.ffi.varTableToDict(loc);
 };
+Sk.builtin.superbi =  function superbi()
+{
+    throw new Sk.builtin.NotImplementedError("super is not yet implemented, please report your use case as a github issue.");
+}
+
+Sk.builtin.eval_ =  function eval_()
+{
+    throw new Sk.builtin.NotImplementedError("eval is not yet implemented");
+}
+
+Sk.builtin.map = function map(fun, seq) {
+    Sk.builtin.pyCheckArgs("map", arguments, 2);
+
+    if (arguments.length > 2)
+    {
+        // Pack sequences into one list of Javascript Arrays
+
+        var combined = [];
+        var iterables = Array.prototype.slice.apply(arguments).slice(1);
+        for (var i in iterables)
+        {
+            if (!Sk.builtin.checkIterable(iterables[i]))
+            {
+                var argnum = parseInt(i,10) + 2;
+                throw new Sk.builtin.TypeError("argument " + argnum + " to map() must support iteration");
+            }
+            iterables[i] = iterables[i].tp$iter()
+        }
+
+        while(true) 
+        {
+            var args = [];
+            var nones = 0;
+            for (var i in iterables)
+            {
+                var next = iterables[i].tp$iternext()
+                if (next === undefined) 
+                {
+                    args.push(Sk.builtin.none.none$);
+                    nones++;
+                }
+                else
+                {
+                    args.push(next);
+                }
+            }
+            if (nones !== iterables.length) 
+            {
+                combined.push(args);
+            }
+            else 
+            {
+                // All iterables are done
+                break;
+            }
+        }
+        seq = new Sk.builtin.list(combined);
+    }
+
+    if (!Sk.builtin.checkIterable(seq))
+    {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(seq) + "' object is not iterable");
+    }
+
+    var retval = [];
+    var iter, item;
+
+    for (iter = seq.tp$iter(), item = iter.tp$iternext();
+         item !== undefined;
+         item = iter.tp$iternext())
+    {
+        if (fun === Sk.builtin.none.none$)
+        {
+            if (item instanceof Array)
+            {
+                // With None function and multiple sequences, 
+                // map should return a list of tuples
+                item = new Sk.builtin.tuple(item);
+            }
+            retval.push(item);
+        }
+        else
+        {
+            if (!(item instanceof Array))
+            {
+                // If there was only one iterable, convert to Javascript
+                // Array for call to apply.
+                item = [item];
+            }
+            retval.push(Sk.misceval.apply(fun, undefined, undefined, undefined, item));
+        }
+    }
+    
+    return new Sk.builtin.list(retval);
+}
+
+Sk.builtin.reduce = function reduce(fun, seq, initializer) {
+    Sk.builtin.pyCheckArgs("reduce", arguments, 2, 3);
+    if (!Sk.builtin.checkIterable(seq))
+    {
+	throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(seq) + "' object is not iterable");
+    }
+
+    var iter = seq.tp$iter();
+    if (initializer === undefined)
+    {
+	initializer = iter.tp$iternext();
+	if (initializer === undefined)
+        {
+	    throw new Sk.builtin.TypeError('reduce() of empty sequence with no initial value');
+	}
+    }
+    var accum_value = initializer;
+    var item;
+    for (item = iter.tp$iternext();
+         item !== undefined;
+         item = iter.tp$iternext())
+    {
+        accum_value = Sk.misceval.callsim(fun, accum_value, item);
+    }
+
+    return accum_value;
+}
+
+Sk.builtin.filter = function filter(fun, iterable) { 
+    Sk.builtin.pyCheckArgs("filter", arguments, 2, 2);
+	
+    if (!Sk.builtin.checkIterable(iterable))
+    {
+	throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(iterable) + "' object is not iterable");
+    }
+	
+    var ctor = function () { return []; }
+    var add = function (iter, item) { iter.push(item); return iter; } 
+    var ret = function (iter) { return new Sk.builtin.list(iter); }
+    
+    if (iterable.__class__ === Sk.builtin.str)
+    {
+	ctor = function () { return new Sk.builtin.str(''); }
+	add = function (iter, item) { return iter.sq$concat(item); }
+	ret = function (iter) { return iter; }
+    } 
+    else if (iterable.__class__ === Sk.builtin.tuple) 
+    {
+	ret = function (iter) { return new Sk.builtin.tuple(iter); }
+    }
+    
+    var retval = ctor();
+    var iter, item;
+    var result;
+
+    for (iter = iterable.tp$iter(), item = iter.tp$iternext();
+         item !== undefined;
+         item = iter.tp$iternext())
+    {
+        if (fun === Sk.builtin.none.none$)
+        {
+            result = Sk.builtin.bool(item);
+        }
+        else
+        {
+            result = Sk.misceval.callsim(fun, item);
+        }
+
+        if (Sk.misceval.isTrue(result))
+        {
+            retval = add(retval, item);
+        }
+    }
+
+    return ret(retval);
+}
+
+Sk.builtin.hasattr = function hasattr(obj,attr) {
+    Sk.builtin.pyCheckArgs("hasattr", arguments, 2, 2);
+    if (!Sk.builtin.checkString(attr)) {
+        throw new Sk.builtin.TypeError('hasattr(): attribute name must be string');
+    }
+
+    if (obj.tp$getattr) {
+        if (obj.tp$getattr(attr.v)) {
+            return Sk.builtin.bool.true$;
+        } else
+            return Sk.builtin.bool.false$;
+    } else
+        throw new Sk.builtin.AttributeError('Object has no tp$getattr method')
+}
+
+
+Sk.builtin.pow = function pow(a, b, c) {
+    Sk.builtin.pyCheckArgs("pow", arguments, 2, 3);
+
+    if (c instanceof Sk.builtin.none)
+        c = undefined;
+
+    var a_num = Sk.builtin.asnum$(a);
+    var b_num = Sk.builtin.asnum$(b);
+    var c_num = Sk.builtin.asnum$(c);
+
+    if (!Sk.builtin.checkNumber(a) || !Sk.builtin.checkNumber(b))
+    {
+	if (c === undefined)
+	{
+	    throw new Sk.builtin.TypeError("unsupported operand type(s) for pow(): '" + Sk.abstr.typeName(a) + "' and '" + Sk.abstr.typeName(b) + "'");
+	}
+	else
+	{
+	    throw new Sk.builtin.TypeError("unsupported operand type(s) for pow(): '" + Sk.abstr.typeName(a) + "', '" + Sk.abstr.typeName(b) + "', '" + Sk.abstr.typeName(c) + "'");
+	}
+    }
+    if (a_num < 0 && b.skType === Sk.builtin.nmber.float$)
+    {
+	throw new Sk.builtin.ValueError("negative number cannot be raised to a fractional power");
+    }
+
+    if (c === undefined)
+    {
+	var res = Math.pow(a_num, b_num);
+	if ((a.skType === Sk.builtin.nmber.float$ || b.skType === Sk.builtin.nmber.float$) || (b_num < 0))
+	{
+	    return new Sk.builtin.nmber(res, Sk.builtin.nmber.float$);
+	}
+	else if (a instanceof Sk.builtin.lng || b instanceof Sk.builtin.lng)
+	{
+	    return new Sk.builtin.lng(res);
+	}
+	else
+	{
+	    return new Sk.builtin.nmber(res, Sk.builtin.nmber.int$);
+	}
+    }
+    else
+    {
+	if (!Sk.builtin.checkInt(a) || !Sk.builtin.checkInt(b) || !Sk.builtin.checkInt(c))
+	{
+	    throw new Sk.builtin.TypeError("pow() 3rd argument not allowed unless all arguments are integers");
+	}
+	if (b_num < 0)
+	{
+	    throw new Sk.builtin.TypeError("pow() 2nd argument cannot be negative when 3rd argument specified");
+	}
+
+	if ((a instanceof Sk.builtin.lng || b instanceof Sk.builtin.lng || c instanceof Sk.builtin.lng)
+            || (Math.pow(a_num, b_num) === Infinity))
+	{
+	    // convert a to a long so that we can use biginteger's modPowInt method
+	    a = new Sk.builtin.lng(a);
+	    return a.nb$power(b, c);
+	}
+	else
+	{
+	    var ret = new Sk.builtin.nmber(Math.pow(a_num, b_num), Sk.builtin.nmber.int$);
+	    return ret.nb$remainder(c);
+	}
+    }
+
+}
+
+Sk.builtin.quit = function quit(msg) {
+    var s = new Sk.builtin.str(msg).v;
+    throw new Sk.builtin.SystemExit(s);
+}
+
+Sk.builtin.sorted = function sorted(iterable, cmp, key, reverse) {
+	var compare_func;
+	var list;
+	if (key !== undefined && !(key instanceof Sk.builtin.none)) {
+		if (cmp instanceof Sk.builtin.none || cmp === undefined) {
+			compare_func = function(a,b){
+			    return Sk.misceval.richCompareBool(a[0], b[0], "Lt") ? new Sk.builtin.nmber(-1, Sk.builtin.nmber.int$) : new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
+			};
+		}
+        else {
+            compare_func = function(a,b) { return Sk.misceval.callsim(cmp, a[0], b[0]); };
+		}
+		var iter = iterable.tp$iter();
+		var next = iter.tp$iternext();
+		var arr = [];
+		while (next !== undefined){
+			arr.push([Sk.misceval.callsim(key, next), next]);
+			next = iter.tp$iternext();
+		}
+        list = new Sk.builtin.list(arr);
+	}
+	else {
+		if (!(cmp instanceof Sk.builtin.none) && cmp !== undefined) {
+			compare_func = cmp;
+		}
+        list = new Sk.builtin.list(iterable);
+	}
+
+	if (compare_func !== undefined) {
+		list.list_sort_(list, compare_func);
+	}
+	else {
+		list.list_sort_(list);
+	}
+
+	if (reverse) {
+		list.list_reverse_(list);
+	}
+
+	if (key !== undefined && !(key instanceof Sk.builtin.none)) {
+		var iter = list.tp$iter();
+		var next = iter.tp$iternext()
+		var arr = [];
+		while (next !== undefined){
+			arr.push(next[1]);
+			next = iter.tp$iternext();
+		}
+		list = new Sk.builtin.list(arr);
+	}
+
+	return list;
+}
+Sk.builtin.sorted.co_varnames = ['cmp', 'key', 'reverse'];
+Sk.builtin.sorted.$defaults = [Sk.builtin.none, Sk.builtin.none, false];
+Sk.builtin.sorted.co_numargs = 4;
+
+Sk.builtin.issubclass = function issubclass(c1, c2) {
+    Sk.builtin.pyCheckArgs("issubclass", arguments, 2, 2);
+    if (!Sk.builtin.checkClass(c2) && !(c2 instanceof Sk.builtin.tuple)) {
+        throw new Sk.builtin.TypeError("issubclass() arg 2 must be a classinfo, type, or tuple of classes and types");
+    }
+
+    //print("c1 name: " + c1.tp$name);
+
+    if (c2 === Sk.builtin.int_.prototype.ob$type) {
+        return true;
+    }
+
+    if (c2 === Sk.builtin.float_.prototype.ob$type) {
+        return true;
+    }
+
+    if (c2 === Sk.builtin.none.prototype.ob$type) {
+        return true;
+    }
+
+    // Normal case
+    if (c1.ob$type === c2) return true;
+
+    var issubclass_internal = function(klass, base)
+    {
+        if (klass === base) return true;
+        if (klass['$d'] === undefined) return false;
+        if (klass['$d'].mp$subscript) {
+            var bases = klass['$d'].mp$subscript(Sk.builtin.type.basesStr_);
+        } else {
+            return false;
+        }
+        for (var i = 0; i < bases.v.length; ++i)
+        {
+            if (issubclass_internal(bases.v[i], base))
+                return true;
+        }
+        return false;
+    };
+
+    // Handle tuple type argument
+    if (c2 instanceof Sk.builtin.tuple)
+    {
+        for (var i = 0; i < c2.v.length; ++i)
+        {
+            if (Sk.builtin.issubclass(c1, c2.v[i]))
+                return true;
+        }
+        return false;
+    }
+
+    return issubclass_internal(c1, c2);
+
+ }
+
+Sk.builtin.globals = function globals() { 
+    var ret = new Sk.builtin.dict([]);
+    for (var i in Sk['globals']) {
+        ret.mp$ass_subscript(new Sk.builtin.str(i),Sk['globals'][i])
+    }
+    
+    return ret;
+
+};
+
+Sk.builtin.print = function () {
+  var args, len, sep, end;
+
+  args = Array.prototype.slice.call(arguments);
+  len = args.length;
+
+  end = new Sk.builtin.str(args[len - 1]);
+  sep = new Sk.builtin.str(args[len - 2]);
+
+  for(var i = 0; i < len - 3; i++) {
+    Sk.output(new Sk.builtins.str(args[i]).v);
+    Sk.output(sep.v);
+  }
+  if(i >= 0 && args.length > 2) {
+    Sk.output(new Sk.builtins.str(args[i]).v);
+  }
+  Sk.output(end.v);
+  return Sk.builtin.none.none$;
+};
+Sk.builtin.print.co_varnames = ['sep', 'end'];
+Sk.builtin.print.$defaults = [' ', '\n'];
+
+
+Sk.builtin.bytearray = function bytearray() { throw new Sk.builtin.NotImplementedError("bytearray is not yet implemented")}
+Sk.builtin.callable = function callable() { throw new Sk.builtin.NotImplementedError("callable is not yet implemented")}
+Sk.builtin.complex = function complex() { throw new Sk.builtin.NotImplementedError("complex is not yet implemented")}
+Sk.builtin.delattr = function delattr() { throw new Sk.builtin.NotImplementedError("delattr is not yet implemented")}
+Sk.builtin.divmod = function divmod() { throw new Sk.builtin.NotImplementedError("divmod is not yet implemented")}
+Sk.builtin.execfile = function execfile() { throw new Sk.builtin.NotImplementedError("execfile is not yet implemented")}
+Sk.builtin.format = function format() { throw new Sk.builtin.NotImplementedError("format is not yet implemented")}
+Sk.builtin.frozenset = function frozenset() { throw new Sk.builtin.NotImplementedError("frozenset is not yet implemented")}
+Sk.builtin.help = function help() { throw new Sk.builtin.NotImplementedError("help is not yet implemented")}
+Sk.builtin.iter = function iter() { throw new Sk.builtin.NotImplementedError("iter is not yet implemented")}
+Sk.builtin.memoryview = function memoryview() { throw new Sk.builtin.NotImplementedError("memoryview is not yet implemented")}
+Sk.builtin.next_ = function next_() { throw new Sk.builtin.NotImplementedError("next is not yet implemented")}
+Sk.builtin.property = function property() { throw new Sk.builtin.NotImplementedError("property is not yet implemented")}
+Sk.builtin.reload = function reload() { throw new Sk.builtin.NotImplementedError("reload is not yet implemented")}
+Sk.builtin.reversed = function reversed() { throw new Sk.builtin.NotImplementedError("reversed is not yet implemented")}
+Sk.builtin.unichr = function unichr() { throw new Sk.builtin.NotImplementedError("unichr is not yet implemented")}
+Sk.builtin.vars = function vars() { throw new Sk.builtin.NotImplementedError("vars is not yet implemented")}
+Sk.builtin.xrange = Sk.builtin.range;
+Sk.builtin.apply_ = function apply_() { throw new Sk.builtin.NotImplementedError("apply is not yet implemented")}
+Sk.builtin.buffer = function buffer() { throw new Sk.builtin.NotImplementedError("buffer is not yet implemented")}
+Sk.builtin.coerce = function coerce() { throw new Sk.builtin.NotImplementedError("coerce is not yet implemented")}
+Sk.builtin.intern = function intern() { throw new Sk.builtin.NotImplementedError("intern is not yet implemented")}
 
 /*
 Sk.builtinFiles = {};
@@ -3987,9 +6411,20 @@ Sk.builtin.read = function read(x) {
     return Sk.builtinFiles["files"][x];
 };
 Sk.builtinFiles = undefined;
-*//**
+*/
+/*
+ * The filename, line number, and column number of exceptions are
+ * stored within the exception object.  Note that not all exceptions
+ * clearly report the column number.  To customize the exception
+ * message to use any/all of these fields, you can either modify
+ * tp$str below to print the desired message, or use them in the
+ * skulpt wrapper (i.e., runit) to present the exception message.
+ */
+
+
+/**
  * @constructor
- * @param {...*} args
+ * @param {...Object|null} args
  */
 Sk.builtin.Exception = function(args)
 {
@@ -4001,25 +6436,72 @@ Sk.builtin.Exception = function(args)
             args[i] = new Sk.builtin.str(args[i]);
     }
     this.args = new Sk.builtin.tuple(args);
+
+    if (Sk.currFilename)
+    {
+        this.filename = Sk.currFilename;
+    }
+    else if (this.args.sq$length() >= 3)
+    {
+        if (this.args.v[1].v)
+        {
+            this.filename = this.args.v[1].v;
+        }
+        else
+        {
+            // Unknown, this is an error, and the exception that causes it
+            // probably needs to be fixed.
+            this.filename = "<unknown>";
+        }
+    }
+    else
+    {
+        // Unknown, this is an error, and the exception that causes it
+        // probably needs to be fixed.
+        this.filename = "<unknown>";
+    }
+    if (this.args.sq$length() >= 3)
+    {
+        this.lineno = this.args.v[2];
+    }
+    else if (Sk.currLineNo > 0) 
+    {
+        this.lineno = Sk.currLineNo;
+    }
+    else
+    {
+        // Unknown, this is an error, and the exception that causes it
+        // probably needs to be fixed.
+        this.lineno = "<unknown>";
+    }
+
+    if (Sk.currColNo > 0)
+    {
+        this.colno = Sk.currColNo;
+    }
+    else
+    {
+        this.colno = "<unknown>";
+    }
 };
 Sk.builtin.Exception.prototype.tp$name = "Exception";
 
 Sk.builtin.Exception.prototype.tp$str = function()
 {
     var ret = "";
-    //print(JSON.stringify(this.args));
 
     ret += this.tp$name;
     if (this.args)
-        ret += ": " + this.args.v[0].v;
+        ret += ": " + (this.args.v.length > 0 ? this.args.v[0].v : '');
+    ret += " on line " + this.lineno;
 
-    if (this.args.v.length > 4)		//	RNL from length > 1
+    if (this.args.v.length > 4)
     {
-        ret += "\nFile \"" + this.args.v[1].v + "\", " + "line " + this.args.v[2] + "\n" +
-            this.args.v[4].v + "\n";
+        ret += "\n" + this.args.v[4].v + "\n";
         for (var i = 0; i < this.args.v[3]; ++i) ret += " ";
         ret += "^\n";
     }
+
     return new Sk.builtin.str(ret);
 };
 
@@ -4035,7 +6517,14 @@ goog.exportSymbol("Sk.builtin.Exception", Sk.builtin.Exception);
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.AssertionError = function(args) { Sk.builtin.Exception.apply(this, arguments); };
+Sk.builtin.AssertionError = function(args) {
+    if (!(this instanceof Sk.builtin.AssertionError)) {
+        var o = Object.create(Sk.builtin.AssertionError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.AssertionError, Sk.builtin.Exception);
 Sk.builtin.AssertionError.prototype.tp$name = "AssertionError";
 goog.exportSymbol("Sk.builtin.AssertionError", Sk.builtin.AssertionError);
@@ -4045,7 +6534,14 @@ goog.exportSymbol("Sk.builtin.AssertionError", Sk.builtin.AssertionError);
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.AttributeError = function(args) { Sk.builtin.Exception.apply(this, arguments); };
+Sk.builtin.AttributeError = function(args) {
+    if (!(this instanceof Sk.builtin.AttributeError)) {
+        var o = Object.create(Sk.builtin.AttributeError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.AttributeError, Sk.builtin.Exception);
 Sk.builtin.AttributeError.prototype.tp$name = "AttributeError";
 
@@ -4054,7 +6550,14 @@ Sk.builtin.AttributeError.prototype.tp$name = "AttributeError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.ImportError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.ImportError = function(args) {
+    if (!(this instanceof Sk.builtin.ImportError)) {
+        var o = Object.create(Sk.builtin.ImportError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.ImportError, Sk.builtin.Exception);
 Sk.builtin.ImportError.prototype.tp$name = "ImportError";
 
@@ -4063,7 +6566,14 @@ Sk.builtin.ImportError.prototype.tp$name = "ImportError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.IndentationError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.IndentationError = function(args) {
+    if (!(this instanceof Sk.builtin.IndentationError)) {
+        var o = Object.create(Sk.builtin.IndentationError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.IndentationError, Sk.builtin.Exception);
 Sk.builtin.IndentationError.prototype.tp$name = "IndentationError";
 
@@ -4072,7 +6582,14 @@ Sk.builtin.IndentationError.prototype.tp$name = "IndentationError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.IndexError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.IndexError = function(args) {
+    if (!(this instanceof Sk.builtin.IndexError)) {
+        var o = Object.create(Sk.builtin.IndexError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.IndexError, Sk.builtin.Exception);
 Sk.builtin.IndexError.prototype.tp$name = "IndexError";
 
@@ -4081,7 +6598,14 @@ Sk.builtin.IndexError.prototype.tp$name = "IndexError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.KeyError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.KeyError = function(args) {
+    if (!(this instanceof Sk.builtin.KeyError)) {
+        var o = Object.create(Sk.builtin.KeyError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.KeyError, Sk.builtin.Exception);
 Sk.builtin.KeyError.prototype.tp$name = "KeyError";
 
@@ -4090,7 +6614,14 @@ Sk.builtin.KeyError.prototype.tp$name = "KeyError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.NameError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.NameError = function(args) {
+    if (!(this instanceof Sk.builtin.NameError)) {
+        var o = Object.create(Sk.builtin.NameError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.NameError, Sk.builtin.Exception);
 Sk.builtin.NameError.prototype.tp$name = "NameError";
 
@@ -4099,16 +6630,66 @@ Sk.builtin.NameError.prototype.tp$name = "NameError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.ParseError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
-goog.inherits(Sk.builtin.ParseError, Sk.builtin.Exception);
-Sk.builtin.ParseError.prototype.tp$name = "ParseError";
+Sk.builtin.OverflowError = function(args) {
+    if (!(this instanceof Sk.builtin.OverflowError)) {
+        var o = Object.create(Sk.builtin.OverflowError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.OverflowError, Sk.builtin.Exception);
+Sk.builtin.OverflowError.prototype.tp$name = "OverflowError";
+
 
 /**
  * @constructor
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.SyntaxError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.ParseError = function(args) {
+    if (!(this instanceof Sk.builtin.ParseError)) {
+        var o = Object.create(Sk.builtin.ParseError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.ParseError, Sk.builtin.Exception);
+Sk.builtin.ParseError.prototype.tp$name = "ParseError";
+
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.SystemExit = function(args) {
+    if (!(this instanceof Sk.builtin.SystemExit)) {
+        var o = Object.create(Sk.builtin.SystemExit.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.SystemExit, Sk.builtin.Exception);
+Sk.builtin.SystemExit.prototype.tp$name = "SystemExit";
+goog.exportSymbol("Sk.builtin.SystemExit", Sk.builtin.SystemExit);
+
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.SyntaxError = function(args) {
+    if (!(this instanceof Sk.builtin.SyntaxError)) {
+        var o = Object.create(Sk.builtin.SyntaxError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.SyntaxError, Sk.builtin.Exception);
 Sk.builtin.SyntaxError.prototype.tp$name = "SyntaxError";
 
@@ -4117,7 +6698,14 @@ Sk.builtin.SyntaxError.prototype.tp$name = "SyntaxError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.TokenError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.TokenError = function(args) {
+    if (!(this instanceof Sk.builtin.TokenError)) {
+        var o = Object.create(Sk.builtin.TokenError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.TokenError, Sk.builtin.Exception);
 Sk.builtin.TokenError.prototype.tp$name = "TokenError";
 
@@ -4126,7 +6714,14 @@ Sk.builtin.TokenError.prototype.tp$name = "TokenError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.TypeError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.TypeError = function(args) {
+    if (!(this instanceof Sk.builtin.TypeError)) {
+        var o = Object.create(Sk.builtin.TypeError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.TypeError, Sk.builtin.Exception);
 Sk.builtin.TypeError.prototype.tp$name = "TypeError";
 goog.exportSymbol("Sk.builtin.TypeError", Sk.builtin.TypeError);
@@ -4136,17 +6731,31 @@ goog.exportSymbol("Sk.builtin.TypeError", Sk.builtin.TypeError);
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.ValueError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.ValueError = function(args) {
+    if (!(this instanceof Sk.builtin.ValueError)) {
+        var o = Object.create(Sk.builtin.ValueError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.ValueError, Sk.builtin.Exception);
 Sk.builtin.ValueError.prototype.tp$name = "ValueError";
-goog.exportSymbol('Sk.builtin.ValueError', Sk.builtin.ValueError);
+goog.exportSymbol("Sk.builtin.ValueError", Sk.builtin.ValueError);
 
 /**
  * @constructor
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.ZeroDivisionError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.ZeroDivisionError = function(args) {
+    if (!(this instanceof Sk.builtin.ZeroDivisionError)) {
+        var o = Object.create(Sk.builtin.ZeroDivisionError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.ZeroDivisionError, Sk.builtin.Exception);
 Sk.builtin.ZeroDivisionError.prototype.tp$name = "ZeroDivisionError";
 
@@ -4155,10 +6764,112 @@ Sk.builtin.ZeroDivisionError.prototype.tp$name = "ZeroDivisionError";
  * @extends Sk.builtin.Exception
  * @param {...*} args
  */
-Sk.builtin.TimeLimitError = function(args) { Sk.builtin.Exception.apply(this, arguments); }
+Sk.builtin.TimeLimitError = function(args) {
+    if (!(this instanceof Sk.builtin.TimeLimitError)) {
+        var o = Object.create(Sk.builtin.TimeLimitError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
 goog.inherits(Sk.builtin.TimeLimitError, Sk.builtin.Exception);
 Sk.builtin.TimeLimitError.prototype.tp$name = "TimeLimitError";
 goog.exportSymbol("Sk.builtin.TimeLimitError", Sk.builtin.TimeLimitError);
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.IOError = function(args) {
+    if (!(this instanceof Sk.builtin.IOError)) {
+        var o = Object.create(Sk.builtin.IOError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.IOError, Sk.builtin.Exception);
+Sk.builtin.IOError.prototype.tp$name = "IOError";
+goog.exportSymbol("Sk.builtin.IOError", Sk.builtin.IOError);
+
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.NotImplementedError = function(args) {
+    if (!(this instanceof Sk.builtin.NotImplementedError)) {
+        var o = Object.create(Sk.builtin.NotImplementedError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.NotImplementedError, Sk.builtin.Exception);
+Sk.builtin.NotImplementedError.prototype.tp$name = "NotImplementedError";
+goog.exportSymbol("Sk.builtin.NotImplementedError", Sk.builtin.NotImplementedError);
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.NegativePowerError = function(args) {
+    if (!(this instanceof Sk.builtin.NegativePowerError)) {
+        var o = Object.create(Sk.builtin.NegativePowerError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.NegativePowerError, Sk.builtin.Exception);
+Sk.builtin.NegativePowerError.prototype.tp$name = "NegativePowerError";
+goog.exportSymbol("Sk.builtin.NegativePowerError", Sk.builtin.NegativePowerError);
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.OperationError = function(args) {
+    if (!(this instanceof Sk.builtin.OperationError)) {
+        var o = Object.create(Sk.builtin.OperationError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments);
+}
+goog.inherits(Sk.builtin.OperationError, Sk.builtin.Exception);
+Sk.builtin.OperationError.prototype.tp$name = "OperationError";
+goog.exportSymbol("Sk.builtin.OperationError", Sk.builtin.OperationError);
+
+/**
+ * @constructor
+ * @extends Sk.builtin.Exception
+ * @param {...*} args
+ */
+Sk.builtin.SystemError = function(args) { 
+    if (!(this instanceof Sk.builtin.SystemError)) {
+        var o = Object.create(Sk.builtin.SystemError.prototype);
+        o.constructor.apply(o, arguments);
+        return o;
+    }
+    Sk.builtin.Exception.apply(this, arguments); 
+}
+goog.inherits(Sk.builtin.SystemError, Sk.builtin.Exception);
+Sk.builtin.SystemError.prototype.tp$name = "SystemError";
+goog.exportSymbol("Sk.builtin.SystemError", Sk.builtin.SystemError);
+
+Sk.currLineNo = -1;
+Sk.currColNo = -1;
+Sk.currFilename = '';
+
+goog.exportSymbol("Sk", Sk);
+goog.exportProperty(Sk, "currLineNo", Sk.currLineNo);
+goog.exportProperty(Sk, "currColNo", Sk.currColNo);
+goog.exportProperty(Sk, "currFilename", Sk.currFilename);
 /**
  *
  * @constructor
@@ -4183,16 +6894,19 @@ Sk.builtin.type = function(name, bases, dict)
     if (bases === undefined && dict === undefined)
     {
         // 1 arg version of type()
+        // the argument is an object, not a name and returns a type object
         var obj = name;
-        if (obj === true || obj === false) return Sk.builtin.BoolObj.prototype.ob$type;
-        if (obj === null) return Sk.builtin.NoneObj.prototype.ob$type;
-        if (typeof obj === "number")
+        if (obj.constructor === Sk.builtin.nmber)
         {
-            if (Math.floor(obj) === obj)
-                return Sk.builtin.IntObj.prototype.ob$type;
-            else
-                return Sk.builtin.FloatObj.prototype.ob$type;
-        }
+	    if (obj.skType === Sk.builtin.nmber.int$)
+            {
+		return Sk.builtin.int_.prototype.ob$type;
+            }
+	    else
+            {
+                return Sk.builtin.float_.prototype.ob$type;
+            }
+	}
         return obj.ob$type;
     }
     else if (bases !== undefined && dict !== undefined)
@@ -4206,11 +6920,11 @@ Sk.builtin.type = function(name, bases, dict)
         /**
          * @constructor
          */
-        var klass = (function(args)
+        var klass = (function(kwdict, varargseq, kws, args)
         {
             if (!(this instanceof klass))
             {
-              return new klass(Array.prototype.slice.call(arguments, 0));
+              return new klass(kwdict, varargseq, kws, args);
             }
             else
             {
@@ -4229,7 +6943,7 @@ Sk.builtin.type = function(name, bases, dict)
               {
                   // return ignored I guess?
                   args.unshift(self);
-                  Sk.misceval.apply(init, undefined, undefined, undefined, args);
+                  Sk.misceval.apply(init, kwdict, varargseq, kws, args);
               }
 
               Sk._finishCreatingObject();
@@ -4245,6 +6959,7 @@ Sk.builtin.type = function(name, bases, dict)
         }
         klass['$ex'] = {};
         klass['__class__'] = klass;
+        klass.sk$klass = true;
         klass.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
         klass.prototype.tp$setattr = Sk.builtin.object.prototype.GenericSetAttr;
         klass.prototype.tp$descr_get = function() { goog.asserts.fail("in type tp$descr_get"); };
@@ -4258,25 +6973,42 @@ Sk.builtin.type = function(name, bases, dict)
             if (mod) cname = mod.v + ".";
             return new Sk.builtin.str("<" + cname + name + " object>");
         };
+        klass.prototype.tp$str = function()
+        {
+            var strf = this.tp$getattr("__str__");
+            if (strf !== undefined)
+                return Sk.misceval.apply(strf, undefined, undefined, undefined, []);
+            return this['$r']();
+        };
+	klass.prototype.tp$length = function()
+	{
+            var lenf = this.tp$getattr("__len__");
+            if (lenf !== undefined)
+                return Sk.misceval.apply(lenf, undefined, undefined, undefined, []);
+	    var tname = Sk.abstr.typeName(this);
+	    throw new Sk.builtin.AttributeError(tname + " instance has no attribute '__len__'");
+	};	    
         klass.prototype.tp$call = function(args, kw)
         {
             var callf = this.tp$getattr("__call__");
             /* todo; vararg kwdict */
             if (callf)
                 return Sk.misceval.apply(callf, undefined, undefined, kw, args);
-            throw new Sk.builtin.TypeError("'" + this.tp$name + "' object is not callable");
+            throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(this) + "' object is not callable");
         };
         klass.prototype.tp$iter = function()
         {
             var iterf = this.tp$getattr("__iter__");
+            var tname = Sk.abstr.typeName(this);
             if (iterf)
             {
                  var ret = Sk.misceval.callsim(iterf);
-                 if (ret.tp$getattr("next") === undefined)
-                    throw new Sk.builtin.TypeError("iter() return non-iterator of type '" + this.tp$name + "'");
+                 // This check does not work for builtin iterators 
+                 // if (ret.tp$getattr("next") === undefined)
+                 //    throw new Sk.builtin.TypeError("iter() return non-iterator of type '" + tname + "'");
                  return ret;
             }
-            throw new Sk.builtin.TypeError("'" + this.tp$name + "' object is not iterable");
+            throw new Sk.builtin.TypeError("'" + tname + "' object is not iterable");
         };
         klass.prototype.tp$iternext = function()
         {
@@ -4284,17 +7016,24 @@ Sk.builtin.type = function(name, bases, dict)
             goog.asserts.assert(iternextf !== undefined, "iter() should have caught this");
             return Sk.misceval.callsim(iternextf);
         };
-        klass.prototype.sq$length = function()
-        {
-            var lenf = this.tp$getattr("__len__");
-            if (lenf)
-            {
-                return Sk.misceval.callsim(lenf);
-            }
-            throw new Sk.builtin.TypeError("object of type '" + this.tp$name + "' has no len()");
-        };
 
         klass.tp$name = name;
+	klass.prototype.tp$getitem = function(key)
+	{
+	    var getf = this.tp$getattr("__getitem__");
+	    if (getf !== undefined)
+		return Sk.misceval.apply(getf, undefined, undefined, undefined, [key]);
+	    throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(this) + "' object does not support indexing");
+	}
+	klass.prototype.tp$setitem = function(key, value)
+	{
+	    var setf = this.tp$getattr("__setitem__");
+	    if (setf !== undefined)
+		return Sk.misceval.apply(setf, undefined, undefined, undefined, [key,value]);
+	    throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(this) + "' object does not support item assignment");
+	}
+
+        klass.prototype.tp$name = name;
 
         if (bases)
         {
@@ -4309,13 +7048,11 @@ Sk.builtin.type = function(name, bases, dict)
             //print("mro result", Sk.builtin.repr(mro).v);
         }
 
-        // because we're not returning a new type() here, we have to manually
-        // add all the methods we want from the type class.
-        klass.tp$getattr = Sk.builtin.type.prototype.tp$getattr;
-        klass.ob$type = Sk.builtin.type;
-
         klass.prototype.ob$type = klass;
         Sk.builtin.type.makeIntoTypeObj(name, klass);
+	
+	// fix for class attributes
+	klass.tp$setattr = Sk.builtin.type.prototype.tp$setattr;
 
         return klass;
     }
@@ -4346,11 +7083,16 @@ Sk.builtin.type.makeIntoTypeObj = function(name, t)
         var mod = t.__module__;
         var cname = "";
         if (mod) cname = mod.v + ".";
-        return new Sk.builtin.str("<class '" + cname + t.tp$name + "'>");
+	var ctype = "class";
+	if (!mod && !t.sk$klass)
+	    ctype = "type";
+        return new Sk.builtin.str("<" + ctype + " '" + cname + t.tp$name + "'>");
     };
     t.tp$str = undefined;
     t.tp$getattr = Sk.builtin.type.prototype.tp$getattr;
     t.tp$setattr = Sk.builtin.object.prototype.GenericSetAttr;
+    t.tp$richcompare = Sk.builtin.type.prototype.tp$richcompare;
+    t.sk$type = true;
     return t;
 };
 
@@ -4375,7 +7117,7 @@ Sk.builtin.type.prototype.tp$getattr = function(name)
     var descr = Sk.builtin.type.typeLookup(tp, name);
     var f;
     //print("type.tpgetattr descr", descr, descr.tp$name, descr.func_code, name);
-    if (descr !== undefined && descr.ob$type !== undefined)
+    if (descr !== undefined && descr !== null && descr.ob$type !== undefined)
     {
         f = descr.ob$type.tp$descr_get;
         // todo;if (f && descr.tp$descr_set) // is a data descriptor if it has a set
@@ -4384,11 +7126,11 @@ Sk.builtin.type.prototype.tp$getattr = function(name)
 
     if (this['$d'])
     {
-        //print("hi");
-        var res = this['$d'].mp$subscript(new Sk.builtin.str(name));
-        //print(res);
+        var res = this['$d'].mp$lookup(new Sk.builtin.str(name));
         if (res !== undefined)
+        {
             return res;
+        }
     }
 
     if (f)
@@ -4397,7 +7139,7 @@ Sk.builtin.type.prototype.tp$getattr = function(name)
         return f.call(descr, null, tp);
     }
 
-    if (descr)
+    if (descr !== undefined)
     {
         return descr;
     }
@@ -4405,23 +7147,35 @@ Sk.builtin.type.prototype.tp$getattr = function(name)
     return undefined;
 };
 
+Sk.builtin.type.prototype.tp$setattr = function(name, value)
+{
+    // class attributes are direct properties of the object
+    this[name] = value;
+}
+
 Sk.builtin.type.typeLookup = function(type, name)
 {
     var mro = type.tp$mro;
+    var pyname = new Sk.builtin.str(name);
+    var base;
+    var res;
+    var i;
 
     // todo; probably should fix this, used for builtin types to get stuff
     // from prototype
     if (!mro)
         return type.prototype[name];
 
-    for (var i = 0; i < mro.v.length; ++i)
+    for (i = 0; i < mro.v.length; ++i)
     {
-        var base = mro.v[i];
+        base = mro.v[i];
         if (base.hasOwnProperty(name))
             return base[name];
-        var res = base['$d'].mp$subscript(new Sk.builtin.str(name));
+        res = base['$d'].mp$lookup(pyname);
         if (res !== undefined)
+        {
             return res;
+        }
     }
 
     return undefined;
@@ -4473,7 +7227,7 @@ Sk.builtin.type.mroMerge_ = function(seqs)
         }
 
         if (cands.length === 0)
-            throw new TypeError("Inconsistent precedences in type hierarchy");
+            throw new Sk.builtin.TypeError("Inconsistent precedences in type hierarchy");
 
         var next = cands[0];
         // append next to result and remove from sequences
@@ -4492,7 +7246,7 @@ Sk.builtin.type.buildMRO_ = function(klass)
     // MERGE(klass + mro(bases) + bases)
     var all = [ [klass] ];
 
-    //Sk.debugout("buildMRO for", klass.tp$name);
+    // Sk.debugout("buildMRO for", klass.tp$name);
 
     var kbases = klass['$d'].mp$subscript(Sk.builtin.type.basesStr_);
     for (var i = 0; i < kbases.v.length; ++i)
@@ -4527,6 +7281,19 @@ Sk.builtin.type.buildMRO = function(klass)
     return new Sk.builtin.tuple(Sk.builtin.type.buildMRO_(klass));
 };
 
+Sk.builtin.type.prototype.tp$richcompare = function(other, op)
+{
+	if (other.ob$type != Sk.builtin.type)
+		return undefined;
+
+	if (!this['$r'] || !other['$r'])
+		return undefined;
+
+	var r1 = this['$r']();
+	var r2 = other['$r']();
+
+	return r1.tp$richcompare(r2, op);
+};
 /**
  * @constructor
  */
@@ -4555,7 +7322,7 @@ Sk.builtin.object.prototype.GenericGetAttr = function(name)
     // otherwise, look in the type for a descr
     var f;
     //print("descr", descr);
-    if (descr !== undefined && descr.ob$type !== undefined)
+    if (descr !== undefined && descr !== null && descr.ob$type !== undefined)
     {
         f = descr.ob$type.tp$descr_get;
         // todo;
@@ -4571,8 +7338,16 @@ Sk.builtin.object.prototype.GenericGetAttr = function(name)
     else if (this['$d'])
     {
         var res;
-        if (this['$d'].mp$subscript)
-            res = this['$d'].mp$subscript(new Sk.builtin.str(name));
+        if  (this['$d'].mp$lookup) {
+            res = this['$d'].mp$lookup(new Sk.builtin.str(name));
+        }
+        else if (this['$d'].mp$subscript) {
+            try {
+                res = this['$d'].mp$subscript(new Sk.builtin.str(name));
+            } catch (x) {
+                res = undefined;
+            }
+        }
         else if (typeof this['$d'] === "object") // todo; definitely the wrong place for this. other custom tp$getattr won't work on object -- bnm -- implemented custom __getattr__ in abstract.js
             res = this['$d'][name];
 
@@ -4603,7 +7378,7 @@ Sk.builtin.object.prototype.GenericGetAttr = function(name)
         return res;
     }
 
-    if (descr)
+    if (descr !== undefined)
     {
         return descr;
     }
@@ -4633,24 +7408,150 @@ goog.exportSymbol("Sk.builtin.object.prototype.GenericSetAttr", Sk.builtin.objec
 
 Sk.builtin.object.prototype.HashNotImplemented = function()
 {
-    throw new Sk.builtin.TypeError("unhashable type: '" + this.tp$name + "'");
+    throw new Sk.builtin.TypeError("unhashable type: '" + Sk.abstr.typeName(this) + "'");
 };
 
 Sk.builtin.object.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
 Sk.builtin.object.prototype.tp$setattr = Sk.builtin.object.prototype.GenericSetAttr;
-Sk.builtin.type.makeIntoTypeObj('object', Sk.builtin.object);
+Sk.builtin.object.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('object', Sk.builtin.object);
 
-Sk.builtin.BoolObj = function() {};
-Sk.builtin.BoolObj.prototype.ob$type = Sk.builtin.type.makeTypeObj('Bool', new Sk.builtin.BoolObj());
+/**
+ * @constructor
+ */
+Sk.builtin.none = function() {};
+Sk.builtin.none.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('NoneType', Sk.builtin.none);
+Sk.builtin.none.prototype.tp$name = "NoneType";
+Sk.builtin.none.none$ = Object.create(Sk.builtin.none.prototype, {v: {value: null, enumerable: true}});
 
-Sk.builtin.IntObj = function() {};
-Sk.builtin.IntObj.prototype.ob$type = Sk.builtin.type.makeTypeObj('int', new Sk.builtin.IntObj());
+goog.exportSymbol("Sk.builtin.none", Sk.builtin.none);
+Sk.builtin.bool = function(x)
+{
+    Sk.builtin.pyCheckArgs("bool", arguments, 1);
+    if (Sk.misceval.isTrue(x))
+    {
+	return Sk.builtin.bool.true$;
+    }
+    else
+    {
+	return Sk.builtin.bool.false$;
+    }
+};
 
-Sk.builtin.FloatObj = function() {};
-Sk.builtin.FloatObj.prototype.ob$type = Sk.builtin.type.makeTypeObj('float', new Sk.builtin.FloatObj());
+Sk.builtin.bool.prototype.tp$name = "bool";
+Sk.builtin.bool.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('bool', Sk.builtin.bool);
 
-Sk.builtin.NoneObj = function() {};
-Sk.builtin.NoneObj.prototype.ob$type = Sk.builtin.type.makeTypeObj('None', new Sk.builtin.NoneObj());
+Sk.builtin.bool.prototype['$r'] = function()
+{
+    if (this.v)
+	return new Sk.builtin.str('True');
+    return new Sk.builtin.str('False');
+}
+
+Sk.builtin.bool.true$ = Object.create(Sk.builtin.bool.prototype, {v: {value: true, enumerable: true}});
+Sk.builtin.bool.false$ = Object.create(Sk.builtin.bool.prototype, {v: {value: false, enumerable: true}});
+
+goog.exportSymbol("Sk.builtin.bool", Sk.builtin.bool);/**
+ * Check arguments to Python functions to ensure the correct number of
+ * arguments are passed.
+ * 
+ * @param {string} name the name of the function
+ * @param {Object} args the args passed to the function
+ * @param {number} minargs the minimum number of allowable arguments
+ * @param {number=} maxargs optional maximum number of allowable
+ * arguments (default: Infinity)
+ * @param {boolean=} kwargs optional true if kwargs, false otherwise
+ * (default: false)
+ * @param {boolean=} free optional true if free vars, false otherwise
+ * (default: false)
+ */
+Sk.builtin.pyCheckArgs = function (name, args, minargs, maxargs, kwargs, free) {
+    var nargs = args.length;
+    var msg = "";
+
+    if (maxargs === undefined) { maxargs = Infinity; }
+    if (kwargs) { nargs -= 1; }
+    if (free) { nargs -= 1; }
+    if ((nargs < minargs) || (nargs > maxargs)) {
+        if (minargs === maxargs) {
+            msg = name + "() takes exactly " + minargs + " arguments";
+        } else if (nargs < minargs) {
+            msg = name + "() takes at least " + minargs + " arguments";
+        } else {
+            msg = name + "() takes at most " + maxargs + " arguments";
+        }
+        msg += " (" + nargs + " given)";
+        throw new Sk.builtin.TypeError(msg);
+    };
+};
+goog.exportSymbol("Sk.builtin.pyCheckArgs", Sk.builtin.pyCheckArgs);
+
+/**
+ * Check type of argument to Python functions.
+ * 
+ * @param {string} name the name of the argument
+ * @param {string} exptype string of the expected type name
+ * @param {boolean} check truthy if type check passes, falsy otherwise
+ */
+
+Sk.builtin.pyCheckType = function (name, exptype, check) {
+    if (!check) {
+        throw new Sk.builtin.TypeError(name + " must be a " + exptype);
+    };
+};
+goog.exportSymbol("Sk.builtin.pyCheckType", Sk.builtin.pyCheckType);
+
+Sk.builtin.checkSequence = function (arg) {
+    return (arg !== null && arg.mp$subscript !== undefined);
+};
+goog.exportSymbol("Sk.builtin.checkSequence", Sk.builtin.checkSequence);
+
+Sk.builtin.checkIterable = function (arg) {
+    return (arg !== null && arg.tp$iter !== undefined);
+};
+goog.exportSymbol("Sk.builtin.checkIterable", Sk.builtin.checkIterable);
+
+Sk.builtin.checkNumber = function (arg) {
+    return (arg !== null && (typeof arg === "number"
+			     || arg instanceof Sk.builtin.nmber
+			     || arg instanceof Sk.builtin.lng
+                             || arg instanceof Sk.builtin.bool));
+};
+goog.exportSymbol("Sk.builtin.checkNumber", Sk.builtin.checkNumber);
+
+Sk.builtin.checkInt = function (arg) {
+    return (arg !== null) && ((typeof arg === "number" && arg === (arg|0))
+			      || (arg instanceof Sk.builtin.nmber
+				  && arg.skType === Sk.builtin.nmber.int$)
+			      || arg instanceof Sk.builtin.lng
+                              || arg instanceof Sk.builtin.bool);
+};
+goog.exportSymbol("Sk.builtin.checkInt", Sk.builtin.checkInt);
+
+Sk.builtin.checkString = function (arg) {
+    return (arg !== null && arg.__class__ == Sk.builtin.str);
+};
+goog.exportSymbol("Sk.builtin.checkString", Sk.builtin.checkString);
+
+Sk.builtin.checkClass = function (arg) {
+    return (arg !== null && arg.sk$type);
+};
+goog.exportSymbol("Sk.builtin.checkClass", Sk.builtin.checkClass);
+
+Sk.builtin.checkBool = function (arg) {
+    return (arg instanceof Sk.builtin.bool);
+};
+goog.exportSymbol("Sk.builtin.checkBool", Sk.builtin.checkBool);
+
+Sk.builtin.checkNone = function (arg) {
+    return (arg instanceof Sk.builtin.none);
+};
+goog.exportSymbol("Sk.builtin.checkNone", Sk.builtin.checkNone);
+
+Sk.builtin.checkFunction = function (arg) {
+    return (arg !== null && arg.tp$call !== undefined);  
+};
+goog.exportSymbol("Sk.builtin.checkFunction", Sk.builtin.checkFunction);
+
 /**
  * @constructor
  *
@@ -4696,6 +7597,8 @@ Sk.builtin.func.prototype.tp$descr_get = function(obj, objtype)
 };
 Sk.builtin.func.prototype.tp$call = function(args, kw)
 {
+    var name;
+
     // note: functions expect 'this' to be globals to avoid having to
     // slice/unshift onto the main args
     if (this.func_closure)
@@ -4706,6 +7609,11 @@ Sk.builtin.func.prototype.tp$call = function(args, kw)
 
     var expectskw = this.func_code['co_kwargs'];
     var kwargsarr = [];
+
+    if (this.func_code['no_kw'] && kw) {
+        name = (this.func_code && this.func_code['co_name'] && this.func_code['co_name'].v) || '<native JS>';
+        throw new Sk.builtin.TypeError(name + "() takes no keyword arguments");
+    }
 
     if (kw)
     {
@@ -4725,11 +7633,16 @@ Sk.builtin.func.prototype.tp$call = function(args, kw)
             {
                 args[j] = kw[i+1];
             }
-            else if (this.func_code['co_kwargs'])
+            else if (expectskw)
             {
                 // build kwargs dict
                 kwargsarr.push(new Sk.builtin.str(kw[i]));
                 kwargsarr.push(kw[i + 1]);
+            }
+            else
+            {
+                name = (this.func_code && this.func_code['co_name'] && this.func_code['co_name'].v) || '<native JS>';
+                throw new Sk.builtin.TypeError(name + "() got an unexpected keyword argument '" + kw[i] + "'");
             }
         }
     }
@@ -4743,6 +7656,13 @@ Sk.builtin.func.prototype.tp$call = function(args, kw)
     return this.func_code.apply(this.func_globals, args);
 };
 
+Sk.builtin.func.prototype.tp$getattr = function(key) {
+    return this[key];
+}
+Sk.builtin.func.prototype.tp$setattr = function(key,value) {
+    this[key] = value;
+}
+
 //todo; investigate why the other doesn't work
 //Sk.builtin.type.makeIntoTypeObj('function', Sk.builtin.func);
 Sk.builtin.func.prototype.ob$type = Sk.builtin.type.makeTypeObj('function', new Sk.builtin.func(null, null));
@@ -4752,6 +7672,47 @@ Sk.builtin.func.prototype['$r'] = function()
     var name = (this.func_code && this.func_code['co_name'] && this.func_code['co_name'].v) || '<native JS>';
     return new Sk.builtin.str("<function " + name + ">");
 };
+/*
+ * Object to facilitate building native Javascript functions that
+ * behave similarly to Python functions.
+ *
+ * Use:
+ * foo = Sk.nativejs.func(function foo(...) {...});
+ */
+Sk.nativejs = {
+    FN_ARGS: /^function\s*[^\(]*\(\s*([^\)]*)\)/m,
+    FN_ARG_SPLIT: /,/,
+    FN_ARG: /^\s*(_?)(\S+?)\1\s*$/,
+    STRIP_COMMENTS: /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg,
+    formalParameterList: function (fn) {
+        var fnText,argDecl;
+        var args=[];
+        fnText = fn.toString().replace(this.STRIP_COMMENTS, '');
+        argDecl = fnText.match(this.FN_ARGS); 
+        
+        var r = argDecl[1].split(this.FN_ARG_SPLIT);
+        for(var a in r){
+            var arg = r[a];
+            arg.replace(this.FN_ARG, function(all, underscore, name) {
+                args.push(name);
+            });
+        }
+        return args;
+    },
+    func: function (code) {
+        code['co_name'] = new Sk.builtin.str(code.name);
+        code['co_varnames'] = Sk.nativejs.formalParameterList(code);
+        return new Sk.builtin.func(code);
+    },
+    func_nokw: function (code) {
+        code['co_name'] = new Sk.builtin.str(code.name);
+        code['co_varnames'] = Sk.nativejs.formalParameterList(code);
+        code['no_kw'] = true;
+        return new Sk.builtin.func(code);
+    }
+};
+goog.exportSymbol("Sk.nativejs.func", Sk.nativejs.func);
+goog.exportSymbol("Sk.nativejs.func_nokw", Sk.nativejs.func_nokw);
 /**
  * @constructor
  *
@@ -4798,14 +7759,20 @@ Sk.builtin.method.prototype.tp$call = function(args, kw)
 
 Sk.builtin.method.prototype['$r'] = function()
 {
-    return new Sk.builtin.str("<bound method " + this.im_self.ob$type.tp$name + "." + this.im_func.func_code['co_name'].v
+    var name = (this.im_func.func_code && this.im_func.func_code['co_name'] && this.im_func.func_code['co_name'].v) || '<native JS>';
+    return new Sk.builtin.str("<bound method " + this.im_self.ob$type.tp$name + "." + name
             + " of " + this.im_self['$r']().v + ">");
 };
 Sk.misceval = {};
 
 Sk.misceval.isIndex = function(o)
 {
-    return o === null || typeof o === "number" || o.constructor === Sk.builtin.lng || o.tp$index;
+    if (o === null || o.constructor === Sk.builtin.lng || o.tp$index
+	|| o === true || o === false) {
+        return true;
+    }
+
+    return Sk.builtin.checkInt(o);
 };
 goog.exportSymbol("Sk.misceval.isIndex", Sk.misceval.isIndex);
 
@@ -4813,8 +7780,12 @@ Sk.misceval.asIndex = function(o)
 {
     if (!Sk.misceval.isIndex(o)) return undefined;
     if (o === null) return undefined;
+    if (o === true) return 1;
+    if (o === false) return 0;
     if (typeof o === "number") return o;
-    goog.asserts.fail("todo;");
+	if (o.constructor === Sk.builtin.nmber) return o.v;
+	if (o.constructor === Sk.builtin.lng) return o.tp$index();
+    goog.asserts.fail("todo asIndex;");
 };
 
 /**
@@ -4873,7 +7844,7 @@ Sk.misceval.arrayFromArguments = function(args)
     var arg = args[0];
     if ( arg instanceof Sk.builtin.set )
     {
-        // this is a Sk.builtin.list
+        // this is a Sk.builtin.set
         arg = arg.tp$iter().$obj;
     }
     else if ( arg instanceof Sk.builtin.dict )
@@ -4881,25 +7852,38 @@ Sk.misceval.arrayFromArguments = function(args)
         // this is a Sk.builtin.list
         arg = Sk.builtin.dict.prototype['keys'].func_code(arg);
     }
-    // shouldn't else if here as the two above output lists to arg.
+
+    // shouldn't else if here as the above may output lists to arg.
     if ( arg instanceof Sk.builtin.list || arg instanceof Sk.builtin.tuple )
     {
         return arg.v;
     }
-    return args;
+    else if ( arg.tp$iter !== undefined )
+    {
+        // handle arbitrary iterable (strings, generators, etc.)
+        var res = [];
+        for (var it = arg.tp$iter(), i = it.tp$iternext();
+             i !== undefined; i = it.tp$iternext())
+        {
+            res.push(i);
+        }
+        return res;
+    }
+
+    throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(arg) + "' object is not iterable");
 };
 goog.exportSymbol("Sk.misceval.arrayFromArguments", Sk.misceval.arrayFromArguments);
 
 /**
- * for reversed comparison: Eq -> NotEq, etc.
+ * for reversed comparison: Gt -> Lt, etc.
  */
 Sk.misceval.swappedOp_ = {
-    'Eq': 'NotEq',
-    'NotEq': 'Eq',
-    'Lt': 'Gt',
-    'LtE': 'GtE',
-    'Gt': 'Lt',
-    'GtE': 'LtE',
+    'Eq': 'Eq',
+    'NotEq': 'NotEq',
+    'Lt': 'GtE',
+    'LtE': 'Gt',
+    'Gt': 'LtE',
+    'GtE': 'Lt',
     'Is': 'IsNot',
     'IsNot': 'Is',
     'In_': 'NotIn',
@@ -4909,145 +7893,242 @@ Sk.misceval.swappedOp_ = {
 
 Sk.misceval.richCompareBool = function(v, w, op)
 {
-    if (op === 'Is')
+    // v and w must be Python objects. will return Javascript true or false for internal use only
+    // if you want to return a value from richCompareBool to Python you must wrap as Sk.builtin.bool first
+
+    goog.asserts.assert((v !== null) && (v !== undefined), "passed null or undefined parameter to Sk.misceval.richCompareBool");
+    goog.asserts.assert((w !== null) && (w !== undefined), "passed null or undefined parameter to Sk.misceval.richCompareBool");
+
+    var v_type = new Sk.builtin.type(v);
+    var w_type = new Sk.builtin.type(w);
+
+    // Python has specific rules when comparing two different builtin types
+    // currently, this code will execute even if the objects are not builtin types
+    // but will fall through and not return anything in this section
+    if ((v_type !== w_type)
+        && (op === 'GtE' || op === 'Gt' || op === 'LtE' || op === 'Lt'))
+    {
+        // note: sets are omitted here because they can only be compared to other sets
+        var numeric_types = [Sk.builtin.float_.prototype.ob$type,
+                             Sk.builtin.int_.prototype.ob$type,
+                             Sk.builtin.lng.prototype.ob$type,
+                             Sk.builtin.bool.prototype.ob$type];
+        var sequence_types = [Sk.builtin.dict.prototype.ob$type,
+                              Sk.builtin.enumerate.prototype.ob$type,
+                              Sk.builtin.list.prototype.ob$type,
+                              Sk.builtin.str.prototype.ob$type,
+                              Sk.builtin.tuple.prototype.ob$type];
+
+        var v_num_type = numeric_types.indexOf(v_type);
+        var v_seq_type = sequence_types.indexOf(v_type);
+        var w_num_type = numeric_types.indexOf(w_type);
+        var w_seq_type = sequence_types.indexOf(w_type);
+
+        // NoneTypes are considered less than any other type in Python
+        // note: this only handles comparing NoneType with any non-NoneType.
+        // Comparing NoneType with NoneType is handled further down.
+        if (v_type === Sk.builtin.none.prototype.ob$type)
+        {
+            switch (op)
+            {
+                case 'Lt':  return true;
+                case 'LtE': return true;
+                case 'Gt':  return false;
+                case 'GtE': return false;
+            }
+        }
+
+        if (w_type === Sk.builtin.none.prototype.ob$type)
+        {
+            switch (op)
+            {
+                case 'Lt':  return false;
+                case 'LtE': return false;
+                case 'Gt':  return true;
+                case 'GtE': return true;
+            }
+        }
+
+        // numeric types are always considered smaller than sequence types in Python
+        if (v_num_type !== -1 && w_seq_type !== -1)
+        {
+            switch (op)
+            {
+                case 'Lt':  return true;
+                case 'LtE': return true;
+                case 'Gt':  return false;
+                case 'GtE': return false;
+            }
+        }
+
+        if (v_seq_type !== -1 && w_num_type !== -1)
+        {
+            switch (op)
+            {
+                case 'Lt':  return false;
+                case 'LtE': return false;
+                case 'Gt':  return true;
+                case 'GtE': return true;
+            }
+        }
+
+        // in Python, different sequence types are ordered alphabetically
+        // by name so that dict < list < str < tuple
+        if (v_seq_type !== -1 && w_seq_type !== -1)
+        {
+            switch (op)
+            {
+                case 'Lt':  return v_seq_type < w_seq_type;
+                case 'LtE': return v_seq_type <= w_seq_type;
+                case 'Gt':  return v_seq_type > w_seq_type;
+                case 'GtE': return v_seq_type >= w_seq_type;
+            }
+        }
+    }
+
+
+    // handle identity and membership comparisons
+    if (op === 'Is') {
+	if (v instanceof Sk.builtin.nmber && w instanceof Sk.builtin.nmber)
+	{
+	    return (v.numberCompare(w) === 0) && (v.skType === w.skType);
+	}
+	else if (v instanceof Sk.builtin.lng && w instanceof Sk.builtin.lng)
+	{
+	    return v.longCompare(w) === 0;
+	}
+
         return v === w;
+    }
 
-    if (op === 'IsNot')
+    if (op === 'IsNot') {
+	if (v instanceof Sk.builtin.nmber && w instanceof Sk.builtin.nmber)
+	{
+	    return (v.numberCompare(w) !== 0) || (v.skType !== w.skType);
+	}
+	else if (v instanceof Sk.builtin.lng && w instanceof Sk.builtin.lng)
+	{
+	    return v.longCompare(w) !== 0;
+	}
+
         return v !== w;
-
-    if (v === w)
-    {
-        if (op === 'Eq')
-            return true;
-        else if (op === 'NotEq')
-            return false;
     }
 
-    if (v instanceof Sk.builtin.str && w instanceof Sk.builtin.str)
+    if (op === "In")
+        return Sk.abstr.sequenceContains(w, v);
+    if (op === "NotIn")
+        return !Sk.abstr.sequenceContains(w, v);
+
+
+    // use comparison methods if they are given for either object
+    var res;
+    if (v.tp$richcompare && (res = v.tp$richcompare(w, op)) !== undefined)
     {
-        if (op === 'Eq')
-            return v === w;
-        else if (op === 'NotEq')
-            return v !== w;
+        return res;
     }
 
-    if ((typeof v === "number" || typeof v === "boolean") && (typeof w === "number" || typeof w === "boolean"))
+    if (w.tp$richcompare && (res = w.tp$richcompare(v, Sk.misceval.swappedOp_[op])) !== undefined)
     {
-        switch (op)
-        {
-            case 'Lt': return v < w;
-            case 'LtE': return v <= w;
-            case 'Gt': return v > w;
-            case 'GtE': return v >= w;
-            case 'NotEq': return v != w;
-            case 'Eq': return v == w;
-            default: throw "assert";
-        }
-    }
-    else
-    {
-
-        if (op === "In") return Sk.abstr.sequenceContains(w, v);
-        if (op === "NotIn") return !Sk.abstr.sequenceContains(w, v);
-
-
-        var res;
-        //print("  -- rcb:", JSON.stringify(v), JSON.stringify(w), op);
-        if (v && w && v.tp$richcompare && (res = v.tp$richcompare(w, op)) !== undefined)
-        {
-            return res;
-        }
-        else if (w && v && w.tp$richcompare && (res = w.tp$richcompare(v, Sk.misceval.swappedOp_[op])) !== undefined)
-        {
-            return res;
-        }
-        else
-        {
-            // depending on the op, try left:op:right, and if not, then
-            // right:reversed-top:left
-            // yeah, a macro or 3 would be nice...
-            if (op === 'Eq') {
-                if (v && v['__eq__']) 
-                    return Sk.misceval.callsim(v['__eq__'], v, w);
-                else if (w && w['__ne__'])
-                    return Sk.misceval.callsim(w['__ne__'], w, v);
-                }
-            else if (op === 'NotEq') {
-                if (v && v['__ne__'])
-                    return Sk.misceval.callsim(v['__ne__'], v, w);
-                else if (w && w['__eq__'])
-                    return Sk.misceval.callsim(w['__eq__'], w, v);
-                }
-            else if (op === 'Gt') {
-                if (v && v['__gt__'])
-                    return Sk.misceval.callsim(v['__gt__'], v, w);
-                else if (w && w['__lt__'])
-                    return Sk.misceval.callsim(w['__lt__'], w, v);
-                }
-            else if (op === 'Lt') {
-                if (v && v['__lt__'])
-                    return Sk.misceval.callsim(v['__lt__'], v, w);
-                else if (w && w['__gt__'])
-                    return Sk.misceval.callsim(w['__gt__'], w, v);
-                }
-            else if (op === 'GtE') {
-                if (v && v['__ge__'])
-                    return Sk.misceval.callsim(v['__ge__'], v, w);
-                else if (w && w['__le__'])
-                    return Sk.misceval.callsim(w['__le__'], w, v);
-                }
-            else if (op === 'LtE') {
-                if (v && v['__le__'])
-                    return Sk.misceval.callsim(v['__le__'], v, w);
-                else if (w && w['__ge__'])
-                    return Sk.misceval.callsim(w['__ge__'], w, v);
-                }
-
-            // if those aren't defined, fallback on the __cmp__ method if it
-            // exists
-            if (v && v['__cmp__'])
-            {
-                var ret = Sk.misceval.callsim(v['__cmp__'], v, w);
-                if (op === 'Eq') return ret === 0;
-                else if (op === 'NotEq') return ret !== 0;
-                else if (op === 'Lt') return ret < 0;
-                else if (op === 'Gt') return ret > 0;
-                else if (op === 'LtE') return ret <= 0;
-                else if (op === 'GtE') return ret >= 0;
-            }
-            else if (w && w['__cmp__'])
-            {
-                // note, flipped on return value and call
-                var ret = Sk.misceval.callsim(w['__cmp__'], w, v);
-                if (op === 'Eq') return ret === 0;
-                else if (op === 'NotEq') return ret !== 0;
-                else if (op === 'Lt') return ret > 0;
-                else if (op === 'Gt') return ret < 0;
-                else if (op === 'LtE') return ret >= 0;
-                else if (op === 'GtE') return ret <= 0;
-            }
-
-        }
-        if (typeof v !== typeof w) {
-            if (op === 'NotEq') return true;
-            else
-                return false;
-        }
-
+        return res;
     }
 
-    // todo; some defaults, mostly to handle diff types -> false. are these ok?
-    if (op === 'Eq') return v === w;
-    if (op === 'NotEq') return v !== w;
 
-    throw new Sk.builtin.ValueError("don't know how to compare '" + v.tp$name + "' and '" + w.tp$name + "'");
+    // depending on the op, try left:op:right, and if not, then
+    // right:reversed-top:left
+
+    var op2method = {
+        'Eq': '__eq__',
+        'NotEq': '__ne__',
+        'Gt': '__gt__',
+        'GtE': '__ge__',
+        'Lt': '__lt__',
+        'LtE': '__le__'
+    };
+
+    var method = op2method[op];
+    var swapped_method = op2method[Sk.misceval.swappedOp_[op]];
+
+    if (v[method])
+    {
+        return Sk.misceval.isTrue(Sk.misceval.callsim(v[method], v, w));
+    }
+    else if (w[swapped_method])
+    {
+        return Sk.misceval.isTrue(Sk.misceval.callsim(w[swapped_method], w, v));
+    }
+
+    if (v['__cmp__'])
+    {
+        var ret = Sk.misceval.callsim(v['__cmp__'], v, w);
+	ret = Sk.builtin.asnum$(ret);
+        if (op === 'Eq') return ret === 0;
+        else if (op === 'NotEq') return ret !== 0;
+        else if (op === 'Lt') return ret < 0;
+        else if (op === 'Gt') return ret > 0;
+        else if (op === 'LtE') return ret <= 0;
+        else if (op === 'GtE') return ret >= 0;
+    }
+
+    if (w['__cmp__'])
+    {
+        // note, flipped on return value and call
+        var ret = Sk.misceval.callsim(w['__cmp__'], w, v);
+	ret = Sk.builtin.asnum$(ret);
+        if (op === 'Eq') return ret === 0;
+        else if (op === 'NotEq') return ret !== 0;
+        else if (op === 'Lt') return ret > 0;
+        else if (op === 'Gt') return ret < 0;
+        else if (op === 'LtE') return ret >= 0;
+        else if (op === 'GtE') return ret <= 0;
+    }
+
+    // handle special cases for comparing None with None or Bool with Bool
+    if (((v instanceof Sk.builtin.none) && (w instanceof Sk.builtin.none))
+	|| ((v instanceof Sk.builtin.bool) && (w instanceof Sk.builtin.bool)))
+    {
+	// Javascript happens to return the same values when comparing null
+        // with null or true/false with true/false as Python does when
+        // comparing None with None or True/False with True/False
+
+	if (op === 'Eq')
+	    return v.v === w.v;
+	if (op === 'NotEq')
+	    return v.v !== w.v;
+	if (op === 'Gt')
+	    return v.v > w.v;
+	if (op === 'GtE')
+	    return v.v >= w.v;
+	if (op === 'Lt')
+	    return v.v < w.v;
+	if (op === 'LtE')
+	    return v.v <= w.v;
+    }
+
+
+    // handle equality comparisons for any remaining objects
+    if (op === 'Eq')
+    {
+        if ((v instanceof Sk.builtin.str) && (w instanceof Sk.builtin.str))
+            return v.v === w.v;
+        return v === w;
+    }
+    if (op === 'NotEq')
+    {
+        if ((v instanceof Sk.builtin.str) && (w instanceof Sk.builtin.str))
+            return v.v !== w.v;
+        return v !== w;
+    }
+
+    var vname = Sk.abstr.typeName(v);
+    var wname = Sk.abstr.typeName(w);
+    throw new Sk.builtin.ValueError("don't know how to compare '" + vname + "' and '" + wname + "'");
 };
 goog.exportSymbol("Sk.misceval.richCompareBool", Sk.misceval.richCompareBool);
 
 Sk.misceval.objectRepr = function(v)
 {
-    //goog.asserts.assert(v !== undefined, "trying to repr undefined");
-    if (v === null)
+    goog.asserts.assert(v !== undefined, "trying to repr undefined");
+    if ((v === null) || (v instanceof Sk.builtin.none))
         return new Sk.builtin.str("None"); // todo; these should be consts
     else if (v === true)
         return new Sk.builtin.str("True");
@@ -5055,8 +8136,22 @@ Sk.misceval.objectRepr = function(v)
         return new Sk.builtin.str("False");
     else if (typeof v === "number")
         return new Sk.builtin.str("" + v);
-    else if (!v['$r'])
-        return new Sk.builtin.str("<" + v.tp$name + " object>");
+    else if (!v['$r']) {
+        if (v.tp$name) {
+            return new Sk.builtin.str("<" + v.tp$name + " object>");
+        } else {
+            return new Sk.builtin.str("<unknown>");
+        };
+    }
+    else if (v.constructor === Sk.builtin.nmber)
+    {
+        if (v.v === Infinity)
+            return new Sk.builtin.str('inf');
+        else if (v.v === -Infinity)
+            return new Sk.builtin.str('-inf');
+        else
+            return v['$r']();
+    }
     else
         return v['$r']();
 };
@@ -5080,9 +8175,27 @@ Sk.misceval.isTrue = function(x)
     if (x === true) return true;
     if (x === false) return false;
     if (x === null) return false;
+    if (x.constructor === Sk.builtin.none) return false;
+    if (x.constructor === Sk.builtin.bool) return x.v;
     if (typeof x === "number") return x !== 0;
+    if (x instanceof Sk.builtin.lng) return x.nb$nonzero();
+    if (x.constructor === Sk.builtin.nmber) return x.v !== 0;
     if (x.mp$length) return x.mp$length() !== 0;
     if (x.sq$length) return x.sq$length() !== 0;
+    if (x['__nonzero__']) {
+        var ret = Sk.misceval.callsim(x['__nonzero__'], x);
+        if (!Sk.builtin.checkInt(ret)) {
+            throw new Sk.builtin.TypeError ("__nonzero__ should return an int");
+        }
+        return Sk.builtin.asnum$(ret) !== 0;
+    }
+    if (x['__len__']) {
+        var ret = Sk.misceval.callsim(x['__len__'], x);
+        if (!Sk.builtin.checkInt(ret)) {
+            throw new Sk.builtin.TypeError ("__len__ should return an int");
+        }
+        return Sk.builtin.asnum$(ret) !== 0;
+    }
     return true;
 };
 goog.exportSymbol("Sk.misceval.isTrue", Sk.misceval.isTrue);
@@ -5118,6 +8231,8 @@ Sk.misceval.loadname = function(name, other)
     var bi = Sk.builtins[name];
     if (bi !== undefined) return bi;
 
+    name = name.replace('_$rw$', '');
+    name = name.replace('_$rn$', '');
     throw new Sk.builtin.NameError("name '" + name + "' is not defined");
 };
 goog.exportSymbol("Sk.misceval.loadname", Sk.misceval.loadname);
@@ -5222,8 +8337,11 @@ goog.exportSymbol("Sk.misceval.callsim", Sk.misceval.callsim);
  */
 Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
 {
-
-    if (typeof func === "function")
+    if (func === null || func instanceof Sk.builtin.none)
+    {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(func) + "' object is not callable");
+    }
+    else if (typeof func === "function")
     {
         // todo; i believe the only time this happens is the wrapper
         // function around generators (that creates the iterator).
@@ -5233,6 +8351,68 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
         // descriptors to create builtin.func's in other places.
 
         //goog.asserts.assert(kws === undefined);
+        
+        // This actually happens for all builtin functions (in
+        // builtin.js, for example) as they are javascript functions,
+        // not Sk.builtin.func objects.
+
+        if (func.sk$klass)
+        {
+            // klass wrapper around __init__ requires special handling
+            return func.apply(null, [kwdict, varargseq, kws, args]);
+        }
+
+        if (varargseq)
+        {
+            for (var it = varargseq.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+            {
+                args.push(i);
+            }
+        }
+
+        if (kwdict)
+        {
+            goog.asserts.fail("kwdict not implemented;");
+        }
+        //goog.asserts.assert(((kws === undefined) || (kws.length === 0)));
+        //print('kw args location: '+ kws + ' args ' + args.length)
+        if(kws !== undefined && kws.length > 0 ) {
+            if (!func.co_varnames) {
+                throw new Sk.builtin.ValueError("Keyword arguments are not supported by this function")
+            }
+    
+            //number of positionally placed optional parameters
+            var numNonOptParams = func.co_numargs - func.co_varnames.length;
+            var numPosParams = args.length - numNonOptParams;
+            
+            //add defaults
+            var numNonOptParams_alt = args.length;
+            args = args.concat(func.$defaults.slice(numPosParams));
+            
+            for(var i = 0; i < kws.length; i = i + 2) {
+                var kwix = func.co_varnames.indexOf(kws[i]);
+                
+                if(kwix === -1) {
+                    throw new Sk.builtin.TypeError("'" + kws[i] + "' is an invalid keyword argument for this function");
+                } 
+                
+                if (kwix < numPosParams) {
+                    throw new Sk.builtin.TypeError("Argument given by name ('" + kws[i] + "') and position (" + (kwix + numNonOptParams + 1) + ")");
+                }
+                
+                if(isNaN(numNonOptParams)) {
+                  args[kwix + numNonOptParams_alt] = kws[i + 1];
+                } else {
+                  args[kwix + numNonOptParams] = kws[i + 1];  
+                }
+            }  
+        } else if(func.$defaults !== undefined &&
+                  func.co_numargs === undefined &&
+                  func.$defaults.length > 0) {
+            //For funcs with variable number of args and opt args (like print)
+            args = args.concat(func.$defaults);
+        }
+        //append kw args to args, filling in the default value where none is provided.
         return func.apply(null, args);
     }
     else
@@ -5247,10 +8427,10 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
                     args.push(i);
                 }
             }
-            // if (kwdict)
-            // {
-            //     goog.asserts.fail("todo;");
-            // }
+            if (kwdict)
+            {
+                goog.asserts.fail("kwdict not implemented;");
+            }
             return fcall.call(func, args, kws, kwdict);
         }
 
@@ -5264,7 +8444,7 @@ Sk.misceval.apply = function(func, kwdict, varargseq, kws, args)
             args.unshift(func);
             return Sk.misceval.apply(fcall, kws, args, kwdict, varargseq);
         }
-        throw new TypeError("'" + func.tp$name + "' object is not callable");
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(func) + "' object is not callable");
     }
 };
 goog.exportSymbol("Sk.misceval.apply", Sk.misceval.apply);
@@ -5293,7 +8473,7 @@ Sk.misceval.buildClass = function(globals, func, name, bases)
 
     // init the dict for the class
     //print("CALLING", func);
-    func(globals, locals);
+    func(globals, locals, []);
 
     // file's __name__ is class's __module__
     locals.__module__ = globals['__name__'];
@@ -5315,83 +8495,127 @@ Sk.abstr = {};
 //
 //
 
-Sk.abstr.binop_type_error = function(v, w, name)
-{
-    throw new TypeError("unsupported operand type(s) for " + name + ": '"
-            + v.tp$name + "' and '" + w.tp$name + "'");
+Sk.abstr.typeName = function(v) {
+    var vtypename;
+    if (v instanceof Sk.builtin.nmber) {
+        vtypename = v.skType;
+    } else if (v.tp$name !== undefined) {
+        vtypename = v.tp$name;
+    } else {
+        vtypename = "<invalid type>";
+    };
+    return vtypename;
 };
 
-// this can't be a table for closure
-// bnm -- this seems like the most logical place to add support for user defined
-//        operators. (__xxx__ that I've defined in my own class)
-Sk.abstr.boNameToSlotFunc_ = function(obj, name)
+Sk.abstr.binop_type_error = function(v, w, name)
 {
-    switch (name)
-    {
-        case "Add": return obj.nb$add ? obj.nb$add : obj['__add__'];
-        case "Sub": return obj.nb$subtract ? obj.nb$subtract : obj['__sub__'];
-        case "Mult": return obj.nb$multiply ? obj.nb$multiply : obj['__mul__'];
-        case "Div": return obj.nb$divide ? obj.nb$divide : obj['__div__'];
-        case "FloorDiv": return obj.nb$floor_divide ? obj.nb$floor_divide : obj['__floordiv__'];
-        case "Mod": return obj.nb$remainder ? obj.nb$remainder : obj['__mod__'];
-        case "Pow": return obj.nb$power ? obj.nb$power : obj['__pow__'];
-        //case "LShift": return obj.nb$lshift;
-        //case "RShift": return obj.nb$rshift;
-        //case "BitAnd": return obj.nb$and;
-        //case "BitOr": return obj.nb$or;
-        //case "BitXor": return obj.nb$xor;
-    }
+    var vtypename = Sk.abstr.typeName(v);
+    var wtypename = Sk.abstr.typeName(w);
+
+    throw new Sk.builtin.TypeError("unsupported operand type(s) for " + name + ": '"
+            + vtypename + "' and '" + wtypename + "'");
 };
-Sk.abstr.iboNameToSlotFunc_ = function(obj, name)
+Sk.abstr.unop_type_error = function(v, name)
 {
-    switch (name)
-    {
-        case "Add": return obj.nb$inplace_add;
-        //case "Sub": return obj.nb$inplace_subtract;
-        //case "Mult": return obj.nb$inplace_multiply;
-        //case "Div": return obj.nb$divide;
-        //case "FloorDiv": return obj.nb$floor_divide;
-        //case "Mod": return obj.nb$inplace_remainder;
-        //case "Pow": return obj.nb$inplace_power;
-        //case "LShift": return obj.nb$lshift;
-        //case "RShift": return obj.nb$rshift;
-        //case "BitAnd": return obj.nb$and;
-        //case "BitOr": return obj.nb$or;
-        //case "BitXor": return obj.nb$xor;
-    }
+    var vtypename = Sk.abstr.typeName(v);
+    var uop = {
+        'UAdd':'+',
+        'USub':'-',
+        'Invert':'~'}[name];
+
+    throw new Sk.builtin.TypeError("bad operand type for unary " + uop + ": '" + vtypename + "'");
+};
+
+Sk.abstr.boNameToSlotFuncLhs_ = function(obj, name) {
+  if (obj === null) {
+    return undefined;
+  };
+  switch (name) {
+    case "Add":      return obj.nb$add          ? obj.nb$add :          obj['__add__'];
+    case "Sub":      return obj.nb$subtract     ? obj.nb$subtract :     obj['__sub__'];
+    case "Mult":     return obj.nb$multiply     ? obj.nb$multiply :     obj['__mul__'];
+    case "Div":      return obj.nb$divide       ? obj.nb$divide :       obj['__div__'];
+    case "FloorDiv": return obj.nb$floor_divide ? obj.nb$floor_divide : obj['__floordiv__'];
+    case "Mod":      return obj.nb$remainder    ? obj.nb$remainder :    obj['__mod__'];
+    case "Pow":      return obj.nb$power        ? obj.nb$power :        obj['__pow__'];
+    case "LShift":   return obj.nb$lshift       ? obj.nb$lshift :       obj['__lshift__'];
+    case "RShift":   return obj.nb$rshift       ? obj.nb$rshift :       obj['__rshift__'];
+    case "BitAnd":   return obj.nb$and          ? obj.nb$and :          obj['__and__'];
+    case "BitXor":   return obj.nb$xor          ? obj.nb$xor :          obj['__xor__'];
+    case "BitOr":    return obj.nb$or           ? obj.nb$or :           obj['__or__'];
+  }
+};
+
+Sk.abstr.boNameToSlotFuncRhs_ = function(obj, name) {
+  if (obj === null) {
+    return undefined;
+  };
+  switch (name) {
+    case "Add":      return obj.nb$add          ? obj.nb$add :          obj['__radd__'];
+    case "Sub":      return obj.nb$subtract     ? obj.nb$subtract :     obj['__rsub__'];
+    case "Mult":     return obj.nb$multiply     ? obj.nb$multiply :     obj['__rmul__'];
+    case "Div":      return obj.nb$divide       ? obj.nb$divide :       obj['__rdiv__'];
+    case "FloorDiv": return obj.nb$floor_divide ? obj.nb$floor_divide : obj['__rfloordiv__'];
+    case "Mod":      return obj.nb$remainder    ? obj.nb$remainder :    obj['__rmod__'];
+    case "Pow":      return obj.nb$power        ? obj.nb$power :        obj['__rpow__'];
+    case "LShift":   return obj.nb$lshift       ? obj.nb$lshift :       obj['__rlshift__'];
+    case "RShift":   return obj.nb$rshift       ? obj.nb$rshift :       obj['__rrshift__'];
+    case "BitAnd":   return obj.nb$and          ? obj.nb$and :          obj['__rand__'];
+    case "BitXor":   return obj.nb$xor          ? obj.nb$xor :          obj['__rxor__'];
+    case "BitOr":    return obj.nb$or           ? obj.nb$or :           obj['__ror__'];
+  }
+};
+
+Sk.abstr.iboNameToSlotFunc_ = function(obj, name) {
+  switch (name) {
+    case "Add":      return obj.nb$inplace_add          ? obj.nb$inplace_add          : obj['__iadd__'];
+    case "Sub":      return obj.nb$inplace_subtract     ? obj.nb$inplace_subtract     : obj['__isub__'];
+    case "Mult":     return obj.nb$inplace_multiply     ? obj.nb$inplace_multiply     : obj['__imul__'];
+    case "Div":      return obj.nb$inplace_divide       ? obj.nb$inplace_divide       : obj['__idiv__'];
+    case "FloorDiv": return obj.nb$inplace_floor_divide ? obj.nb$inplace_floor_divide : obj['__ifloordiv__'];
+    case "Mod":      return obj.nb$inplace_remainder;
+    case "Pow":      return obj.nb$inplace_power;
+    case "LShift":   return obj.nb$inplace_lshift       ? obj.nb$inplace_lshift       : obj['__ilshift__'];
+    case "RShift":   return obj.nb$inplace_rshift       ? obj.nb$inplace_rshift       : obj['__irshift__'];
+    case "BitAnd":   return obj.nb$inplace_and;
+    case "BitOr":    return obj.nb$inplace_or;
+    case "BitXor":   return obj.nb$inplace_xor          ? obj.nb$inplace_xor          : obj['__ixor__'];
+  }
+};
+Sk.abstr.uoNameToSlotFunc_ = function(obj, name) {
+  if (obj === null) {
+    return undefined;
+  };
+  switch (name) {
+    case "USub":      return obj.nb$negative          ? obj.nb$negative :          obj['__neg__'];
+    case "UAdd":      return obj.nb$positive          ? obj.nb$positive :          obj['__pos__'];
+    case "Invert":    return obj.nb$invert            ? obj.nb$invert :            obj['__invert__'];
+  }
 };
 
 Sk.abstr.binary_op_ = function(v, w, opname)
 {
     var ret;
-    var vop = Sk.abstr.boNameToSlotFunc_(v, opname);
+    var vop = Sk.abstr.boNameToSlotFuncLhs_(v, opname);
     if (vop !== undefined)
-    {	
-		if (vop.call)
-        	ret = vop.call(v, w);
-		else {  // assume that vop is an __xxx__ type method
-			ret = Sk.misceval.callsim(vop,v,w)
-		}
+    {
+        if (vop.call) {
+            ret = vop.call(v, w);
+        } else {
+            ret = Sk.misceval.callsim(vop,v,w)
+        }
         if (ret !== undefined) return ret;
     }
-    var wop = Sk.abstr.boNameToSlotFunc_(w, opname);
+    var wop = Sk.abstr.boNameToSlotFuncRhs_(w, opname);
     if (wop !== undefined)
     {
-		if (wop.call)
-        	ret = wop.call(w, v);
-		else { // assume that wop is an __xxx__ type method
-			ret = Sk.misceval.callsim(wop,w,v)
-		}
+        if (wop.call) {
+            ret = wop.call(w, v);
+        } else {
+            ret = Sk.misceval.callsim(wop,w,v)
+        }
         if (ret !== undefined) return ret;
     }
-
-    if (opname === "Add" && v.sq$concat)
-        return v.sq$concat(w);
-    else if (opname === "Mult" && v.sq$repeat)
-        return Sk.abstr.sequenceRepeat(v.sq$repeat, v, w);
-    else if (opname === "Mult" && w.sq$repeat)
-        return Sk.abstr.sequenceRepeat(w.sq$repeat, w, v);
-
     Sk.abstr.binop_type_error(v, w, opname);
 };
 
@@ -5401,35 +8625,39 @@ Sk.abstr.binary_iop_ = function(v, w, opname)
     var vop = Sk.abstr.iboNameToSlotFunc_(v, opname);
     if (vop !== undefined)
     {
-        ret = vop.call(v, w);
+    if (vop.call) {
+            ret = vop.call(v, w);
+    } else {  // assume that vop is an __xxx__ type method
+        ret = Sk.misceval.callsim(vop,v,w); //  added to be like not-in-place... is this okay?
+        }
         if (ret !== undefined) return ret;
     }
     var wop = Sk.abstr.iboNameToSlotFunc_(w, opname);
     if (wop !== undefined)
     {
-        ret = wop.call(w, v);
+    if (wop.call) {
+            ret = wop.call(w, v);
+    } else { // assume that wop is an __xxx__ type method
+        ret = Sk.misceval.callsim(wop,w,v); //  added to be like not-in-place... is this okay?
+        }
         if (ret !== undefined) return ret;
     }
-
-    if (opname === "Add")
-    {
-        if (v.sq$inplace_concat)
-            return v.sq$inplace_concat(w);
-        else if (v.sq$concat)
-            return v.sq$concat(w);
-    }
-    else if (opname === "Mult")
-    {
-        if (v.sq$inplace_repeat)
-            return Sk.abstr.sequenceRepeat(v.sq$inplace_repeat, v, w);
-        else if (v.sq$repeat)
-            return Sk.abstr.sequenceRepeat(v.sq$repeat, v, w);
-        // note, don't use w inplace_repeat because we don't want to mutate rhs
-        else if (w.sq$repeat)
-            return Sk.abstr.sequenceRepeat(w.sq$repeat, w, v);
-    }
-
     Sk.abstr.binop_type_error(v, w, opname);
+};
+Sk.abstr.unary_op_ = function(v, opname)
+{
+    var ret;
+    var vop = Sk.abstr.uoNameToSlotFunc_(v, opname);
+    if (vop !== undefined)
+    {
+    if (vop.call) {
+            ret = vop.call(v);
+    } else {  // assume that vop is an __xxx__ type method
+        ret = Sk.misceval.callsim(vop,v); //  added to be like not-in-place... is this okay?
+        }
+        if (ret !== undefined) return ret;
+    }
+    Sk.abstr.unop_type_error(v, opname);
 };
 
 //
@@ -5437,32 +8665,49 @@ Sk.abstr.binary_iop_ = function(v, w, opname)
 // result, or if either of the ops are already longs
 Sk.abstr.numOpAndPromote = function(a, b, opfn)
 {
+    if (a === null || b === null) {
+        return undefined;
+    };
+
     if (typeof a === "number" && typeof b === "number")
     {
         var ans = opfn(a, b);
-        // todo; handle float	Removed RNL (bugs in lng, and it should be a question of precision, not magnitude -- this was just wrong)
-        if ( (ans > Sk.builtin.lng.threshold$ || ans < -Sk.builtin.lng.threshold$)	// RNL
-        && Math.floor(ans) === ans)	{												// RNL
-            return [Sk.builtin.lng.fromInt$(a), Sk.builtin.lng.fromInt$(b)];		// RNL
-        } else																		// RNL
+        // todo; handle float   Removed RNL (bugs in lng, and it should be a question of precision, not magnitude -- this was just wrong)
+        if ( (ans > Sk.builtin.lng.threshold$ || ans < -Sk.builtin.lng.threshold$) && Math.floor(ans) === ans) {
+            return [Sk.builtin.lng.fromInt$(a), Sk.builtin.lng.fromInt$(b)];
+        } else
             return ans;
     }
-	else if (a === undefined || b === undefined) {
-		throw new Sk.builtin.NameError('Undefined variable in expression')
-	}
-    else if (a.constructor === Sk.builtin.lng && typeof b === "number")
-        return [a, Sk.builtin.lng.fromInt$(b)];
-    else if (b.constructor === Sk.builtin.lng && typeof a === "number")
-        return [Sk.builtin.lng.fromInt$(a), b];
+    else if (a === undefined || b === undefined) {
+        throw new Sk.builtin.NameError('Undefined variable in expression')
+    }
 
-    return undefined;
+    if (a.constructor === Sk.builtin.lng) {
+//      if (b.constructor == Sk.builtin.nmber)
+//          if (b.skType == Sk.builtin.nmber.float$) {
+//              var tmp = new Sk.builtin.nmber(a.tp$str(), Sk.builtin.nmber.float$);
+//              return [tmp, b];
+//          } else
+//              return [a, b.v];
+        return [a, b];
+    } else if (a.constructor === Sk.builtin.nmber) {
+        return [a, b];
+    } else if (typeof a === "number") {
+        var tmp = new Sk.builtin.nmber(a, undefined);
+        return [tmp, b];
+    } else
+        return undefined;
 };
 
 Sk.abstr.boNumPromote_ = {
     "Add": function(a, b) { return a + b; },
     "Sub": function(a, b) { return a - b; },
     "Mult": function(a, b) { return a * b; },
-    "Mod": function(a, b) { return (b < 0 ? -1 : 1) * (Math.abs(a) % b); },
+    "Mod": function(a, b) { 
+        if (b === 0)
+            throw new Sk.builtin.ZeroDivisionError("division or modulo by zero");
+        var m = a % b; return ((m * b) < 0 ? (m + b) : m); 
+    },
     "Div": function(a, b) {
         if (b === 0)
             throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
@@ -5473,13 +8718,58 @@ Sk.abstr.boNumPromote_ = {
         else
             return a / b;
     },
-    "FloorDiv": function(a, b) { return Math.floor(a / b); }, // todo; wrong? neg?
+    "FloorDiv": function(a, b) { 
+        if (b === 0)
+            throw new Sk.builtin.ZeroDivisionError("division or modulo by zero");
+        else
+            return Math.floor(a / b); // todo; wrong? neg?
+    },
     "Pow": Math.pow,
-    "BitAnd": function(a, b) { return a & b; },
-    "BitOr": function(a, b) { return a | b; },
-    "BitXor": function(a, b) { return a ^ b; },
-    "LShift": function(a, b) { return a << b; },
-    "RShift": function(a, b) { return a >> b; }
+    "BitAnd": function(a, b) { 
+        var m = a & b;
+        if (m < 0) {
+            m = m + 4294967296; // convert back to unsigned
+        }
+        return m;
+    },
+    "BitOr": function(a, b) {
+        var m = a | b;
+        if (m < 0) {
+            m = m + 4294967296; // convert back to unsigned
+        }
+        return m;
+    },
+    "BitXor": function(a, b) {
+        var m = a ^ b;
+        if (m < 0) {
+            m = m + 4294967296; // convert back to unsigned
+        }
+        return m;
+    },
+    "LShift": function(a, b) { 
+    if (b < 0) {
+        throw new Sk.builtin.ValueError("negative shift count");
+    }
+    var m = a << b;
+    if (m > a) {
+        return m; 
+    }
+    else {
+        // Fail, this will get recomputed with longs
+        return a * Math.pow(2, b);
+    }
+    },
+    "RShift": function(a, b) { 
+        if (b < 0) {
+            throw new Sk.builtin.ValueError("negative shift count");
+        }
+        var m = a >> b;
+        if ((a > 0) && (m < 0)) {
+            // fix incorrect sign extension
+            m = m & (Math.pow(2, 32-b) - 1);
+        }
+        return m; 
+    }
 };
 
 Sk.abstr.numberBinOp = function(v, w, op)
@@ -5489,6 +8779,14 @@ Sk.abstr.numberBinOp = function(v, w, op)
     {
         var tmp = Sk.abstr.numOpAndPromote(v, w, numPromoteFunc);
         if (typeof tmp === "number")
+        {
+            return tmp;
+        }
+        else if (tmp !== undefined &&  tmp.constructor === Sk.builtin.nmber)
+        {
+            return tmp;
+        }
+        else if (tmp !== undefined && tmp.constructor === Sk.builtin.lng)
         {
             return tmp;
         }
@@ -5513,6 +8811,14 @@ Sk.abstr.numberInplaceBinOp = function(v, w, op)
         {
             return tmp;
         }
+        else if (tmp !== undefined &&  tmp.constructor === Sk.builtin.nmber)
+        {
+            return tmp;
+        }
+        else if (tmp !== undefined && tmp.constructor === Sk.builtin.lng)
+        {
+            return tmp;
+        }
         else if (tmp !== undefined)
         {
             v = tmp[0];
@@ -5526,20 +8832,21 @@ goog.exportSymbol("Sk.abstr.numberInplaceBinOp", Sk.abstr.numberInplaceBinOp);
 
 Sk.abstr.numberUnaryOp = function(v, op)
 {
-    if (op === "Not") return Sk.misceval.isTrue(v) ? false : true;
-    else if (typeof v === "number" || typeof v === "boolean")
-    {
-        if (op === "USub") return -v;
-        if (op === "UAdd") return v;
-        if (op === "Invert") return ~v;
+    if (op === "Not") return Sk.misceval.isTrue(v) ? Sk.builtin.bool.false$ : Sk.builtin.bool.true$;
+    else if (v instanceof Sk.builtin.nmber || v instanceof Sk.builtin.bool) {
+    var value = Sk.builtin.asnum$(v);
+    if (op === "USub") return new Sk.builtin.nmber(-value, v.skType);
+        if (op === "UAdd") return new Sk.builtin.nmber(value, v.skType);
+        if (op === "Invert") return new Sk.builtin.nmber(~value, v.skType);
     }
     else
     {
         if (op === "USub" && v.nb$negative) return v.nb$negative();
         if (op === "UAdd" && v.nb$positive) return v.nb$positive();
-        //todo; if (op === "Invert" && v.nb$positive) return v.nb$invert();
+        if (op === "Invert" && v.nb$invert) return v.nb$invert();
     }
-    throw new TypeError("unsupported operand type for " + op + " '" + v.tp$name + "'");
+
+    return Sk.abstr.unary_op_(v, op);
 };
 goog.exportSymbol("Sk.abstr.numberUnaryOp", Sk.abstr.numberUnaryOp);
 
@@ -5555,6 +8862,7 @@ goog.exportSymbol("Sk.abstr.numberUnaryOp", Sk.abstr.numberUnaryOp);
 
 Sk.abstr.fixSeqIndex_ = function(seq, i)
 {
+    i = Sk.builtin.asnum$(i);
     if (i < 0 && seq.sq$length)
         i += seq.sq$length();
     return i;
@@ -5564,7 +8872,8 @@ Sk.abstr.sequenceContains = function(seq, ob)
 {
     if (seq.sq$contains) return seq.sq$contains(ob);
 
-    if (!seq.tp$iter) throw new TypeError("argument of type '" + seq.tp$name + "' is not iterable");
+    var seqtypename = Sk.abstr.typeName(seq);
+    if (!seq.tp$iter) throw new Sk.builtin.TypeError("argument of type '" + seqtypename + "' is not iterable");
     
     for (var it = seq.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
     {
@@ -5574,32 +8883,73 @@ Sk.abstr.sequenceContains = function(seq, ob)
     return false;
 };
 
-Sk.abstr.sequenceGetItem = function(seq, i)
-{
-    goog.asserts.fail();
+Sk.abstr.sequenceConcat = function(seq1, seq2) {
+    if (seq1.sq$concat) {
+            return seq1.sq$concat(seq2)
+    }
+    var seq1typename = Sk.abstr.typeName(seq1);
+    throw new Sk.builtin.TypeError("'" + seq1typename + "' object can't be concatenated");
 };
 
-Sk.abstr.sequenceSetItem = function(seq, i, x)
-{
-    goog.asserts.fail();
+Sk.abstr.sequenceGetIndexOf = function(seq, ob) {
+    if (seq.index) {
+        return Sk.misceval.callsim(seq.index, seq, ob);
+    }
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    if (seqtypename === "dict") {
+        throw new Sk.builtin.NotImplementedError("looking up dict key from value is not yet implemented (supported in Python 2.6)");
+    }
+    throw new Sk.builtin.TypeError("argument of type '" + seqtypename + "' is not iterable");
 };
 
-Sk.abstr.sequenceDelItem = function(seq, i)
-{
-    if (seq.sq$ass_item)
+Sk.abstr.sequenceGetCountOf = function(seq, ob) {
+    if (seq.count) {
+        return Sk.misceval.callsim(seq.count, seq, ob);
+    }
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    throw new Sk.builtin.TypeError("argument of type '" + seqtypename + "' is not iterable");
+};
+
+Sk.abstr.sequenceGetItem = function(seq, i) {
+    if (seq.mp$subscript) {
+        return seq.mp$subscript(i);
+    }
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    throw new Sk.builtin.TypeError("'" + seqtypename + "' object is unsubscriptable");
+};
+
+Sk.abstr.sequenceSetItem = function(seq, i, x) {
+    if (seq.mp$ass_subscript) {
+        return seq.mp$ass_subscript(i, x);
+    }
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    throw new Sk.builtin.TypeError("'" + seqtypename + "' object does not support item assignment");
+};
+
+Sk.abstr.sequenceDelItem = function(seq, i) {
+    if (seq.sq$del_item)
     {
         i = Sk.abstr.fixSeqIndex_(seq, i);
-        return seq.sq$ass_item(i, null);
+        seq.sq$del_item(i);
+        return;
     }
-    throw new TypeError("'" + seq.tp$name + "' object does not support item deletion");
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    throw new Sk.builtin.TypeError("'" + seqtypename + "' object does not support item deletion");
 };
 
 Sk.abstr.sequenceRepeat = function(f, seq, n)
 {
+    n = Sk.builtin.asnum$(n);
     var count = Sk.misceval.asIndex(n);
     if (count === undefined)
     {
-        throw new TypeError("can't multiply sequence by non-int of type '" + n.tp$name + "'");
+        var ntypename = Sk.abstr.typeName(n);
+        throw new Sk.builtin.TypeError("can't multiply sequence by non-int of type '" + ntypename + "'");
     }
     return f.call(seq, n);
 };
@@ -5616,18 +8966,23 @@ Sk.abstr.sequenceGetSlice = function(seq, i1, i2)
     {
         return seq.mp$subscript(new Sk.builtin.slice(i1, i2));
     }
-    throw new TypeError("'" + seq.tp$name + "' object is unsliceable");
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    throw new Sk.builtin.TypeError("'" + seqtypename + "' object is unsliceable");
 };
 
 Sk.abstr.sequenceDelSlice = function(seq, i1, i2)
 {
-    if (seq.sq$ass_slice)
+    if (seq.sq$del_slice)
     {
         i1 = Sk.abstr.fixSeqIndex_(seq, i1);
         i2 = Sk.abstr.fixSeqIndex_(seq, i2);
-        return seq.sq$ass_slice(i1, i2, null);
+        seq.sq$del_slice(i1, i2);
+        return;
     }
-    throw new TypeError("'" + seq.tp$name + "' doesn't support slice deletion");
+
+    var seqtypename = Sk.abstr.typeName(seq);
+    throw new Sk.builtin.TypeError("'" + seqtypename + "' doesn't support slice deletion");
 };
 
 Sk.abstr.sequenceSetSlice = function(seq, i1, i2, x)
@@ -5644,11 +8999,10 @@ Sk.abstr.sequenceSetSlice = function(seq, i1, i2, x)
     }
     else
     {
-        throw new TypeError("'" + seq.tp$name + "' object doesn't support slice assignment");
+        var seqtypename = Sk.abstr.typeName(seq);
+        throw new Sk.builtin.TypeError("'" + seqtypename + "' object doesn't support slice assignment");
     }
 };
-
-
 
 //
 //
@@ -5660,50 +9014,100 @@ Sk.abstr.sequenceSetSlice = function(seq, i1, i2, x)
 //
 //
 
-Sk.abstr.objectDelItem = function(o, key)
-{
-    if (o.mp$ass_subscript) {
-        var kf = Sk.builtin.hash;
-        var k = kf(key)
-        if (o[k] !== undefined) {
-            o.size -= 1;
-            delete o[k];
+Sk.abstr.objectAdd = function(a, b) {
+    if (a.nb$add) {
+        return a.nb$add(b);
+    }
+
+    var atypename = Sk.abstr.typeName(a);
+    var btypename = Sk.abstr.typeName(b);
+    throw new Sk.builtin.TypeError("unsupported operand type(s) for +: '" + atypename + "' and '" + btypename + "'");
+};
+
+// in Python 2.6, this behaviour seems to be defined for numbers and bools (converts bool to int)
+Sk.abstr.objectNegative = function(obj) {
+    var obj_asnum = Sk.builtin.asnum$(obj); // this will also convert bool type to int
+
+    if (typeof obj_asnum === 'number') {
+        return Sk.builtin.nmber.prototype['nb$negative'].call(obj);
+    }
+
+    var objtypename = Sk.abstr.typeName(obj);
+    throw new Sk.builtin.TypeError("bad operand type for unary -: '" + objtypename + "'");
+};
+
+// in Python 2.6, this behaviour seems to be defined for numbers and bools (converts bool to int)
+Sk.abstr.objectPositive = function(obj) {
+    var objtypename = Sk.abstr.typeName(obj);
+    var obj_asnum = Sk.builtin.asnum$(obj); // this will also convert bool type to int
+
+    if (objtypename === 'bool') {
+        return new Sk.builtin.nmber(obj_asnum, 'int');
+    }
+    if (typeof obj_asnum === 'number') {
+        return Sk.builtin.nmber.prototype['nb$positive'].call(obj);
+    }
+
+    throw new Sk.builtin.TypeError("bad operand type for unary +: '" + objtypename + "'");
+};
+
+Sk.abstr.objectDelItem = function(o, key) {
+    if (o !== null)
+    {
+        if (o.mp$del_subscript) {
+            o.mp$del_subscript(key);
             return;
         }
-        return o.mp$ass_subscript(key, null);
+        if (o.sq$ass_item)
+        {
+            var keyValue = Sk.misceval.asIndex(key);
+            if (keyValue === undefined) {
+                var keytypename = Sk.abstr.typeName(key);
+                throw new Sk.builtin.TypeError("sequence index must be integer, not '" + keytypename + "'");
+            }
+            Sk.abstr.sequenceDelItem(o, keyValue);
+            return;
+        }
+        // if o is a slice do something else...
     }
-    if (o.sq$ass_item)
-    {
-        var keyValue = Sk.misceval.asIndex(key);
-        if (keyValue === undefined)
-            throw new TypeError("sequence index must be integer, not '" + key.tp$name + "'");
-        return Sk.abstr.sequenceDelItem(o, keyValue);
-    }
-    // if o is a slice do something else...
-    throw new TypeError("'" + o.tp$name + "' object does not support item deletion");
+
+    var otypename = Sk.abstr.typeName(o);
+    throw new Sk.builtin.TypeError("'" + otypename + "' object does not support item deletion");
 };
 goog.exportSymbol("Sk.abstr.objectDelItem", Sk.abstr.objectDelItem);
 
 Sk.abstr.objectGetItem = function(o, key)
 {
-    if (o.mp$subscript)
-        return o.mp$subscript(key);
-    else if (Sk.misceval.isIndex(key) && o.sq$item)
-        return Sk.abstr.sequenceGetItem(o, Sk.misceval.asIndex(key));
-    else if (o.__getitem__ !== undefined) {
-        return Sk.misceval.callsim(o.__getitem__,o,key);
+    if (o !== null) 
+    {
+        if (o.mp$subscript)
+            return o.mp$subscript(key);
+        else if (Sk.misceval.isIndex(key) && o.sq$item)
+            return Sk.abstr.sequenceGetItem(o, Sk.misceval.asIndex(key));
+        else if (o.tp$getitem) {
+            return o.tp$getitem(key);
+        }
     }
-    throw new TypeError("'" + o.tp$name + "' does not support indexing");
+
+    var otypename = Sk.abstr.typeName(o);
+    throw new Sk.builtin.TypeError("'" + otypename + "' does not support indexing");
 };
 goog.exportSymbol("Sk.abstr.objectGetItem", Sk.abstr.objectGetItem);
 
 Sk.abstr.objectSetItem = function(o, key, v)
 {
-    if (o.mp$ass_subscript)
-        return o.mp$ass_subscript(key, v);
-    else if (Sk.misceval.isIndex(key) && o.sq$ass_item)
-        return Sk.abstr.sequenceSetItem(o, Sk.misceval.asIndex(key), v);
-    throw new TypeError("'" + o.tp$name + "' does not support item assignment");
+    if (o !== null) 
+    {
+        if (o.mp$ass_subscript)
+            return o.mp$ass_subscript(key, v);
+        else if (Sk.misceval.isIndex(key) && o.sq$ass_item)
+            return Sk.abstr.sequenceSetItem(o, Sk.misceval.asIndex(key), v);
+    else if (o.tp$setitem)
+        return o.tp$setitem(key, v);
+    }
+
+    var otypename = Sk.abstr.typeName(o);
+    throw new Sk.builtin.TypeError("'" + otypename + "' does not support item assignment");
 };
 goog.exportSymbol("Sk.abstr.objectSetItem", Sk.abstr.objectSetItem);
 
@@ -5711,33 +9115,52 @@ goog.exportSymbol("Sk.abstr.objectSetItem", Sk.abstr.objectSetItem);
 
 Sk.abstr.gattr = function(obj, nameJS)
 {
-    var ret;
-    if(obj['__getattr__']) {
-        ret = Sk.misceval.callsim(obj['__getattr__'],obj,nameJS)
-    } else {
+    var objname = Sk.abstr.typeName(obj);
+
+    if (obj === null) {
+        throw new Sk.builtin.AttributeError("'" + objname + "' object has no attribute '" + nameJS + "'");
+    }
+
+    var ret = undefined;
+
+    if (obj['__getattr__']) {
+        ret = Sk.misceval.callsim(obj['__getattr__'], obj, nameJS);
+    } else if (obj.tp$getattr !== undefined) {
         ret = obj.tp$getattr(nameJS);
     }
-    if (ret === undefined)
-        throw new Sk.builtin.AttributeError("'" + obj.tp$name + "' object has no attribute '" + nameJS + "'");
+
+    if (ret === undefined) {
+        throw new Sk.builtin.AttributeError("'" + objname + "' object has no attribute '" + nameJS + "'");       
+    }
+ 
     return ret;
-    
 };
 goog.exportSymbol("Sk.abstr.gattr", Sk.abstr.gattr);
 
 Sk.abstr.sattr = function(obj, nameJS, data)
 {
-    if(obj['__setattr__']) {
-            Sk.misceval.callsim(obj['__setattr__'],obj, nameJS, data)
-    } else {
+    var objname = Sk.abstr.typeName(obj);
+
+    if (obj === null) {
+        throw new Sk.builtin.AttributeError("'" + objname + "' object has no attribute '" + nameJS + "'");
+    } else if (obj['__setattr__']) {
+        Sk.misceval.callsim(obj['__setattr__'], obj, nameJS, data);
+    } else if (obj.tp$setattr !== undefined) {
         obj.tp$setattr(nameJS, data);
+    } else {
+        throw new Sk.builtin.AttributeError("'" + objname + "' object has no attribute '" + nameJS + "'");
     }
 };
-
 goog.exportSymbol("Sk.abstr.sattr", Sk.abstr.sattr);
 
 Sk.abstr.iter = function(obj)
 {
-    return obj.tp$iter();
+    if (obj.tp$iter) {
+        return obj.tp$iter();
+    }
+    else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(obj) + "' object is not iterable");
+    }
 };
 goog.exportSymbol("Sk.abstr.iter", Sk.abstr.iter);
 
@@ -5765,14 +9188,13 @@ Sk.mergeSort = function(arr, cmp, key, reverse)	//	Replaced by quicksort
 Sk.quickSort = function(arr, cmp, key, reverse)
 {
     goog.asserts.assert(!key, "todo;");
-    goog.asserts.assert(!reverse, "todo;");
 
     if (!cmp)
     {
         cmp = Sk.mergeSort.stdCmp;
     }
 
-    var partition = function(arr, begin, end, pivot)
+    var partition = function(arr, begin, end, pivot, reverse)
 	{
 		var tmp;
 		var piv=arr[pivot];
@@ -5785,7 +9207,12 @@ Sk.quickSort = function(arr, cmp, key, reverse)
 		var store=begin;
 		var ix;
 		for(ix=begin; ix<end-1; ++ix) {
-			if(Sk.misceval.callsim(cmp, arr[ix], piv) < 0) { // arr[ix]<=piv) {
+            if ( reverse ) {
+			  var cmpresult = Sk.misceval.callsim(cmp, piv, arr[ix]);
+            } else {
+			  var cmpresult = Sk.misceval.callsim(cmp, arr[ix], piv);
+            }
+            if( Sk.builtin.asnum$(cmpresult) < 0 ) {
 //				swap store, ix
 				tmp=arr[store];
 				arr[store]=arr[ix];
@@ -5802,19 +9229,19 @@ Sk.quickSort = function(arr, cmp, key, reverse)
 		return store;
 	}
 	
-	var qsort = function(arr, begin, end)
+	var qsort = function(arr, begin, end, reverse)
 	{
 		if(end-1>begin) {
 			var pivot=begin+Math.floor(Math.random()*(end-begin));
 	
-			pivot=partition(arr, begin, end, pivot);
+			pivot=partition(arr, begin, end, pivot, reverse);
 	
-			qsort(arr, begin, pivot);
-			qsort(arr, pivot+1, end);
+			qsort(arr, begin, pivot, reverse);
+			qsort(arr, pivot+1, end, reverse);
 		}
 	}
 
-    qsort(arr, 0, arr.length);
+    qsort(arr, 0, arr.length, reverse);
     return null;
 };
 
@@ -5905,7 +9332,7 @@ Sk.mergeSort.stdCmp = new Sk.builtin.func(function(k0, k1)
 //};
 /**
  * @constructor
- * @param {Array.<Object>} L
+ * @param {Array.<Object>=} L
  * @extends Sk.builtin.object
  */
 Sk.builtin.list = function(L)
@@ -5914,7 +9341,11 @@ Sk.builtin.list = function(L)
 
     var self = this;
 
-    if (Object.prototype.toString.apply(L) === '[object Array]')
+    if (L === undefined)
+    {
+            this.v = [];
+    }
+    else if (Object.prototype.toString.apply(L) === '[object Array]')
     {
         self.v = L;
     }
@@ -5939,8 +9370,10 @@ Sk.builtin.list = function(L)
             throw new Sk.builtin.ValueError("expecting Array or iterable");
     }
 
-    self["v"] = self.v;
-    return self;
+    this.__class__ = Sk.builtin.list;
+
+    this["v"] = this.v;
+    return this;
 };
 
 
@@ -5965,6 +9398,12 @@ Sk.builtin.list.prototype.list_iter_ = function()
 
 Sk.builtin.list.prototype.list_concat_ = function(other)
 {
+    // other not a list
+    if (!other.__class__ || other.__class__ != Sk.builtin.list)
+    {
+        throw new Sk.builtin.TypeError("can only concatenate list to list");
+    }
+
     var ret = this.v.slice();
     for (var i = 0; i < other.v.length; ++i)
     {
@@ -5973,19 +9412,66 @@ Sk.builtin.list.prototype.list_concat_ = function(other)
     return new Sk.builtin.list(ret);
 }
 
-Sk.builtin.list.prototype.list_ass_item_ = function(i, v)
+Sk.builtin.list.prototype.list_extend_ = function(other)
 {
+    if (!Sk.builtin.checkIterable(other)) 
+    {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(other) 
+                                        + "' object is not iterable");  
+    }
+
+    if (this == other) 
+    {
+        // Handle extending list with itself
+        var newb = [];
+        for (var it = other.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+            newb.push(i);
+
+        // Concatenate
+        this.v.push.apply(this.v, newb);
+    }
+    else
+    {
+        for (var it = other.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+            this.v.push(i);
+    }
+
+    return this;
+}
+
+Sk.builtin.list.prototype.list_del_item_ = function(i)
+{
+    i = Sk.builtin.asnum$(i);
     if (i < 0 || i >= this.v.length)
         throw new Sk.builtin.IndexError("list assignment index out of range");
-    if (v === null)
-        return Sk.builtin.list.prototype.list_ass_slice_.call(this, i, i+1, v);
+    this.list_del_slice_(i, i+1);    
+};
+
+Sk.builtin.list.prototype.list_del_slice_ = function(ilow, ihigh)
+{
+    ilow = Sk.builtin.asnum$(ilow);
+    ihigh = Sk.builtin.asnum$(ihigh);
+    var args = [];
+    args.unshift(ihigh - ilow);
+    args.unshift(ilow);
+    this.v.splice.apply(this.v, args);
+};
+
+Sk.builtin.list.prototype.list_ass_item_ = function(i, v)
+{
+	i = Sk.builtin.asnum$(i);
+    if (i < 0 || i >= this.v.length)
+        throw new Sk.builtin.IndexError("list assignment index out of range");
     this.v[i] = v;
 };
 
 Sk.builtin.list.prototype.list_ass_slice_ = function(ilow, ihigh, v)
 {
+	ilow = Sk.builtin.asnum$(ilow);
+	ihigh = Sk.builtin.asnum$(ihigh);
+
     // todo; item rather list/null
-    var args = v === null ? [] : v.v.slice(0);
+    var args = v.v.slice(0);
     args.unshift(ihigh - ilow);
     args.unshift(ilow);
     this.v.splice.apply(this.v, args);
@@ -6004,8 +9490,6 @@ Sk.builtin.list.prototype.tp$hash = Sk.builtin.object.prototype.HashNotImplement
 
 Sk.builtin.list.prototype.tp$richcompare = function(w, op)
 {
-    // todo; NotImplemented if either isn't a list
-
     // todo; can't figure out where cpy handles this silly case (test/run/t96.py)
     // perhaps by trapping a stack overflow? otherwise i'm not sure for more
     // complicated cases. bleh
@@ -6013,6 +9497,17 @@ Sk.builtin.list.prototype.tp$richcompare = function(w, op)
     // if the comparison allows for equality then short-circuit it here
     if (this === w && Sk.misceval.opAllowsEquality(op))
         return true;
+
+    // w not a list
+    if (!w.__class__ || w.__class__ != Sk.builtin.list)
+    {
+        // shortcuts for eq/not
+        if (op === 'Eq') return false;
+        if (op === 'NotEq') return true;
+
+        // todo; other types should have an arbitrary order
+        return false;
+    }
 
     var v = this.v;
     var w = w.v;
@@ -6054,20 +9549,31 @@ Sk.builtin.list.prototype.tp$richcompare = function(w, op)
 Sk.builtin.list.prototype.tp$iter = Sk.builtin.list.prototype.list_iter_;
 Sk.builtin.list.prototype.sq$length = function() { return this.v.length; };
 Sk.builtin.list.prototype.sq$concat = Sk.builtin.list.prototype.list_concat_;
+Sk.builtin.list.prototype.nb$add = Sk.builtin.list.prototype.list_concat_;
+Sk.builtin.list.prototype.nb$inplace_add = Sk.builtin.list.prototype.list_extend_;
 Sk.builtin.list.prototype.sq$repeat = function(n)
 {
+    if (!Sk.builtin.checkInt(n)) {
+        throw new Sk.builtin.TypeError("can't multiply sequence by non-int of type '" + Sk.abstr.typeName(n) +"'");
+    }
+
+    n = Sk.builtin.asnum$(n);
     var ret = [];
     for (var i = 0; i < n; ++i)
         for (var j = 0; j < this.v.length; ++j)
             ret.push(this.v[j]);
     return new Sk.builtin.list(ret);
 };
+Sk.builtin.list.prototype.nb$multiply = Sk.builtin.list.prototype.sq$repeat;
+Sk.builtin.list.prototype.nb$inplace_multiply = Sk.builtin.list.prototype.sq$repeat;
 /*
 Sk.builtin.list.prototype.sq$item = list_item;
 Sk.builtin.list.prototype.sq$slice = list_slice;
 */
 Sk.builtin.list.prototype.sq$ass_item = Sk.builtin.list.prototype.list_ass_item_;
+Sk.builtin.list.prototype.sq$del_item = Sk.builtin.list.prototype.list_del_item_;
 Sk.builtin.list.prototype.sq$ass_slice = Sk.builtin.list.prototype.list_ass_slice_;
+Sk.builtin.list.prototype.sq$del_slice = Sk.builtin.list.prototype.list_del_slice_;
 //Sk.builtin.list.prototype.sq$contains // iter version is fine
 /*
 Sk.builtin.list.prototype.sq$inplace_concat = list_inplace_concat;
@@ -6076,11 +9582,17 @@ Sk.builtin.list.prototype.sq$inplace_repeat = list_inplace_repeat;
 
 Sk.builtin.list.prototype.list_subscript_ = function(index)
 {
-    if (typeof index === "number")
+    if (Sk.misceval.isIndex(index))
     {
-        if (index < 0) index = this.v.length + index;
-        if (index < 0 || index >= this.v.length) throw new Sk.builtin.IndexError("list index out of range");
-        return this.v[index];
+        var i = Sk.misceval.asIndex(index);
+        if (i !== undefined) 
+        {
+            if (i < 0) i = this.v.length + i;
+            if (i < 0 || i >= this.v.length) {
+                throw new Sk.builtin.IndexError("list index out of range");
+            }
+            return this.v[i]
+        }
     }
     else if (index instanceof Sk.builtin.slice)
     {
@@ -6091,17 +9603,8 @@ Sk.builtin.list.prototype.list_subscript_ = function(index)
                 });
         return new Sk.builtin.list(ret);
     }
-    else
-        throw new TypeError("list indices must be integers, not " + typeof index);
-};
 
-Sk.builtin.list.prototype.list_ass_item_ = function(i, value)
-{
-    if (i < 0 || i >= this.v.length) throw new Sk.builtin.IndexError("list index out of range");
-    if (value === null)
-        this.list_ass_slice_(i, i+1, value);
-    else
-        this.v[i] = value;
+    throw new Sk.builtin.TypeError("list indices must be integers, not " + Sk.abstr.typeName(index));
 };
 
 Sk.builtin.list.prototype.list_ass_subscript_ = function(index, value)
@@ -6109,75 +9612,231 @@ Sk.builtin.list.prototype.list_ass_subscript_ = function(index, value)
     if (Sk.misceval.isIndex(index))
     {
         var i = Sk.misceval.asIndex(index);
-        if (i < 0) i = this.v.length + i;
-        this.list_ass_item_(i, value);
+        if (i !== undefined) 
+        {
+            if (i < 0) i = this.v.length + i;
+            this.list_ass_item_(i, value);
+            return;
+        }
     }
     else if (index instanceof Sk.builtin.slice)
     {
-        if (index.step === 1)
-            this.list_ass_slice_(index.start, index.stop, value);
+        var indices = index.indices(this.v.length);
+        if (indices[2] === 1) 
+        {
+            this.list_ass_slice_(indices[0], indices[1], value);
+        }
         else
         {
-            if (value === null)
+            var tosub = [];
+            index.sssiter$(this, function(i, wrt) { tosub.push(i); });
+            var j = 0;
+            if (tosub.length !== value.v.length) throw new Sk.builtin.ValueError("attempt to assign sequence of size " + value.v.length + " to extended slice of size " + tosub.length);
+            for (var i = 0; i < tosub.length; ++i)
             {
-                var self = this;
-                var dec = 0; // offset of removal for next index (because we'll have removed, but the iterator is giving orig indices)
-                var offdir = index.step > 0 ? 1 : 0;
-                index.sssiter$(this, function(i, wrt)
-                        {
-                            self.v.splice(i - dec, 1);
-                            dec += offdir;
-                        });
-            }
-            else
-            {
-                var tosub = [];
-                index.sssiter$(this, function(i, wrt) { tosub.push(i); });
-                var j = 0;
-                if (tosub.length !== value.v.length) throw new Sk.builtin.ValueError("attempt to assign sequence of size " + value.v.length + " to extended slice of size " + tosub.length);
-                for (var i = 0; i < tosub.length; ++i)
-                {
-                    this.v.splice(tosub[i], 1, value.v[j]);
-                    j += 1;
-                }
+                this.v.splice(tosub[i], 1, value.v[j]);
+                j += 1;
             }
         }
+        return;
     }
-    else
-        throw new TypeError("list indices must be integers, not " + typeof index);
+
+    throw new Sk.builtin.TypeError("list indices must be integers, not " + Sk.abstr.typeName(index));
+};
+
+Sk.builtin.list.prototype.list_del_subscript_ = function(index)
+{
+    if (Sk.misceval.isIndex(index))
+    {
+        var i = Sk.misceval.asIndex(index);
+        if (i !== undefined) 
+        {
+            if (i < 0) i = this.v.length + i;
+            this.list_del_item_(i);
+            return;
+        }
+    }
+    else if (index instanceof Sk.builtin.slice)
+    {
+        var indices = index.indices(this.v.length);
+        if (indices[2] === 1)
+        {
+            this.list_del_slice_(indices[0], indices[1]);
+        }
+        else
+        {
+            var self = this;
+            var dec = 0; // offset of removal for next index (because we'll have removed, but the iterator is giving orig indices)
+            var offdir = indices[2] > 0 ? 1 : 0;
+            index.sssiter$(this, function(i, wrt)
+                           {
+                               self.v.splice(i - dec, 1);
+                               dec += offdir;
+                           });
+        }
+        return;
+    }
+
+    throw new Sk.builtin.TypeError("list indices must be integers, not " + typeof index);
 };
 
 Sk.builtin.list.prototype.mp$subscript = Sk.builtin.list.prototype.list_subscript_;
 Sk.builtin.list.prototype.mp$ass_subscript = Sk.builtin.list.prototype.list_ass_subscript_;
+Sk.builtin.list.prototype.mp$del_subscript = Sk.builtin.list.prototype.list_del_subscript_;
 
 Sk.builtin.list.prototype.__getitem__ = new Sk.builtin.func(function(self, index)
-        {
-            return Sk.builtin.list.prototype.list_subscript_.call(self, index);
-        });
+{
+    return Sk.builtin.list.prototype.list_subscript_.call(self, index);
+});
+
+/**
+ * @param {?=} self
+ * @param {?=} cmp optional
+ * @param {?=} key optional
+ * @param {?=} reverse optional
+ */
+Sk.builtin.list.prototype.list_sort_ = function(self, cmp, key, reverse) {
+    var has_key = key !== undefined && key !== null;
+    var has_cmp = cmp !== undefined && cmp !== null;
+    if (reverse == undefined) { reverse = false; }
+
+    var timsort = new Sk.builtin.timSort(self);
+
+    self.v = [];
+    var zero = new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
+
+    if (has_key){
+        if (has_cmp) {
+            timsort.lt = function(a, b){
+                var res = Sk.misceval.callsim(cmp, a[0], b[0])
+                return Sk.misceval.richCompareBool(res, zero, "Lt");
+            };
+        }
+        else{
+            timsort.lt = function(a, b) {
+                return Sk.misceval.richCompareBool(a[0], b[0], "Lt");
+            }
+        }
+        for (var i =0; i < timsort.listlength; i++){
+            var item = timsort.list.v[i];
+            var keyvalue = Sk.misceval.callsim(key, item);
+            timsort.list.v[i] = [keyvalue, item];
+        }
+    } else if (has_cmp) {
+        timsort.lt = function(a, b){
+            var res = Sk.misceval.callsim(cmp, a, b);
+            return Sk.misceval.richCompareBool(res, zero, "Lt");
+        };
+    }
+
+    if (reverse){
+        timsort.list.list_reverse_(timsort.list);
+    }
+
+    timsort.sort();
+
+    if (reverse){
+        timsort.list.list_reverse_(timsort.list);
+    }
+
+    if (has_key){
+        for (var j = 0; j < timsort.listlength; j++){
+            item = timsort.list.v[j][1];
+            timsort.list.v[j] = item;
+        }
+    }
+
+    var mucked = self.sq$length() > 0;
+
+    self.v = timsort.list.v;
+
+    if (mucked) {
+        throw new Sk.builtin.OperationError("list modified during sort");
+    }
+
+    return Sk.builtin.none.none$;
+}
+
+/**
+ * @param {Sk.builtin.list=} self optional
+ **/
+Sk.builtin.list.prototype.list_reverse_ = function(self)
+{
+    Sk.builtin.pyCheckArgs("reverse", arguments, 1, 1);
+
+    var len = self.v.length;
+    var old = self.v;
+    var newarr = [];
+    for (var i = len -1; i > -1; --i)
+    {
+        newarr.push(old[i]);
+    }
+    self.v = newarr;
+    return Sk.builtin.none.none$;
+}
+
 //Sk.builtin.list.prototype.__reversed__ = todo;
+Sk.builtin.list.prototype['__iter__'] = new Sk.builtin.func(function(self)
+{
+    Sk.builtin.pyCheckArgs("__iter__", arguments, 1, 1);
+
+    return self.list_iter_();
+});
+
 Sk.builtin.list.prototype['append'] = new Sk.builtin.func(function(self, item)
 {
+    Sk.builtin.pyCheckArgs("append", arguments, 2, 2);
+
     self.v.push(item);
-    return null;
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.list.prototype['insert'] = new Sk.builtin.func(function(self, i, x)
 {
-    if (i < 0) i = 0;
-    else if (i > self.v.length) i = self.v.length - 1;
+    Sk.builtin.pyCheckArgs("insert", arguments, 3, 3);
+    if (!Sk.builtin.checkNumber(i)) {
+        throw new Sk.builtin.TypeError("an integer is required");
+    };
+
+    i = Sk.builtin.asnum$(i);
+    if (i < 0) {
+	i = i + self.v.length;
+    }
+    if (i < 0) {
+	i = 0;
+    }
+    else if (i > self.v.length) {
+	i = self.v.length;
+    }
     self.v.splice(i, 0, x);
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.list.prototype['extend'] = new Sk.builtin.func(function(self, b)
 {
-    for (var it = b.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
-        self.v.push(i);
-    return null;
+    Sk.builtin.pyCheckArgs("extend", arguments, 2, 2);
+    self.list_extend_(b);
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.list.prototype['pop'] = new Sk.builtin.func(function(self, i)
 {
-    if (i === undefined) i = self.v.length - 1;
+    Sk.builtin.pyCheckArgs("pop", arguments, 1, 2);
+    if (i === undefined) {
+        i = self.v.length - 1;
+    };
+    if (!Sk.builtin.checkNumber(i)) {
+        throw new Sk.builtin.TypeError("an integer is required");
+    };
+
+    i = Sk.builtin.asnum$(i);
+    if (i < 0) {
+	i = i + self.v.length;
+    }
+    if ((i < 0) || (i >= self.v.length)) {
+        throw new Sk.builtin.IndexError("pop index out of range");
+    };
+
     var ret = self.v[i];
     self.v.splice(i, 1);
     return ret;
@@ -6185,25 +9844,48 @@ Sk.builtin.list.prototype['pop'] = new Sk.builtin.func(function(self, i)
 
 Sk.builtin.list.prototype['remove'] = new Sk.builtin.func(function(self, item)
 {
+    Sk.builtin.pyCheckArgs("remove", arguments, 2, 2);
+
     var idx = Sk.builtin.list.prototype['index'].func_code(self, item);
-    self.v.splice(idx, 1);
-    return null;
+    self.v.splice(Sk.builtin.asnum$(idx), 1);
+    return Sk.builtin.none.none$;
 });
 
-Sk.builtin.list.prototype['index'] = new Sk.builtin.func(function(self, item)
+Sk.builtin.list.prototype['index'] = new Sk.builtin.func(function(self, item, start, stop)
 {
+    Sk.builtin.pyCheckArgs("index", arguments, 2, 4);
+    if (start !== undefined && !Sk.builtin.checkInt(start)) {
+        throw new Sk.builtin.TypeError("slice indices must be integers");
+    }
+    if (stop !== undefined && !Sk.builtin.checkInt(stop)) {
+        throw new Sk.builtin.TypeError("slice indices must be integers");
+    }
+
     var len = self.v.length;
     var obj = self.v;
-    for (var i = 0; i < len; ++i)
+
+    start = (start === undefined) ? 0 : start.v;
+    if (start < 0) {
+        start = ((start + len) >= 0) ? start + len : 0;
+    }
+
+    stop = (stop === undefined) ? len : stop.v;
+    if (stop < 0) {
+        stop = ((stop + len) >= 0) ? stop + len : 0;
+    }
+
+    for (var i = start; i < stop; ++i)
     {
         if (Sk.misceval.richCompareBool(obj[i], item, "Eq"))
-            return i;
+            return Sk.builtin.assk$(i, Sk.builtin.nmber.int$);
     }
     throw new Sk.builtin.ValueError("list.index(x): x not in list");
 });
 
 Sk.builtin.list.prototype['count'] = new Sk.builtin.func(function(self, item)
 {
+    Sk.builtin.pyCheckArgs("count", arguments, 2, 2);
+
     var len = self.v.length;
     var obj = self.v;
     var count = 0;
@@ -6214,31 +9896,25 @@ Sk.builtin.list.prototype['count'] = new Sk.builtin.func(function(self, item)
             count += 1;
         }
     }
-    return count;
+    return new Sk.builtin.nmber(count, Sk.builtin.nmber.int$);
 });
 
-Sk.builtin.list.prototype['reverse'] = new Sk.builtin.func(function(self)
-{
-    var len = self.v.length;
-    var old = self.v;
-    var newarr = [];
-    for (var i = len -1; i > -1; --i)
-    {
-        newarr.push(old[i]);
-    }
-    self.v = newarr;
-    return null;
-});
+Sk.builtin.list.prototype['reverse'] = new Sk.builtin.func(Sk.builtin.list.prototype.list_reverse_);
 
-Sk.builtin.list.prototype['sort'] = new Sk.builtin.func(function(self, cmp, key, reverse)
-{
-    goog.asserts.assert(!key, "todo;");
-    goog.asserts.assert(!reverse, "todo;");
-    Sk.mergeSort(self.v, cmp);
-    return null;
-});
+Sk.builtin.list.prototype['sort'] = new Sk.builtin.func(Sk.builtin.list.prototype.list_sort_);
 
-goog.exportSymbol("Sk.builtin.list", Sk.builtin.list);var interned = {};
+// Make sure that key/value variations of lst.sort() work
+// See issue 45 on github as to possible alternate approaches to this and
+// why this was chosen - csev
+Sk.builtin.list.prototype['sort'].func_code['co_varnames']=['__self__','cmp', 'key', 'reverse'];
+goog.exportSymbol("Sk.builtin.list", Sk.builtin.list);
+// This is to prevent type checking of this file
+// Without it, closure compiler has a problem with line 1056
+/**
+  * @fileoverview
+  * @suppress {checkTypes}
+  */
+var interned = {};
 
 /**
  * @constructor
@@ -6247,7 +9923,7 @@ goog.exportSymbol("Sk.builtin.list", Sk.builtin.list);var interned = {};
  */
 Sk.builtin.str = function(x)
 {
-    if (x === undefined) throw "error: trying to str() undefined (should be at least null)";
+    if (x === undefined) x = "";
     if (x instanceof Sk.builtin.str && x !== Sk.builtin.str.prototype.ob$type) return x;
     if (!(this instanceof Sk.builtin.str)) return new Sk.builtin.str(x);
 
@@ -6255,7 +9931,12 @@ Sk.builtin.str = function(x)
     var ret;
     if (x === true) ret = "True";
     else if (x === false) ret = "False";
-    else if (x === null) ret = "None";
+    else if ((x === null) || (x instanceof Sk.builtin.none)) ret = "None";
+    else if (x instanceof Sk.builtin.bool)
+    {
+	if (x.v) ret = "True";
+	else ret = "False";
+    }
     else if (typeof x === "number")
     {
         ret = x.toString();
@@ -6269,9 +9950,6 @@ Sk.builtin.str = function(x)
         ret = x.tp$str();
         if (!(ret instanceof Sk.builtin.str)) throw new Sk.builtin.ValueError("__str__ didn't return a str");
         return ret;
-    }
-    else if (x.__str__ !== undefined) {
-        return Sk.misceval.callsim(x.__str__,x);
     }
     else 
         return Sk.misceval.objectRepr(x);
@@ -6295,6 +9973,7 @@ Sk.builtin.str.$emptystr = new Sk.builtin.str('');
 
 Sk.builtin.str.prototype.mp$subscript = function(index)
 {
+	index = Sk.builtin.asnum$(index);
     if (typeof index === "number" && Math.floor(index) === index /* not a float*/ )
     {
         if (index < 0) index = this.v.length + index;
@@ -6311,37 +9990,57 @@ Sk.builtin.str.prototype.mp$subscript = function(index)
         return new Sk.builtin.str(ret);
     }
     else
-        throw new TypeError("string indices must be numbers, not " + typeof index);
+        throw new Sk.builtin.TypeError("string indices must be numbers, not " + typeof index);
 };
 
 Sk.builtin.str.prototype.sq$length = function()
 {
     return this.v.length;
 };
-Sk.builtin.str.prototype.sq$concat = function(other) { return new Sk.builtin.str(this.v + other.v); };
+Sk.builtin.str.prototype.sq$concat = function(other) 
+{ 
+    if (!other || !Sk.builtin.checkString(other))
+    {
+        var otypename = Sk.abstr.typeName(other);
+        throw new Sk.builtin.TypeError("cannot concatenate 'str' and '"
+                            + otypename + "' objects");
+    }
+    return new Sk.builtin.str(this.v + other.v); 
+};
+Sk.builtin.str.prototype.nb$add = Sk.builtin.str.prototype.sq$concat;
+Sk.builtin.str.prototype.nb$inplace_add = Sk.builtin.str.prototype.sq$concat;
 Sk.builtin.str.prototype.sq$repeat = function(n)
 {
+    if (!Sk.builtin.checkInt(n)) {
+        throw new Sk.builtin.TypeError("can't multiply sequence by non-int of type '" + Sk.abstr.typeName(n) +"'");
+    }
+
+    n = Sk.builtin.asnum$(n);
     var ret = "";
     for (var i = 0; i < n; ++i)
         ret += this.v;
     return new Sk.builtin.str(ret);
 };
+Sk.builtin.str.prototype.nb$multiply = Sk.builtin.str.prototype.sq$repeat;
+Sk.builtin.str.prototype.nb$inplace_multiply = Sk.builtin.str.prototype.sq$repeat;
 Sk.builtin.str.prototype.sq$item = function() { goog.asserts.fail(); };
 Sk.builtin.str.prototype.sq$slice = function(i1, i2)
 {
+	i1 = Sk.builtin.asnum$(i1);
+	i2 = Sk.builtin.asnum$(i2);
+    if (i1 < 0) i1 = 0;
     return new Sk.builtin.str(this.v.substr(i1, i2 - i1));
 };
 
 Sk.builtin.str.prototype.sq$contains = function(ob) {
     if ( ob.v === undefined || ob.v.constructor != String) {
-        throw new TypeError("TypeError: 'In <string> requires string as left operand");
+        throw new Sk.builtin.TypeError("TypeError: 'In <string> requires string as left operand");
     }
     if (this.v.indexOf(ob.v) != -1) {
         return true;
     } else {
         return false;
     }
-
 }
 
 Sk.builtin.str.prototype.tp$name = "str";
@@ -6367,49 +10066,14 @@ Sk.builtin.str.prototype.tp$richcompare = function(other, op)
 {
     if (!(other instanceof Sk.builtin.str)) return undefined;
 
-    if (this === other)
-    {
-        switch (op)
-        {
-            case 'Eq': case 'LtE': case 'GtE':
-                return true;
-            case 'NotEq': case 'Lt': case 'Gt':
-                return false;
-        }
-    }
-    var lenA = this.v.length;
-    var lenB = other.v.length;
-    var minLength = Math.min(lenA, lenB);
-    var c = 0;
-    if (minLength > 0)
-    {
-        for (var i = 0; i < minLength; ++i)
-        {
-            if (this.v[i] != other.v[i])
-            {
-                c = this.v[i].charCodeAt(0) - other.v[i].charCodeAt(0);
-                break;
-            }
-        }
-    }
-    else
-    {
-        c = 0;
-    }
-
-    if (c == 0)
-    {
-        c = (lenA < lenB) ? -1 : (lenA > lenB) ? 1 : 0;
-    }
-
     switch (op)
     {
-        case 'Lt': return c < 0;
-        case 'LtE': return c <= 0;
-        case 'Eq': return c == 0;
-        case 'NotEq': return c != 0;
-        case 'Gt': return c > 0;
-        case 'GtE': return c >= 0;
+        case 'Lt': return this.v < other.v;
+        case 'LtE': return this.v <= other.v;
+        case 'Eq': return this.v === other.v;
+        case 'NotEq': return this.v !== other.v;
+        case 'Gt': return this.v > other.v;
+        case 'GtE': return this.v >= other.v;
         default:
             goog.asserts.fail();
     }
@@ -6475,21 +10139,40 @@ Sk.builtin.str.re_escape_ = function(s)
 
 Sk.builtin.str.prototype['lower'] = new Sk.builtin.func(function(self)
 {
+    Sk.builtin.pyCheckArgs("lower", arguments, 1, 1);
     return new Sk.builtin.str(self.v.toLowerCase());
 });
 
 Sk.builtin.str.prototype['upper'] = new Sk.builtin.func(function(self)
 {
+    Sk.builtin.pyCheckArgs("upper", arguments, 1, 1);
     return new Sk.builtin.str(self.v.toUpperCase());
 });
 
 Sk.builtin.str.prototype['capitalize'] = new Sk.builtin.func(function(self)
 {
-    return new Sk.builtin.str(self.v.charAt(0).toUpperCase()+self.v.substring(1));
+    Sk.builtin.pyCheckArgs("capitalize", arguments, 1, 1);
+    var orig = self.v;
+    var cap;
+    var i;
+
+    if (orig.length === 0) {
+        return new Sk.builtin.str("");
+    };
+
+    cap = orig.charAt(0).toUpperCase();
+
+    for (i = 1; i < orig.length; i++) {
+        cap += orig.charAt(i).toLowerCase();
+    };
+        
+    return new Sk.builtin.str(cap);
 });
 
 Sk.builtin.str.prototype['join'] = new Sk.builtin.func(function(self, seq)
 {
+    Sk.builtin.pyCheckArgs("join", arguments, 2, 2);
+    Sk.builtin.pyCheckType("seq", "iterable", Sk.builtin.checkIterable(seq));
     var arrOfStrs = [];
     for (var it = seq.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
     {
@@ -6501,40 +10184,113 @@ Sk.builtin.str.prototype['join'] = new Sk.builtin.func(function(self, seq)
 
 Sk.builtin.str.prototype['split'] = new Sk.builtin.func(function(self, on, howmany)
 {
-    var res;
-    if (! on) {
-        res = self.v.trim().split(/[\s]+/, howmany);
+    Sk.builtin.pyCheckArgs("split", arguments, 1, 3);
+    if ((on === undefined) || (on instanceof Sk.builtin.none)) {
+        on = null;
+    }
+    if ((on !== null) && !Sk.builtin.checkString(on)) { 
+        throw new Sk.builtin.TypeError("expected a string");
+    }
+    if ((on !== null) && on.v === "") {
+        throw new Sk.builtin.ValueError("empty separator");
+    }
+    if ((howmany !== undefined) && !Sk.builtin.checkInt(howmany)) {
+        throw new Sk.builtin.TypeError("an integer is required");
+    }
+
+    howmany = Sk.builtin.asnum$(howmany);
+    var regex = /[\s]+/g;
+    var str = self.v;
+    if (on === null) {
+        str = str.trimLeft();
     } else {
-        res = self.v.split(new Sk.builtin.str(on).v, howmany);
+	// Escape special characters in "on" so we can use a regexp
+	var s = on.v.replace(/([.*+?=|\\\/()\[\]\{\}^$])/g, "\\$1");
+        regex = new RegExp(s, "g");
     }
-    var tmp = [];
-    for (var i = 0; i < res.length; ++i)
-    {
-        tmp.push(new Sk.builtin.str(res[i]));
+
+    // This is almost identical to re.split, 
+    // except how the regexp is constructed
+
+    var result = [];
+    var match;
+    var index = 0;
+    var splits = 0;
+    while ((match = regex.exec(str)) != null) {
+        if (match.index === regex.lastIndex) {
+            // empty match
+            break;
+        }
+        result.push(new Sk.builtin.str(str.substring(index, match.index)));
+        index = regex.lastIndex;
+        splits += 1;
+        if (howmany && (splits >= howmany)) {
+            break;
+        }
     }
-    return new Sk.builtin.list(tmp);
+    str = str.substring(index);
+    if (on !== null || (str.length > 0)) {
+        result.push(new Sk.builtin.str(str));
+    }
+
+    return new Sk.builtin.list(result);
 });
 
 Sk.builtin.str.prototype['strip'] = new Sk.builtin.func(function(self, chars)
 {
-    goog.asserts.assert(!chars, "todo;");
-    return new Sk.builtin.str(self.v.replace(/^\s+|\s+$/g, ''));
+    Sk.builtin.pyCheckArgs("strip", arguments, 1, 2);
+    if ((chars !== undefined) && !Sk.builtin.checkString(chars)) {
+	throw new Sk.builtin.TypeError("strip arg must be None or str");
+    }
+    var pattern;
+    if (chars === undefined) {
+	pattern =  /^\s+|\s+$/g;
+    }
+    else {
+	var regex = Sk.builtin.str.re_escape_(chars.v);
+	pattern = new RegExp("^["+regex+"]+|["+regex+"]+$","g");
+    }
+    return new Sk.builtin.str(self.v.replace(pattern, ''));
 });
 
 Sk.builtin.str.prototype['lstrip'] = new Sk.builtin.func(function(self, chars)
 {
-    goog.asserts.assert(!chars, "todo;");
-    return new Sk.builtin.str(self.v.replace(/^\s+/g, ''));
+    Sk.builtin.pyCheckArgs("lstrip", arguments, 1, 2);
+    if ((chars !== undefined) && !Sk.builtin.checkString(chars)) {
+	throw new Sk.builtin.TypeError("lstrip arg must be None or str");
+    }
+    var pattern;
+    if (chars === undefined) {
+	pattern =  /^\s+/g;
+    }
+    else {
+	var regex = Sk.builtin.str.re_escape_(chars.v);
+	pattern = new RegExp("^["+regex+"]+","g");
+    }
+    return new Sk.builtin.str(self.v.replace(pattern, ''));
 });
 
 Sk.builtin.str.prototype['rstrip'] = new Sk.builtin.func(function(self, chars)
 {
-    goog.asserts.assert(!chars, "todo;");
-    return new Sk.builtin.str(self.v.replace(/\s+$/g, ''));
+    Sk.builtin.pyCheckArgs("rstrip", arguments, 1, 2);
+    if ((chars !== undefined) && !Sk.builtin.checkString(chars)) {
+	throw new Sk.builtin.TypeError("rstrip arg must be None or str");
+    }
+    var pattern;
+    if (chars === undefined) {
+	pattern =  /\s+$/g;
+    }
+    else {
+	var regex = Sk.builtin.str.re_escape_(chars.v);
+	pattern = new RegExp("["+regex+"]+$","g");
+    }
+    return new Sk.builtin.str(self.v.replace(pattern, ''));
 });
 
 Sk.builtin.str.prototype['partition'] = new Sk.builtin.func(function(self, sep)
 {
+    Sk.builtin.pyCheckArgs("partition", arguments, 2, 2);
+    Sk.builtin.pyCheckType("sep", "string", Sk.builtin.checkString(sep));
     var sepStr = new Sk.builtin.str(sep);
     var pos = self.v.indexOf(sepStr.v);
     if (pos < 0)
@@ -6550,6 +10306,8 @@ Sk.builtin.str.prototype['partition'] = new Sk.builtin.func(function(self, sep)
 
 Sk.builtin.str.prototype['rpartition'] = new Sk.builtin.func(function(self, sep)
 {
+    Sk.builtin.pyCheckArgs("rpartition", arguments, 2, 2);
+    Sk.builtin.pyCheckType("sep", "string", Sk.builtin.checkString(sep));
     var sepStr = new Sk.builtin.str(sep);
     var pos = self.v.lastIndexOf(sepStr.v);
     if (pos < 0)
@@ -6563,73 +10321,258 @@ Sk.builtin.str.prototype['rpartition'] = new Sk.builtin.func(function(self, sep)
         new Sk.builtin.str(self.v.substring(pos + sepStr.v.length))]);
 });
 
-Sk.builtin.str.prototype['count'] = new Sk.builtin.func(function(self, pat) {
+Sk.builtin.str.prototype['count'] = new Sk.builtin.func(function(self, pat, start, end) {
+    Sk.builtin.pyCheckArgs("count", arguments, 2, 4);
+    if (!Sk.builtin.checkString(pat)) {
+	throw new Sk.builtin.TypeError("expected a character buffer object");
+    }
+    if ((start !== undefined) && !Sk.builtin.checkInt(start)) {
+	throw new Sk.builtin.TypeError("slice indices must be integers or None or have an __index__ method");
+    }
+    if ((end !== undefined) && !Sk.builtin.checkInt(end)) {
+	throw new Sk.builtin.TypeError("slice indices must be integers or None or have an __index__ method");
+    }
+
+    if (start === undefined)
+	start = 0;
+    else {
+	start = Sk.builtin.asnum$(start);
+	start = start >= 0 ? start : self.v.length + start;
+    }
+
+    if (end === undefined)
+	end = self.v.length;
+    else {
+	end = Sk.builtin.asnum$(end);
+	end = end >= 0 ? end : self.v.length + end;
+    }
+
     var m = new RegExp(pat.v,'g');
-    var ctl = self.v.match(m)
+    var slice = self.v.slice(start,end);
+    var ctl = slice.match(m)
     if (! ctl) {
-        return 0;
+        return  new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
     } else {
-        return ctl.length;
+        return new Sk.builtin.nmber(ctl.length, Sk.builtin.nmber.int$);
     }
     
 });
 
-Sk.builtin.str.prototype['ljust'] = new Sk.builtin.func(function(self, len) {
+Sk.builtin.str.prototype['ljust'] = new Sk.builtin.func(function(self, len, fillchar) {
+    Sk.builtin.pyCheckArgs("ljust", arguments, 2, 3);
+    if (!Sk.builtin.checkInt(len)) {
+	throw new Sk.builtin.TypeError("integer argument exepcted, got "
+				       + Sk.abstr.typeName(len));
+    }
+    if ((fillchar !== undefined) && (!Sk.builtin.checkString(fillchar)
+				     || fillchar.v.length !== 1)) {
+	throw new Sk.builtin.TypeError("must be char, not "
+				       + Sk.abstr.typeName(fillchar))
+    }
+    if (fillchar === undefined) {
+	fillchar = " ";
+    } else {
+	fillchar = fillchar.v;
+    }
+	len = Sk.builtin.asnum$(len);
     if (self.v.length >= len) {
         return self;
     } else {
-        var newstr = Array.prototype.join.call({length:Math.floor(len-self.v.length)+1}," ");
+        var newstr = Array.prototype.join.call({length:Math.floor(len-self.v.length)+1},fillchar);
         return new Sk.builtin.str(self.v+newstr);
     }
 });
 
-Sk.builtin.str.prototype['rjust'] = new Sk.builtin.func(function(self, len) {
+Sk.builtin.str.prototype['rjust'] = new Sk.builtin.func(function(self, len, fillchar) {
+    Sk.builtin.pyCheckArgs("rjust", arguments, 2, 3);
+    if (!Sk.builtin.checkInt(len)) {
+	throw new Sk.builtin.TypeError("integer argument exepcted, got "
+				       + Sk.abstr.typeName(len));
+    }
+    if ((fillchar !== undefined) && (!Sk.builtin.checkString(fillchar)
+				     || fillchar.v.length !== 1)) {
+	throw new Sk.builtin.TypeError("must be char, not "
+				       + Sk.abstr.typeName(fillchar))
+    }
+    if (fillchar === undefined) {
+	fillchar = " ";
+    } else {
+	fillchar = fillchar.v;
+    }
+	len = Sk.builtin.asnum$(len);
     if (self.v.length >= len) {
         return self;
     } else {
-        var newstr = Array.prototype.join.call({length:Math.floor(len-self.v.length)+1}," ");
+        var newstr = Array.prototype.join.call({length:Math.floor(len-self.v.length)+1},fillchar);
         return new Sk.builtin.str(newstr+self.v);
     }
 
 });
 
-Sk.builtin.str.prototype['center'] = new Sk.builtin.func(function(self, len) {
+Sk.builtin.str.prototype['center'] = new Sk.builtin.func(function(self, len, fillchar) {
+    Sk.builtin.pyCheckArgs("center", arguments, 2, 3);
+    if (!Sk.builtin.checkInt(len)) {
+	throw new Sk.builtin.TypeError("integer argument exepcted, got "
+				       + Sk.abstr.typeName(len));
+    }
+    if ((fillchar !== undefined) && (!Sk.builtin.checkString(fillchar)
+				     || fillchar.v.length !== 1)) {
+	throw new Sk.builtin.TypeError("must be char, not "
+				       + Sk.abstr.typeName(fillchar))
+    }
+    if (fillchar === undefined) {
+	fillchar = " ";
+    } else {
+	fillchar = fillchar.v;
+    }
+	len = Sk.builtin.asnum$(len);
     if (self.v.length >= len) {
         return self;
     } else {
-        var newstr1 = Array.prototype.join.call({length:Math.floor((len-self.v.length)/2)+1}," ");
+        var newstr1 = Array.prototype.join.call({length:Math.floor((len-self.v.length)/2)+1},fillchar);
         var newstr = newstr1+self.v+newstr1;
         if (newstr.length < len ) {
-            newstr = newstr + " "
+            newstr = newstr + fillchar
         }
         return new Sk.builtin.str(newstr);
     }
 
 });
 
-Sk.builtin.str.prototype['find'] = new Sk.builtin.func(function(self, tgt, start) {
-   return self.v.indexOf(tgt.v,start);
+Sk.builtin.str.prototype['find'] = new Sk.builtin.func(function(self, tgt, start, end) {
+    Sk.builtin.pyCheckArgs("find", arguments, 2, 4);
+    if (!Sk.builtin.checkString(tgt)) {
+	throw new Sk.builtin.TypeError("expected a character buffer object");
+    }
+    if ((start !== undefined) && !Sk.builtin.checkInt(start)) {
+	throw new Sk.builtin.TypeError("slice indices must be integers or None or have an __index__ method");
+    }
+    if ((end !== undefined) && !Sk.builtin.checkInt(end)) {
+	throw new Sk.builtin.TypeError("slice indices must be integers or None or have an __index__ method");
+    }
+
+    if (start === undefined)
+	start = 0;
+    else {
+	start = Sk.builtin.asnum$(start);
+	start = start >= 0 ? start : self.v.length + start;
+    }
+
+    if (end === undefined)
+	end = self.v.length;
+    else {
+	end = Sk.builtin.asnum$(end);
+	end = end >= 0 ? end : self.v.length + end;
+    }
+
+    var idx = self.v.indexOf(tgt.v, start);
+    idx = ((idx >= start) && (idx < end)) ? idx : -1;
+
+    return new Sk.builtin.nmber(idx, Sk.builtin.nmber.int$);
 });
 
-Sk.builtin.str.prototype['index'] = new Sk.builtin.func(function(self, tgt, start) {
-   return self.v.indexOf(tgt.v,start);
+Sk.builtin.str.prototype['index'] = new Sk.builtin.func(function(self, tgt, start, end) {
+    Sk.builtin.pyCheckArgs("index", arguments, 2, 4);
+    var idx = Sk.misceval.callsim(self['find'], self, tgt, start, end);
+    if (Sk.builtin.asnum$(idx) === -1) {
+        throw new Sk.builtin.ValueError("substring not found");
+    };
+    return idx;
 });
 
-Sk.builtin.str.prototype['rfind'] = new Sk.builtin.func(function(self, tgt, start) {
-   return self.v.lastIndexOf(tgt.v,start);
+Sk.builtin.str.prototype['rfind'] = new Sk.builtin.func(function(self, tgt, start, end) {
+    Sk.builtin.pyCheckArgs("rfind", arguments, 2, 4);
+    if (!Sk.builtin.checkString(tgt)) {
+	throw new Sk.builtin.TypeError("expected a character buffer object");
+    }
+    if ((start !== undefined) && !Sk.builtin.checkInt(start)) {
+	throw new Sk.builtin.TypeError("slice indices must be integers or None or have an __index__ method");
+    }
+    if ((end !== undefined) && !Sk.builtin.checkInt(end)) {
+	throw new Sk.builtin.TypeError("slice indices must be integers or None or have an __index__ method");
+    }
+
+    if (start === undefined)
+	start = 0;
+    else {
+	start = Sk.builtin.asnum$(start);
+	start = start >= 0 ? start : self.v.length + start;
+    }
+
+    if (end === undefined)
+	end = self.v.length;
+    else {
+	end = Sk.builtin.asnum$(end);
+	end = end >= 0 ? end : self.v.length + end;
+    }
+
+    var idx = self.v.lastIndexOf(tgt.v, end);
+    idx = (idx !== end) ? idx : self.v.lastIndexOf(tgt.v, end-1);
+    idx = ((idx >= start) && (idx < end)) ? idx : -1;
+
+    return new Sk.builtin.nmber(idx, Sk.builtin.nmber.int$);
 });
 
-Sk.builtin.str.prototype['rindex'] = new Sk.builtin.func(function(self, tgt, start) {
-   return self.v.lastIndexOf(tgt.v,start);
+Sk.builtin.str.prototype['rindex'] = new Sk.builtin.func(function(self, tgt, start, end) {
+    Sk.builtin.pyCheckArgs('rindex', arguments, 2, 4);
+    var idx = Sk.misceval.callsim(self['rfind'], self, tgt, start, end);
+    if (Sk.builtin.asnum$(idx) === -1) {
+        throw new Sk.builtin.ValueError("substring not found");
+    };
+    return idx;
+});
+
+Sk.builtin.str.prototype['startswith'] = new Sk.builtin.func(function(self, tgt) {
+    Sk.builtin.pyCheckArgs("startswith", arguments, 2, 2);
+    Sk.builtin.pyCheckType("tgt", "string", Sk.builtin.checkString(tgt));
+    return Sk.builtin.bool(0 == self.v.indexOf(tgt.v));
+});
+
+// http://stackoverflow.com/questions/280634/endswith-in-javascript
+Sk.builtin.str.prototype['endswith'] = new Sk.builtin.func(function(self, tgt) {
+    Sk.builtin.pyCheckArgs("endswith", arguments, 2, 2);
+    Sk.builtin.pyCheckType("tgt", "string", Sk.builtin.checkString(tgt));
+    return Sk.builtin.bool(self.v.indexOf(tgt.v, self.v.length - tgt.v.length) !== -1);
 });
 
 Sk.builtin.str.prototype['replace'] = new Sk.builtin.func(function(self, oldS, newS, count)
 {
-    if (oldS.constructor !== Sk.builtin.str || newS.constructor !== Sk.builtin.str)
-        throw new Sk.builtin.TypeError("expecting a string");
-    goog.asserts.assert(count === undefined, "todo; replace() with count not implemented");
+    Sk.builtin.pyCheckArgs("replace", arguments, 3, 4);
+    Sk.builtin.pyCheckType("oldS", "string", Sk.builtin.checkString(oldS));
+    Sk.builtin.pyCheckType("newS", "string", Sk.builtin.checkString(newS));
+    if ((count !== undefined) && !Sk.builtin.checkInt(count)) {
+	throw new Sk.builtin.TypeError("integer argument expected, got " +
+				       Sk.abstr.typeName(count));
+    }
+    count = Sk.builtin.asnum$(count);
     var patt = new RegExp(Sk.builtin.str.re_escape_(oldS.v), "g");
-    return new Sk.builtin.str(self.v.replace(patt, newS.v));
+
+    if ((count === undefined) || (count < 0)) {
+	return new Sk.builtin.str(self.v.replace(patt, newS.v));
+    }
+
+    var c = 0;
+    function replacer(match) {
+	c++;
+	if (c <= count) {
+	    return newS.v;
+	}
+	return match;
+    }
+    return new Sk.builtin.str(self.v.replace(patt, replacer));
+});
+
+Sk.builtin.str.prototype['isdigit'] = new Sk.builtin.func(function(self) {
+    Sk.builtin.pyCheckArgs("isdigit", arguments, 1, 1);
+    if (self.v.length === 0) { return Sk.builtin.bool(false); }
+    var i;
+    for (i=0; i<self.v.length; i++) {
+        var ch = self.v.charAt(i);
+        if (ch < '0' || ch > '9') {
+            return Sk.builtin.bool(false);
+        };
+    };
+    return Sk.builtin.bool(true);
 });
 
 Sk.builtin.str.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('str', Sk.builtin.str);
@@ -6651,7 +10594,7 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
     // length modifier is ignored
 
     if (rhs.constructor !== Sk.builtin.tuple && (rhs.mp$subscript === undefined || rhs.constructor === Sk.builtin.str)) rhs = new Sk.builtin.tuple([rhs]);
-    
+
     // general approach is to use a regex that matches the format above, and
     // do an re.sub with a function as replacement to make the subs.
 
@@ -6660,9 +10603,16 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
     var index = 0;
     var replFunc = function(substring, mappingKey, conversionFlags, fieldWidth, precision, precbody, conversionType)
     {
+		fieldWidth = Sk.builtin.asnum$(fieldWidth);
+		precision  = Sk.builtin.asnum$(precision);
+
         var i;
         if (mappingKey === undefined || mappingKey === "" ) i = index++; // ff passes '' not undef for some reason
-
+				
+				if (precision === "") { // ff passes '' here aswell causing problems with G,g, etc.
+					precision = undefined;
+				}
+				
         var zeroPad = false;
         var leftAdjust = false;
         var blankBeforePositive = false;
@@ -6686,6 +10636,7 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
 
         var formatNumber = function(n, base)
         {
+			base = Sk.builtin.asnum$(base);
             var j;
             var r;
             var neg = false;
@@ -6699,10 +10650,17 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
                 }
                 r = n.toString(base);
             }
+            else if (n instanceof Sk.builtin.nmber)
+            {
+                r = n.str$(base, false);
+				if (r.length > 2 && r.substr(-2) === ".0")
+					r = r.substr(0, r.length - 2);
+                neg = n.nb$isnegative();
+            }
             else if (n instanceof Sk.builtin.lng)
             {
                 r = n.str$(base, false);
-                neg = n.compare(0) < 0;
+                neg = n.nb$isnegative();	//	neg = n.size$ < 0;	RNL long.js change
             }
 
             goog.asserts.assert(r !== undefined, "unhandled number format");
@@ -6783,14 +10741,28 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
             case 'X':
                 return handleWidth(formatNumber(value, 16)).toUpperCase();
 
-            case 'e':
-            case 'E':
             case 'f':
             case 'F':
+            case 'e':
+            case 'E':
             case 'g':
             case 'G':
+				var convValue = Sk.builtin.asnum$(value);
+				if (typeof convValue === "string")
+					convValue = Number(convValue);
+				if (convValue === Infinity)
+					return "inf";
+				if (convValue === -Infinity)
+					return "-inf";
+				if (isNaN(convValue))
+					return "nan";
                 var convName = ['toExponential', 'toFixed', 'toPrecision']['efg'.indexOf(conversionType.toLowerCase())];
-                var result = (value)[convName](precision);
+				if (precision === undefined || precision === "")
+					if (conversionType === 'e' || conversionType === 'E')
+						precision = 6;
+					else if (conversionType === 'f' || conversionType === 'F')
+						precision = 7;
+					      var result = (convValue)[convName](precision);
                 if ('EFG'.indexOf(conversionType) !== -1) result = result.toUpperCase();
                 // todo; signs etc.
                 return handleWidth(['', result]);
@@ -6798,12 +10770,14 @@ Sk.builtin.str.prototype.nb$remainder = function(rhs)
             case 'c':
                 if (typeof value === "number")
                     return String.fromCharCode(value);
+                else if (value instanceof Sk.builtin.nmber)
+                    return String.fromCharCode(value.v);
                 else if (value instanceof Sk.builtin.lng)
                     return String.fromCharCode(value.str$(10,false)[0]);
                 else if (value.constructor === Sk.builtin.str)
                     return value.v.substr(0, 1);
                 else
-                    throw new TypeError("an integer is required");
+                    throw new Sk.builtin.TypeError("an integer is required");
                 break; // stupid lint
 
             case 'r':
@@ -7027,19 +11001,36 @@ function str_repeat(input, multiplier) {
  */
 Sk.builtin.tuple = function(L)
 {
-    if (arguments.length > 1) {
-	throw new TypeError("tuple must be created from a sequence");
-    }
-    if (L instanceof Sk.builtin.tuple) return;
     if (!(this instanceof Sk.builtin.tuple)) return new Sk.builtin.tuple(L);
+
+    if (L === undefined)
+    {
+        L = [];
+    }
+
     if (Object.prototype.toString.apply(L) === '[object Array]')
+    {
         this.v = L;
+    }
     else
-        this.v = L.v;
+    {
+        if (L.tp$iter)
+        {
+            this.v = [];
+            for (var it = L.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+                this.v.push(i);
+        }
+        else
+            throw new Sk.builtin.ValueError("expecting Array or iterable");        
+    }
+
     this.__class__ = Sk.builtin.tuple;
+
+    this["v"] = this.v;
     return this;
 };
 
+Sk.builtin.tuple.prototype.tp$name = "tuple";
 Sk.builtin.tuple.prototype['$r'] = function()
 {
     if (this.v.length === 0) return new Sk.builtin.str("()");
@@ -7055,11 +11046,17 @@ Sk.builtin.tuple.prototype['$r'] = function()
 
 Sk.builtin.tuple.prototype.mp$subscript = function(index)
 {
-    if (typeof index === "number")
+    if (Sk.misceval.isIndex(index))
     {
-        if (index < 0) index = this.v.length + index;
-        if (index < 0 || index >= this.v.length) throw new Sk.builtin.IndexError("tuple index out of range");
-        return this.v[index];
+	var i = Sk.misceval.asIndex(index);
+	if (i !== undefined)
+	{
+            if (i < 0) i = this.v.length + i;
+            if (i < 0 || i >= this.v.length) {
+		throw new Sk.builtin.IndexError("tuple index out of range");
+	    }
+            return this.v[i];
+	}
     }
     else if (index instanceof Sk.builtin.slice)
     {
@@ -7070,8 +11067,8 @@ Sk.builtin.tuple.prototype.mp$subscript = function(index)
                 });
         return new Sk.builtin.tuple(ret);
     }
-    else
-        throw new TypeError("tuple indices must be integers, not " + typeof index);
+
+    throw new Sk.builtin.TypeError("tuple indices must be integers, not " + Sk.abstr.typeName(index));
 };
 
 // todo; the numbers and order are taken from python, but the answer's
@@ -7085,24 +11082,27 @@ Sk.builtin.tuple.prototype.tp$hash = function()
     var len = this.v.length;
     for (var i = 0; i < len; ++i)
     {
-        var y = Sk.builtin.hash(this.v[i]);
-        if (y === -1) return -1;
+        var y = Sk.builtin.hash(this.v[i]).v;
+        if (y === -1) return new Sk.builtin.nmber(-1, Sk.builtin.nmber.int$);
         x = (x ^ y) * mult;
         mult += 82520 + len + len;
     }
     x += 97531;
     if (x === -1) x = -2;
-    return x;
+    return new Sk.builtin.nmber(x, Sk.builtin.nmber.int$);
 };
 
 Sk.builtin.tuple.prototype.sq$repeat = function(n)
 {
+    n = Sk.builtin.asnum$(n);
     var ret = [];
     for (var i = 0; i < n; ++i)
         for (var j = 0; j < this.v.length; ++ j)
             ret.push(this.v[j]);
     return new Sk.builtin.tuple(ret);
 };
+Sk.builtin.tuple.prototype.nb$multiply = Sk.builtin.tuple.prototype.sq$repeat;
+Sk.builtin.tuple.prototype.nb$inplace_multiply = Sk.builtin.tuple.prototype.sq$repeat;
 
 
 Sk.builtin.tuple.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('tuple', Sk.builtin.tuple);
@@ -7124,12 +11124,30 @@ Sk.builtin.tuple.prototype.tp$iter = function()
     return ret;
 };
 
+Sk.builtin.tuple.prototype['__iter__'] = new Sk.builtin.func(function(self)
+{
+    Sk.builtin.pyCheckArgs("__iter__", arguments, 1, 1);
+
+    return self.tp$iter();
+});
+
+Sk.builtin.tuple.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
+
 Sk.builtin.tuple.prototype.tp$richcompare = function(w, op)
 {
-    // todo; NotImplemented if either isn't a tuple
-
     //print("  tup rc", JSON.stringify(this.v), JSON.stringify(w), op);
         
+    // w not a tuple
+    if (!w.__class__ || w.__class__ != Sk.builtin.tuple)
+    {
+        // shortcuts for eq/not
+        if (op === 'Eq') return false;
+        if (op === 'NotEq') return true;
+
+        // todo; other types should have an arbitrary order
+        return false;
+    }
+
     var v = this.v;
     var w = w.v;
     var vl = v.length;
@@ -7170,12 +11188,51 @@ Sk.builtin.tuple.prototype.tp$richcompare = function(w, op)
 
 Sk.builtin.tuple.prototype.sq$concat = function(other)
 {
+    if (other.__class__ != Sk.builtin.tuple)
+    {
+        var msg = 'can only concatenate tuple (not "';
+        msg += Sk.abstr.typeName(other) + '") to tuple';
+        throw new Sk.builtin.TypeError(msg);
+    }
+
     return new Sk.builtin.tuple(this.v.concat(other.v));
 };
 
+Sk.builtin.tuple.prototype.nb$add = Sk.builtin.tuple.prototype.sq$concat;
+Sk.builtin.tuple.prototype.nb$inplace_add = Sk.builtin.tuple.prototype.sq$concat;
+
 Sk.builtin.tuple.prototype.sq$length = function() { return this.v.length; };
 
-goog.exportSymbol("Sk.builtin.tuple", Sk.builtin.tuple);/**
+
+Sk.builtin.tuple.prototype['index'] = new Sk.builtin.func(function(self, item)
+{
+    var len = self.v.length;
+    var obj = self.v;
+    for (var i = 0; i < len; ++i)
+    {
+        if (Sk.misceval.richCompareBool(obj[i], item, "Eq"))
+            return Sk.builtin.assk$(i, Sk.builtin.nmber.int$);
+    }
+    throw new Sk.builtin.ValueError("tuple.index(x): x not in tuple");
+});
+
+Sk.builtin.tuple.prototype['count'] = new Sk.builtin.func(function(self, item)
+{
+    var len = self.v.length;
+    var obj = self.v;
+    var count = 0;
+    for (var i = 0; i < len; ++i)
+    {
+        if (Sk.misceval.richCompareBool(obj[i], item, "Eq"))
+        {
+            count += 1;
+        }
+    }
+    return  new Sk.builtin.nmber(count, Sk.builtin.nmber.int$);
+});
+
+goog.exportSymbol("Sk.builtin.tuple", Sk.builtin.tuple);
+/**
  * @constructor
  * @param {Array.<Object>} L
  */
@@ -7183,11 +11240,54 @@ Sk.builtin.dict = function dict(L)
 {
     if (!(this instanceof Sk.builtin.dict)) return new Sk.builtin.dict(L);
 
+    if (L === undefined)
+    {
+        L = [];
+    }
+
     this.size = 0;
 
-    for (var i = 0; i < L.length; i += 2)
+    if (Object.prototype.toString.apply(L) === '[object Array]')
     {
-        this.mp$ass_subscript(L[i], L[i+1]);
+        // Handle dictionary literals
+        for (var i = 0; i < L.length; i += 2)
+        {
+            this.mp$ass_subscript(L[i], L[i+1]);
+        }
+    }
+    else if (L instanceof Sk.builtin.dict) {
+        // Handle calls of type "dict(mapping)" from Python code
+        for (var it = L.tp$iter(), k = it.tp$iternext();
+             k !== undefined;
+             k = it.tp$iternext())
+        {
+            var v = L.mp$subscript(k);
+            if (v === undefined)
+            {
+                //print(k, "had undefined v");
+                v = null;
+            }
+            this.mp$ass_subscript(k, v);
+        }
+    }
+    else if (L.tp$iter)
+    {
+        // Handle calls of type "dict(iterable)" from Python code
+        for (var it = L.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+        {
+            if (i.mp$subscript)
+            {
+                this.mp$ass_subscript(i.mp$subscript(0), i.mp$subscript(1));
+            }
+            else
+            {
+                throw new Sk.builtin.TypeError("element " + this.size + " is not a sequence");    
+            }
+        }
+    }
+    else
+    {
+        throw new Sk.builtin.TypeError("object is not iterable");
     }
 
     this.__class__ = Sk.builtin.dict;
@@ -7199,27 +11299,137 @@ Sk.builtin.dict.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('dict', Sk.b
 
 var kf = Sk.builtin.hash;
 
+Sk.builtin.dict.prototype.key$lookup = function(bucket, key)
+{
+    var item;
+    var eq;
+    var i;
+
+    for (i=0; i<bucket.items.length; i++)
+    {
+        item = bucket.items[i];
+        eq = Sk.misceval.richCompareBool(item.lhs, key, 'Eq');
+        if (eq)
+        {
+            return item;
+        }
+    }
+    
+    return null;
+}   
+
+Sk.builtin.dict.prototype.key$pop = function(bucket, key)
+{
+    var item;
+    var eq;
+    var i;
+
+    for (i=0; i<bucket.items.length; i++)
+    {
+        item = bucket.items[i];
+        eq = Sk.misceval.richCompareBool(item.lhs, key, 'Eq');
+        if (eq)
+        {
+            bucket.items.splice(i, 1);
+            this.size -= 1;
+            return item;
+        }
+    }
+    return undefined;    
+}
+
+// Perform dictionary lookup, either return value or undefined if key not in dictionary
+Sk.builtin.dict.prototype.mp$lookup = function(key)
+{
+    var k = kf(key);
+    var bucket = this[k.v];
+    var item;
+
+    // todo; does this need to go through mp$ma_lookup
+
+    if (bucket !== undefined)
+    {
+        item = this.key$lookup(bucket, key);
+        if (item) {
+            return item.rhs;
+        };
+    }
+
+    // Not found in dictionary     
+    return undefined;
+}
+
 Sk.builtin.dict.prototype.mp$subscript = function(key)
 {
-    var entry = this[kf(key)];
-    // todo; does this need to go through mp$ma_lookup
-    return entry === undefined ? undefined : entry.rhs;
+    var res = this.mp$lookup(key);
+
+    if (res !== undefined)
+    {
+        // Found in dictionary
+        return res;
+    }
+    else
+    {
+        // Not found in dictionary
+        var s = new Sk.builtin.str(key);
+        throw new Sk.builtin.KeyError(s.v);
+    }
 };
+
+Sk.builtin.dict.prototype.sq$contains = function(ob)
+{
+    var res = this.mp$lookup(ob);
+
+    return (res !== undefined);
+}
+
 Sk.builtin.dict.prototype.mp$ass_subscript = function(key, w)
 {
     var k = kf(key);
-    // if (this[k] !== undefined)
-    // {
-    //     this.size -=1;
-    //     delete this[k];
-    //     return;
-    // }
-    // only increment if it's not already used as a key
-    if ( !(k in this) ) {
+    var bucket = this[k.v];
+    var item;
+
+    if (bucket === undefined)
+    {
+        // New bucket
+        bucket = {$hash: k, items: [{lhs: key, rhs: w}]};
+        this[k.v] = bucket;
         this.size += 1;
+        return;
     }
-    this[k] = { lhs: key, rhs: w };
+
+    item = this.key$lookup(bucket, key);
+    if (item) {
+        item.rhs = w;
+        return;
+    }
+
+    // Not found in dictionary
+    bucket.items.push({lhs: key, rhs: w});
+    this.size += 1;
 };
+
+Sk.builtin.dict.prototype.mp$del_subscript = function(key)
+{
+    var k = kf(key);
+    var bucket = this[k.v];
+    var item;
+    var s;
+
+    // todo; does this need to go through mp$ma_lookup
+
+    if (bucket !== undefined)
+    {
+        item = this.key$pop(bucket, key);
+        if (item !== undefined) {
+            return;
+        };
+    }
+
+    // Not found in dictionary     
+    s = new Sk.builtin.str(key);
+    throw new Sk.builtin.KeyError(s.v);    
+}
 
 Sk.builtin.dict.prototype.tp$iter = function()
 {
@@ -7228,10 +11438,13 @@ Sk.builtin.dict.prototype.tp$iter = function()
     {
         if (this.hasOwnProperty(k))
         {
-            var i = this[k];
-            if (i && i.lhs !== undefined) // skip internal stuff. todo; merge pyobj and this
+            var bucket = this[k];
+            if (bucket && bucket.$hash !== undefined) // skip internal stuff. todo; merge pyobj and this
             {
-                allkeys.push(k);
+                for (var i=0; i<bucket.items.length; i++)
+                {
+                    allkeys.push(bucket.items[i].lhs);
+                }
             }
         }
     }
@@ -7247,11 +11460,19 @@ Sk.builtin.dict.prototype.tp$iter = function()
         {
             // todo; StopIteration
             if (ret.$index >= ret.$keys.length) return undefined;
-            return ret.$obj[ret.$keys[ret.$index++]].lhs;
+            return ret.$keys[ret.$index++];
+            // return ret.$obj[ret.$keys[ret.$index++]].lhs;
         }
     };
     return ret;
 };
+
+Sk.builtin.dict.prototype['__iter__'] = new Sk.builtin.func(function(self)
+{
+    Sk.builtin.pyCheckArgs("__iter__", arguments, 1, 1);
+
+    return self.tp$iter();
+});
 
 Sk.builtin.dict.prototype['$r'] = function()
 {
@@ -7274,16 +11495,115 @@ Sk.builtin.dict.prototype['$r'] = function()
 Sk.builtin.dict.prototype.mp$length = function() { return this.size; };
 
 Sk.builtin.dict.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
+Sk.builtin.dict.prototype.tp$hash = Sk.builtin.object.prototype.HashNotImplemented;
+
+Sk.builtin.dict.prototype.tp$richcompare = function(other, op)
+{
+    // if the comparison allows for equality then short-circuit it here
+    if (this === other && Sk.misceval.opAllowsEquality(op))
+        return true;
+
+    // Only support Eq and NotEq comparisons
+    switch (op)
+    {
+        case 'Lt': return undefined;
+        case 'LtE': return undefined;
+        case 'Eq': break;
+        case 'NotEq': break;
+        case 'Gt': return undefined;
+        case 'GtE': return undefined;
+        default:
+            goog.asserts.fail();
+    }
+
+    if (!(other instanceof Sk.builtin.dict)) {
+        if (op === 'Eq') {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    var thisl = this.size;
+    var otherl = other.size;
+
+    if (thisl !== otherl) {
+        if (op === 'Eq') {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    for (var iter = this.tp$iter(), k = iter.tp$iternext();
+            k !== undefined;
+            k = iter.tp$iternext())
+    {
+        var v = this.mp$subscript(k);
+        var otherv = other.mp$subscript(k);
+
+        if (!Sk.misceval.richCompareBool(v, otherv, 'Eq'))
+        {
+            if (op === 'Eq') {
+                return false;
+            } else {
+                return true;
+            }            
+        }
+    }
+
+    if (op === 'Eq') {
+        return true;
+    } else {
+        return false;
+    }                
+}
 
 Sk.builtin.dict.prototype['get'] = new Sk.builtin.func(function(self, k, d)
 {
+    var ret;
+
     if (d === undefined) {
-        //d = new Sk.builtin.NoneObj();
-        d = null;
+        d = Sk.builtin.none.none$;
     }
-    var ret = self.mp$subscript(k);
-    if (ret !== undefined) return ret;
-    return d;
+
+    ret = self.mp$lookup(k);
+    if (ret === undefined)
+    {
+        ret = d;
+    }
+
+    return ret;
+});
+
+Sk.builtin.dict.prototype['pop'] = new Sk.builtin.func(function(self, key, d)
+{
+    var k = kf(key);
+    var bucket = self[k.v];
+    var item;
+    var s;
+
+    // todo; does this need to go through mp$ma_lookup
+    if (bucket !== undefined)
+    {
+        item = self.key$pop(bucket, key);
+        if (item !== undefined) {
+            return item.rhs;
+        };
+    }
+
+    // Not found in dictionary     
+    if (d !== undefined) {
+	return d;
+    }
+
+    s = new Sk.builtin.str(key);
+    throw new Sk.builtin.KeyError(s.v);    
+});
+
+Sk.builtin.dict.prototype['has_key'] = new Sk.builtin.func(function(self, k)
+{
+    return Sk.builtin.bool(self.sq$contains(k));
 });
 
 Sk.builtin.dict.prototype['items'] = new Sk.builtin.func(function(self)
@@ -7336,6 +11656,7 @@ Sk.builtin.dict.prototype['values'] = new Sk.builtin.func(function(self)
     return new Sk.builtin.list(ret);
 });
 
+Sk.builtin.dict.prototype.tp$name = "dict";
 
 goog.exportSymbol("Sk.builtin.dict", Sk.builtin.dict);
 
@@ -7415,6 +11736,11 @@ $.prototype.__iter__ = function()
     return ret;
 };
 */
+/**
+ * @fileoverview
+ * @suppress {checkTypes}
+ */
+
 /*
  * Basic JavaScript BN library - subset useful for RSA encryption.
  * 
@@ -7450,6 +11776,12 @@ $.prototype.__iter__ = function()
 
 
 // (public) Constructor
+/**
+ * @constructor
+ * @param {number|string|null} a
+ * @param {number=} b
+ * @param {*=} c
+ */
 Sk.builtin.biginteger = function(a,b,c) {
   if(a != null)
     if("number" == typeof a) this.fromNumber(a,b,c);
@@ -7661,7 +11993,7 @@ Sk.builtin.biginteger.prototype.bnCompareTo = function(a) {
   if(r != 0) return r;
   var i = this.t;
   r = i-a.t;
-  if(r != 0) return r;
+  if(r != 0) return (this.s<0)?-r:r;
   while(--i >= 0) if((r=this[i]-a[i]) != 0) return r;
   return 0;
 }
@@ -7855,6 +12187,10 @@ Sk.builtin.biginteger.prototype.bnMod = function(a) {
 }
 
 // Modular reduction using "classic" algorithm
+/**
+ * @constructor
+ * @extends Sk.builtin.biginteger
+ */
 Sk.builtin.biginteger.Classic = function(m) { this.m = m; }
 Sk.builtin.biginteger.prototype.cConvert = function(x) {
   if(x.s < 0 || x.compareTo(this.m) >= 0) return x.mod(this.m);
@@ -7897,6 +12233,10 @@ Sk.builtin.biginteger.prototype.bnpInvDigit = function() {
 }
 
 // Sk.builtin.Montgomery reduction
+/**
+ * @constructor
+ * @extends Sk.builtin.biginteger
+ */
 Sk.builtin.biginteger.Montgomery = function(m) {
   this.m = m;
   this.mp = m.invDigit();
@@ -8071,6 +12411,7 @@ for(var i = 0; i < s.length; ++i) {
  var x = Sk.builtin.biginteger.intAt(s,i);
  if(x < 0) {
    if(s.charAt(i) == "-" && this.signum() == 0) mi = true;
+   if(s.charAt(i) == ".") break;
    continue;
  }
  w = b*w+x;
@@ -8334,6 +12675,10 @@ while(this[w] >= this.DV) {
 }
 
 //A "null" reducer
+/**
+ * @constructor
+ * @extends Sk.builtin.biginteger
+ */
 Sk.builtin.biginteger.NullExp = function() {}
 Sk.builtin.biginteger.prototype.nNop = function(x) { return x; }
 Sk.builtin.biginteger.prototype.nMulTo = function(x,y,r) { x.multiplyTo(y,r); }
@@ -8374,6 +12719,10 @@ r.drShiftTo(1,r);
 }
 
 //Barrett modular reduction
+/**
+ * @constructor
+ * @extends Sk.builtin.biginteger
+ */
 Sk.builtin.biginteger.Barrett = function(m) {
 // setup Barrett
 this.r2 = Sk.builtin.biginteger.nbi();
@@ -8599,6 +12948,14 @@ for(var i = 0; i < t; ++i) {
 return true;
 }
 
+Sk.builtin.biginteger.prototype.isnegative = function() { return this.s < 0; }
+Sk.builtin.biginteger.prototype.ispositive = function() { return this.s >= 0; }
+Sk.builtin.biginteger.prototype.trueCompare = function(a) {
+	if (this.s >= 0 && a.s < 0) return 1;
+	if (this.s < 0 && a.s >= 0) return -1;
+	return this.compare(a);
+}
+
 //protected
 Sk.builtin.biginteger.prototype.chunkSize = Sk.builtin.biginteger.prototype.bnpChunkSize;
 Sk.builtin.biginteger.prototype.toRadix = Sk.builtin.biginteger.prototype.bnpToRadix;
@@ -8660,432 +13017,1540 @@ Sk.builtin.biginteger.prototype.isProbablePrime = Sk.builtin.biginteger.prototyp
 //long longValue()
 //static Sk.builtin.biginteger valueOf(long val)
 
-//module.exports = Sk.builtin.biginteger;// long aka "bignumber" implementation
+//module.exports = Sk.builtin.biginteger;
+// long aka "bignumber" implementation
 //
 //  Using javascript BigInteger by Tom Wu
 /**
  * @constructor
  */
-Sk.builtin.lng = function(x)	/* long is a reserved word */
+Sk.builtin.nmber = function(x, skType)	/* number is a reserved word */
 {
-    if (!(this instanceof Sk.builtin.lng)) return new Sk.builtin.lng(x);
+    if (!(this instanceof Sk.builtin.nmber)) return new Sk.builtin.nmber(x, skType);
 
-	if (x instanceof Sk.builtin.lng)
-		this.biginteger = x.biginteger.clone();
-	else if (x instanceof Sk.builtin.biginteger)
-		this.biginteger = x;
-	else if (x instanceof String)
-		return Sk.longFromStr(x);
-	else
-		this.biginteger = new Sk.builtin.biginteger(x);
+	if (x instanceof Sk.builtin.str)
+		x = x.v;
+
+	if (x instanceof Sk.builtin.nmber) {
+		this.v = x.v;
+		this.skType = x.skType;
+	} else if (typeof x === "number") {
+		this.v = x;
+		if (skType === undefined) {
+			if (x > Sk.builtin.nmber.threshold$ || x < -Sk.builtin.nmber.threshold$ || x % 1 != 0)
+				this.skType = Sk.builtin.nmber.float$;
+			else
+				this.skType = Sk.builtin.nmber.int$;
+		} else {
+			this.skType = skType;
+			if (skType === Sk.builtin.nmber.int$)
+			if (x > Sk.builtin.nmber.threshold$ || x < -Sk.builtin.nmber.threshold$)
+				return new Sk.builtin.lng(x);
+		}
+	} else if (typeof x === "string") {
+		var result = Sk.numberFromStr(x);
+		if (skType !== undefined)
+			result.skType = skType;
+		if (skType === Sk.builtin.nmber.int$)
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$)
+				return new Sk.builtin.lng(x);
+		return result;
+	} else if (x instanceof Sk.builtin.lng) {
+		return Sk.numberFromStr(x.str$(10, true));
+	} else if (x instanceof Sk.builtin.biginteger) {
+		var result = Sk.numberFromStr(x.toString());
+		if (skType !== undefined)
+			result.skType = skType;
+		if (skType === Sk.builtin.nmber.int$)
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$)
+				return new Sk.builtin.lng(x);
+	} else {
+		this.v = 0;
+		if (skType === undefined)
+			this.skType = Sk.builtin.nmber.int$;
+		else
+			this.skType = skType;
+	}
 
     return this;
 };
 
-Sk.builtin.lng.tp$index = function()
+Sk.builtin.nmber.prototype.tp$index = function()
 {
-    goog.asserts.fail("todo;");
+    return this.v;
+};
+
+Sk.builtin.nmber.prototype.tp$hash = function()
+{
+    //the hash of all numbers should be an int and since javascript doesn't really 
+    //care every number can be an int.
+    return new Sk.builtin.nmber(this.v, Sk.builtin.nmber.int$);
+};
+
+Sk.builtin.nmber.prototype.tp$name = "number";
+Sk.builtin.nmber.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('number', Sk.builtin.nmber);
+
+//	Threshold to determine when types should be converted to long
+Sk.builtin.nmber.threshold$ = Math.pow(2, 53);
+Sk.builtin.nmber.float$ = "float";
+Sk.builtin.nmber.int$ = "int";
+
+Sk.builtin.nmber.fromInt$ = function(ival)
+{
+	return new Sk.builtin.nmber(ival, undefined);
+};
+
+// js string (not Sk.builtin.str) -> long. used to create longs in transformer, respects
+// 0x, 0o, 0b, etc.
+Sk.numberFromStr = function(s)
+{
+	if (s == 'inf')
+		return new Sk.builtin.nmber(Infinity, undefined);
+	if (s == '-inf')
+		return new Sk.builtin.nmber(-Infinity, undefined);
+
+	var res = new Sk.builtin.nmber(0, undefined);
+
+	 if (s.indexOf('.') !== -1
+            || s.indexOf('e') !== -1
+            || s.indexOf('E') !== -1)
+    {
+        res.v = parseFloat(s);
+		res.skType = Sk.builtin.nmber.float$;
+		return res;
+    }
+
+    // ugly gunk to placate an overly-nanny closure-compiler:
+    // http://code.google.com/p/closure-compiler/issues/detail?id=111
+    // this is all just to emulate "parseInt(s)" with no radix.
+    var tmp = s;
+	var s1;
+    if (s.charAt(0) === '-') tmp = s.substr(1);
+    if (tmp.charAt(0) === '0' && (tmp.charAt(1) === 'x' || tmp.charAt(1) === 'X'))
+        s1 = parseInt(s, 16);
+    else if (tmp.charAt(0) === '0' && (tmp.charAt(1) === 'b' || tmp.charAt(1) === 'B'))
+        s1 = parseInt(s, 2);
+    else if (tmp.charAt(0) === '0')
+        s1 = parseInt(s, 8);
+    else
+        s1 = parseInt(s, 10);
+
+	res.v = s1;
+	res.skType = Sk.builtin.nmber.int$;
+	return res;
+};
+goog.exportSymbol("Sk.numberFromStr", Sk.numberFromStr);
+
+Sk.builtin.nmber.prototype.clone = function()
+{
+	return new Sk.builtin.nmber(this, undefined);
+};
+
+Sk.builtin.nmber.prototype.toFixed = function(x) {
+	x = Sk.builtin.asnum$(x);
+	return this.v.toFixed(x)
+}
+
+Sk.builtin.nmber.prototype.nb$add = function(other)
+{
+	var result;
+
+	if (typeof other === "number")
+		other = new Sk.builtin.nmber(other, undefined);
+	else if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.nmber) {
+		result = new Sk.builtin.nmber(this.v + other.v, undefined);
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$)
+			result.skType = Sk.builtin.nmber.float$;
+		else {
+			result.skType = Sk.builtin.nmber.int$;
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$add(other.v);
+			}
+		}
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (this.skType === Sk.builtin.nmber.float$) {  // float + long --> float
+			result = new Sk.builtin.nmber(this.v + parseFloat(other.str$(10, true)), Sk.builtin.nmber.float$);
+		} else {	//	int + long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$add(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+
+Sk.builtin.nmber.prototype.nb$subtract = function(other)
+{
+	var result;
+
+	if (typeof other === "number") {
+		other = new Sk.builtin.nmber(other, undefined);
+	}
+	else if (other instanceof Sk.builtin.bool) {
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+	}
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.nmber) {
+		result = new Sk.builtin.nmber(this.v - other.v, undefined);
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$)
+			result.skType = Sk.builtin.nmber.float$;
+		else {
+			result.skType = Sk.builtin.nmber.int$;
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$subtract(other.v);
+			}
+		}
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (this.skType === Sk.builtin.nmber.float$) {  // float + long --> float
+			result = new Sk.builtin.nmber(this.v - parseFloat(other.str$(10, true)), Sk.builtin.nmber.float$);
+		} else {	//	int - long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$subtract(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+Sk.builtin.nmber.prototype.nb$multiply = function(other)
+{
+	var result;
+
+	if (typeof other === "number")
+		other = new Sk.builtin.nmber(other, undefined);
+	else if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.nmber) {
+		result = new Sk.builtin.nmber(this.v * other.v, undefined);
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$)
+			result.skType = Sk.builtin.nmber.float$;
+		else {
+			result.skType = Sk.builtin.nmber.int$;
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$multiply(other.v);
+			}
+		}
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (this.skType === Sk.builtin.nmber.float$) {  // float + long --> float
+			result = new Sk.builtin.nmber(this.v * parseFloat(other.str$(10, true)), Sk.builtin.nmber.float$);
+		} else {	//	int - long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$multiply(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+Sk.builtin.nmber.prototype.nb$divide = function(other)
+{
+	var result;
+
+	if (typeof other === "number")
+		other = new Sk.builtin.nmber(other, undefined);
+	else if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.nmber) {
+		if (other.v == 0)
+			throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+
+		if (this.v === Infinity)
+			if (other.v === Infinity || other.v === -Infinity)
+				return new Sk.builtin.nmber(NaN, Sk.builtin.nmber.float$);
+			else if (other.nb$isnegative())
+				return new Sk.builtin.nmber(-Infinity, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(Infinity, Sk.builtin.nmber.float$);
+		if (this.v === -Infinity)
+			if (other.v === Infinity || other.v === -Infinity)
+				return new Sk.builtin.nmber(NaN, Sk.builtin.nmber.float$);
+			else if (other.nb$isnegative())
+				return new Sk.builtin.nmber(Infinity, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(-Infinity, Sk.builtin.nmber.float$);
+
+		result = new Sk.builtin.nmber(this.v / other.v, undefined);
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$ || Sk.python3)
+			result.skType = Sk.builtin.nmber.float$;
+		else {
+			result.v = Math.floor(result.v);
+			result.skType = Sk.builtin.nmber.int$;
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$divide(other.v);
+			}
+		}
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (other.longCompare(Sk.builtin.biginteger.ZERO) == 0)
+			throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+
+		if (this.v === Infinity)
+			if (other.nb$isnegative())
+				return new Sk.builtin.nmber(-Infinity, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(Infinity, Sk.builtin.nmber.float$);
+		if (this.v === -Infinity)
+			if (other.nb$isnegative())
+				return new Sk.builtin.nmber(Infinity, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(-Infinity, Sk.builtin.nmber.float$);
+
+		if (this.skType === Sk.builtin.nmber.float$ || Sk.python3) {  // float / long --> float
+			result = new Sk.builtin.nmber(this.v / parseFloat(other.str$(10, true)), Sk.builtin.nmber.float$);
+		} else {	//	int - long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$divide(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+Sk.builtin.nmber.prototype.nb$floor_divide = function(other)
+{
+	var result;
+
+	if (typeof other === "number")
+		other = new Sk.builtin.nmber(other, undefined);
+	else if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (this.v === Infinity || this.v === -Infinity)
+		return new Sk.builtin.nmber(NaN, Sk.builtin.nmber.float$);
+
+	if (other instanceof Sk.builtin.nmber) {
+		if (other.v == 0)
+			throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+
+		if (other.v === Infinity)
+			if (this.nb$isnegative())
+				return new Sk.builtin.nmber(-1, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(0, Sk.builtin.nmber.float$);
+		if (other.v === -Infinity)
+			if (this.nb$isnegative() || !this.nb$nonzero())
+				return new Sk.builtin.nmber(0, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(-1, Sk.builtin.nmber.float$);
+
+		result = new Sk.builtin.nmber(Math.floor(this.v / other.v), undefined);
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$)
+			result.skType = Sk.builtin.nmber.float$;
+		else {
+			result.v = Math.floor(result.v);
+			result.skType = Sk.builtin.nmber.int$;
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$floor_divide(other.v);
+			}
+		}
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (other.longCompare(Sk.builtin.biginteger.ZERO) == 0)
+			throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+		if (this.skType === Sk.builtin.nmber.float$) {  // float / long --> float
+			result = Math.floor(this.v / parseFloat(other.str$(10, true)));
+			result = new Sk.builtin.nmber(result, Sk.builtin.nmber.float$);
+		} else {	//	int - long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$floor_divide(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+Sk.builtin.nmber.prototype.nb$remainder = function(other)
+{
+	var result;
+
+	if (typeof other === "number")
+		other = new Sk.builtin.nmber(other, undefined);
+	else if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.nmber) {
+		if (other.v == 0)
+			throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+
+		if (this.v == 0)
+			if (this.skType == Sk.builtin.nmber.float$ || other.skType == Sk.builtin.nmber.float$)
+				return new Sk.builtin.nmber(0, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(0, Sk.builtin.nmber.int$);
+
+		if (other.v === Infinity)
+			if (this.v === Infinity || this.v === -Infinity)
+				return new Sk.builtin.nmber(NaN, Sk.builtin.nmber.float$);
+			else if (this.nb$ispositive())
+				return new Sk.builtin.nmber(this.v, Sk.builtin.nmber.float$);
+			else
+				return new Sk.builtin.nmber(Infinity, Sk.builtin.nmber.float$);
+
+		//	Javacript logic on negatives doesn't work for Python... do this instead
+		var tmp = this.v % other.v;
+		if (this.v < 0) {
+			if (other.v > 0 && tmp < 0)
+				tmp = tmp + other.v;
+		} else {
+			if (other.v < 0 && tmp != 0)
+				tmp = tmp + other.v;
+		}
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$)
+			result = new Sk.builtin.nmber(tmp, Sk.builtin.nmber.float$);
+		else {
+		//	tmp = Math.floor(tmp);
+			result = new Sk.builtin.nmber(tmp, Sk.builtin.nmber.int$);
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$remainder(other.v);
+			}
+		}
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (other.longCompare(Sk.builtin.biginteger.ZERO) == 0)
+			throw new Sk.builtin.ZeroDivisionError("integer division or modulo by zero");
+
+		if (this.v == 0)
+			if (this.skType === Sk.builtin.nmber.int$)
+				return new Sk.builtin.lng(0);
+			else
+				return new Sk.builtin.nmber(0, this.skType);
+
+		if (this.skType === Sk.builtin.nmber.float$) {  // float / long --> float
+			var op2 = parseFloat(other.str$(10, true))
+			var tmp = this.v % op2;
+			if (tmp < 0) {
+				if (op2 > 0 && tmp != 0)
+					tmp = tmp + op2;
+			} else {
+				if (op2 < 0 && tmp != 0)
+					tmp = tmp + op2;
+			}
+			result = new Sk.builtin.nmber(tmp, Sk.builtin.nmber.float$);
+		} else {	//	int - long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$remainder(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+Sk.builtin.nmber.prototype.nb$power = function(other)
+{
+	var result;
+
+	if (typeof other === "number")
+		other = new Sk.builtin.nmber(other, undefined);
+	else if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.bool)
+		other = new Sk.builtin.nmber(Sk.builtin.asnum$(other), undefined);
+
+	if (other instanceof Sk.builtin.nmber) {
+		if (this.v < 0 && other.v % 1 != 0)
+			throw new Sk.builtin.NegativePowerError("cannot raise a negative number to a fractional power");
+		if (this.v == 0 && other.v < 0) {
+			throw new Sk.builtin.NegativePowerError("cannot raise zero to a negative power");
+		}
+
+		result = new Sk.builtin.nmber(Math.pow(this.v, other.v), undefined);
+		if (this.skType === Sk.builtin.nmber.float$ || other.skType === Sk.builtin.nmber.float$ || other.v < 0)
+			result.skType = Sk.builtin.nmber.float$;
+		else {
+			result.v = Math.floor(result.v);
+			result.skType = Sk.builtin.nmber.int$;
+			if (result.v > Sk.builtin.nmber.threshold$ || result.v < -Sk.builtin.nmber.threshold$) {
+				//	Promote to long
+				result = new Sk.builtin.lng(this.v).nb$power(other.v);
+			}
+		}
+	    if ((Math.abs(result.v) === Infinity)
+		&& (Math.abs(this.v) !== Infinity)
+		&& (Math.abs(other.v) !== Infinity)) {
+		throw new Sk.builtin.OverflowError("Numerical result out of range");
+	    }
+		return result;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (this.v == 0 && other.longCompare(Sk.builtin.biginteger.ZERO) < 0)
+			throw new Sk.builtin.NegativePowerError("cannot raise zero to a negative power");
+		if (this.skType === Sk.builtin.nmber.float$ || other.nb$isnegative()) {  // float / long --> float
+			result = new Sk.builtin.nmber(Math.pow(this.v, parseFloat(other.str$(10, true))), Sk.builtin.nmber.float$);
+		} else {	//	int - long --> long
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			result = thisAsLong.nb$power(other);
+		}
+		return result;
+	}
+
+	return undefined;
+};
+
+Sk.builtin.nmber.prototype.nb$and = function(other)
+{
+	var tmp;
+        other = Sk.builtin.asnum$(other);
+        tmp = this.v & other;
+        if ((tmp !== undefined) && (tmp < 0)) {
+            tmp = tmp + 4294967296; // convert back to unsigned
+        }
+
+	if (tmp !== undefined)
+		return new Sk.builtin.nmber(tmp, undefined);
+
+	return undefined;
+}
+
+Sk.builtin.nmber.prototype.nb$or = function(other)
+{
+	var tmp;
+        other = Sk.builtin.asnum$(other);
+        tmp = this.v | other;
+        if ((tmp !== undefined) && (tmp < 0)) {
+            tmp = tmp + 4294967296; // convert back to unsigned
+        }
+
+	if (tmp !== undefined)
+		return new Sk.builtin.nmber(tmp, undefined);
+
+	return undefined;
+}
+
+Sk.builtin.nmber.prototype.nb$xor = function(other)
+{
+	var tmp;
+        other = Sk.builtin.asnum$(other);
+        tmp = this.v ^ other;
+        if ((tmp !== undefined) && (tmp < 0)) {
+            tmp = tmp + 4294967296; // convert back to unsigned
+        }
+
+	if (tmp !== undefined)
+		return new Sk.builtin.nmber(tmp, undefined);
+
+	return undefined;
+}
+
+Sk.builtin.nmber.prototype.nb$lshift = function(other)
+{
+    var tmp;
+    var shift = Sk.builtin.asnum$(other);
+
+    if (shift !== undefined) {
+        if (shift < 0)
+	    throw new Sk.builtin.ValueError("negative shift count");
+	tmp = this.v << shift;
+	if (tmp <= this.v) {
+	    // Fail, recompute with longs
+	    return Sk.builtin.lng.fromInt$(this.v).nb$lshift(shift);
+	}
+    }
+
+	if (tmp !== undefined)
+		return new Sk.builtin.nmber(tmp, this.skType);
+
+	return undefined;
+}
+
+Sk.builtin.nmber.prototype.nb$rshift = function(other)
+{
+    var tmp;
+    var shift = Sk.builtin.asnum$(other);
+
+    if (shift !== undefined) {
+        if (shift < 0)
+	    throw new Sk.builtin.ValueError("negative shift count");
+	tmp = this.v >> shift;
+	if ((this.v > 0) && (tmp < 0)) {
+	    // Fix incorrect sign extension
+	    tmp = tmp & (Math.pow(2, 32-shift) - 1);
+	}
+    }
+
+	if (tmp !== undefined)
+		return new Sk.builtin.nmber(tmp, this.skType);
+
+	return undefined;
+}
+
+Sk.builtin.nmber.prototype.nb$inplace_add = Sk.builtin.nmber.prototype.nb$add;
+
+Sk.builtin.nmber.prototype.nb$inplace_subtract = Sk.builtin.nmber.prototype.nb$subtract;
+
+Sk.builtin.nmber.prototype.nb$inplace_multiply = Sk.builtin.nmber.prototype.nb$multiply;
+
+Sk.builtin.nmber.prototype.nb$inplace_divide = Sk.builtin.nmber.prototype.nb$divide;
+
+Sk.builtin.nmber.prototype.nb$inplace_remainder = Sk.builtin.nmber.prototype.nb$remainder;
+
+Sk.builtin.nmber.prototype.nb$inplace_floor_divide = Sk.builtin.nmber.prototype.nb$floor_divide;
+
+Sk.builtin.nmber.prototype.nb$inplace_power = Sk.builtin.nmber.prototype.nb$power;
+
+Sk.builtin.nmber.prototype.nb$inplace_and = Sk.builtin.nmber.prototype.nb$and;
+
+Sk.builtin.nmber.prototype.nb$inplace_or = Sk.builtin.nmber.prototype.nb$or;
+
+Sk.builtin.nmber.prototype.nb$inplace_xor = Sk.builtin.nmber.prototype.nb$xor;
+
+Sk.builtin.nmber.prototype.nb$inplace_lshift = Sk.builtin.nmber.prototype.nb$lshift;
+
+Sk.builtin.nmber.prototype.nb$inplace_rshift = Sk.builtin.nmber.prototype.nb$rshift;
+
+Sk.builtin.nmber.prototype.nb$negative = function()
+{
+	return new Sk.builtin.nmber(-this.v, undefined);
+};
+
+Sk.builtin.nmber.prototype.nb$positive = function() { return this.clone(); };
+
+Sk.builtin.nmber.prototype.nb$nonzero = function()
+{
+	return this.v !== 0;
+};
+
+Sk.builtin.nmber.prototype.nb$isnegative = function() { return this.v < 0 };
+
+Sk.builtin.nmber.prototype.nb$ispositive = function() { return this.v >= 0 };
+
+Sk.builtin.nmber.prototype.numberCompare = function(other)
+{
+	if (other instanceof Sk.builtin.bool)
+	    other = Sk.builtin.asnum$(other);
+
+	if (other instanceof Sk.builtin.none)
+		other = 0;
+
+	if (typeof other === "number") {
+		return this.v - other;
+	}
+
+	if (other instanceof Sk.builtin.nmber) {
+		if (this.v == Infinity && other.v == Infinity) return 0;
+		if (this.v == -Infinity && other.v == -Infinity) return 0;
+		return this.v - other.v;
+	}
+
+	if (other instanceof Sk.builtin.lng) {
+		if (this.skType === Sk.builtin.nmber.int$ || this.v % 1 == 0) {
+			var thisAsLong = new Sk.builtin.lng(this.v);
+			var tmp = thisAsLong.longCompare(other);
+			return tmp;
+		}
+		var diff = this.nb$subtract(other);
+		if (diff instanceof Sk.builtin.nmber) {
+			return diff.v;
+		} else if (diff instanceof Sk.builtin.lng) {
+			return diff.longCompare(Sk.builtin.biginteger.ZERO);
+		}
+	}
+
+	return undefined;
+}
+
+Sk.builtin.nmber.prototype.__eq__ = function(me, other) {
+	return (me.numberCompare(other) == 0) && !(other instanceof Sk.builtin.none);
+};
+
+Sk.builtin.nmber.prototype.__ne__ = function(me, other) {
+	return (me.numberCompare(other) != 0) || (other instanceof Sk.builtin.none);
+};
+
+Sk.builtin.nmber.prototype.__lt__ = function(me, other) {
+	return me.numberCompare(other) < 0;
+};
+
+Sk.builtin.nmber.prototype.__le__ = function(me, other) {
+	return me.numberCompare(other) <= 0;
+};
+
+Sk.builtin.nmber.prototype.__gt__ = function(me, other) {
+	return me.numberCompare(other) > 0;
+};
+
+Sk.builtin.nmber.prototype.__ge__ = function(me, other) {
+	return me.numberCompare(other) >= 0;
+};
+
+Sk.builtin.nmber.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
+
+Sk.builtin.nmber.prototype['$r'] = function()
+{
+    return new Sk.builtin.str(this.str$(10, true));
+};
+
+Sk.builtin.nmber.prototype.tp$str = function()
+{
+    return new Sk.builtin.str(this.str$(10, true));
+};
+
+Sk.builtin.nmber.prototype.str$ = function(base, sign)
+{
+	if (isNaN(this.v))
+		return "nan";
+
+	if (sign === undefined) sign = true;
+
+	if (this.v == Infinity)
+		return 'inf';
+	if (this.v == -Infinity && sign)
+		return '-inf';
+	if (this.v == -Infinity && !sign)
+		return 'inf';
+
+	var work = sign ? this.v : Math.abs(this.v);
+
+
+	var tmp;
+	if (base === undefined || base === 10) {
+		if (this.skType == Sk.builtin.nmber.float$) {
+			tmp = work.toPrecision(12);
+
+		    // transform fractions with 4 or more leading zeroes into exponents
+		    var idx = tmp.indexOf('.');
+		    var pre = work.toString().slice(0,idx);
+		    var post = work.toString().slice(idx);
+		    if (pre.match(/^-?0$/) && post.slice(1).match(/^0{4,}/)) {
+			if (tmp.length < 12)
+			    tmp = work.toExponential();
+			else
+			    tmp = work.toExponential(11);
+		    }
+
+			while (tmp.charAt(tmp.length-1) == "0" && tmp.indexOf('e') < 0) {
+				tmp = tmp.substring(0,tmp.length-1)
+			}
+			if (tmp.charAt(tmp.length-1) == ".") {
+				tmp = tmp + "0"
+			}
+			tmp = tmp.replace(new RegExp('\\.0+e'),'e',"i")
+		    // make exponent two digits instead of one (ie e+09 not e+9)
+		    tmp = tmp.replace(/(e[-+])([1-9])$/, "$10$2");
+		    // remove trailing zeroes before the exponent
+		    tmp = tmp.replace(/0+(e.*)/,'$1');
+		} else {
+			tmp = work.toString()
+		}
+	} else {
+		tmp = work.toString(base);
+	}
+
+	if (this.skType !== Sk.builtin.nmber.float$)
+		return tmp;
+	if (tmp.indexOf('.') < 0 && tmp.indexOf('E') < 0 && tmp.indexOf('e') < 0)
+		tmp = tmp + '.0';
+	return tmp;
+};
+
+goog.exportSymbol("Sk.builtin.nmber", Sk.builtin.nmber);
+/* global Sk: true, goog:true */
+
+// long aka "bignumber" implementation
+//
+//  Using javascript BigInteger by Tom Wu
+/**
+ * @constructor
+ * @param {*} x
+ * @param {number=} base
+ */
+Sk.builtin.lng = function (x, base) {   /* long is a reserved word */
+    base = Sk.builtin.asnum$(base);
+    if (!(this instanceof Sk.builtin.lng)) { return new Sk.builtin.lng(x, base); }
+
+    if (x === undefined) {
+        this.biginteger = new Sk.builtin.biginteger(0);
+        return this;
+    }
+    if (x instanceof Sk.builtin.lng) {
+        this.biginteger = x.biginteger.clone();
+        return this;
+    }
+    if (x instanceof Sk.builtin.biginteger) {
+        this.biginteger = x;
+        return this;
+    }
+    if (x instanceof String) {
+        return Sk.longFromStr(x, base);
+    }
+    if (x instanceof Sk.builtin.str) {
+        return Sk.longFromStr(x.v, base);
+    }
+
+    if ((x !== undefined) && (!Sk.builtin.checkString(x) && !Sk.builtin.checkNumber(x))) {
+        if (x === true) {
+            x = 1;
+        } else if (x === false) {
+            x = 0;
+        } else {
+            throw new Sk.builtin.TypeError("long() argument must be a string or a number, not '" + Sk.abstr.typeName(x) + "'");
+        }
+    }
+
+    x = Sk.builtin.asnum$nofloat(x);
+    this.biginteger = new Sk.builtin.biginteger(x);
+    return this;
+};
+Sk.builtin.lng.co_varnames = [ "base" ];
+Sk.builtin.lng.co_numargs = 2;
+Sk.builtin.lng.$defaults = [ new Sk.builtin.nmber(10, Sk.builtin.nmber.int$) ];
+
+Sk.builtin.lng.prototype.tp$index = function () {
+    return parseInt(this.str$(10, true), 10);
+};
+
+Sk.builtin.lng.prototype.tp$hash = function () {
+    return new Sk.builtin.nmber(this.tp$index(), Sk.builtin.nmber.int$);
 };
 
 Sk.builtin.lng.prototype.tp$name = "long";
 Sk.builtin.lng.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('long', Sk.builtin.lng);
 
-//	Threshold to determine when types should be converted to long
+//    Threshold to determine when types should be converted to long
 Sk.builtin.lng.threshold$ = Math.pow(2, 53);
 
-Sk.builtin.lng.LONG_DIVIDE$ = 0;
-Sk.builtin.lng.FLOAT_DIVIDE$ = -1;
-Sk.builtin.lng.VARIABLE_DIVIDE$ = -2;
-// Positive values reserved for scaled, fixed precision big number implementations where mode = number of digits to the right of the decimal
-Sk.builtin.lng.dividemode$ = Sk.builtin.lng.LONG_DIVIDE$;
+Sk.builtin.lng.MAX_INT$ = new Sk.builtin.lng(Sk.builtin.lng.threshold$);
+Sk.builtin.lng.MIN_INT$ = new Sk.builtin.lng(-Sk.builtin.lng.threshold$);
 
-Sk.builtin.lng.longDivideMode = function(m) 
-{
-	if (m) {
-		if (m instanceof Sk.builtin.str) {
-			if (m.v == 'float') m = Sk.builtin.lng.FLOAT_DIVIDE$;
-			else if (m.v == 'long')  m = Sk.builtin.lng.LONG_DIVIDE$;
-			else if (m.v == 'variable') m = Sk.builtin.lng.VARIABLE_DIVIDE$;
-			else goog.asserts.assert(true, "Invalid long division mode.");
-		}
-		Sk.builtin.lng.dividemode$ = m;
-	}
-	if (Sk.builtin.lng.dividemode$ == Sk.builtin.lng.FLOAT_DIVIDE$)
-		return new Sk.builtin.str('float');
-	if (Sk.builtin.lng.dividemode$ == Sk.builtin.lng.VARIABLE_DIVIDE$)
-		return new Sk.builtin.str('variable');
-	return new Sk.builtin.str('long'); 
+Sk.builtin.lng.prototype.cantBeInt = function () {
+    return (this.longCompare(Sk.builtin.lng.MAX_INT$) > 0) || (this.longCompare(Sk.builtin.lng.MIN_INT$) < 0);
 };
 
-Sk.builtin.lng.fromInt$ = function(ival) 
-{
-	return new Sk.builtin.lng(ival);
+Sk.builtin.lng.fromInt$ = function (ival) {
+    return new Sk.builtin.lng(ival);
 };
 
 // js string (not Sk.builtin.str) -> long. used to create longs in transformer, respects
 // 0x, 0o, 0b, etc.
-Sk.longFromStr = function(s)
-{
-    goog.asserts.assert(s.charAt(s.length - 1) !== "L" && s.charAt(s.length - 1) !== 'l', "L suffix should be removed before here");
+Sk.longFromStr = function (s, base) {
+    // l/L are valid digits with base >= 22
+    // goog.asserts.assert(s.charAt(s.length - 1) !== "L" && s.charAt(s.length - 1) !== 'l', "L suffix should be removed before here");
 
-	var neg=false;
-	if (s.substr(0, 1) == "-") {
-		s = s.substr(1);
-		neg=true;
-	}
-    var base = 10;
-    if (s.substr(0, 2) === "0x" || s.substr(0, 2) === "0X")
-    {
-        s = s.substr(2);
-        base = 16;
-    }
-    else if (s.substr(0, 2) === "0o")
-    {
-        s = s.substr(2);
-        base = 8;
-    }
-    else if (s.substr(0, 1) === "0")
-    {
-        s = s.substr(1);
-        base = 8;
-    }
-    else if (s.substr(0, 2) === "0b")
-    {
-        s = s.substr(2);
-        base = 2;
-    }
+    var parser = function (s, base) {
+            if (base === 10) {
+                return new Sk.builtin.biginteger(s);
+            }
+            return new Sk.builtin.biginteger(s, base);
+        },
+        biginteger = Sk.str2number(s, base, parser, function (x) { return x.negate(); }, "long");
 
-	var biginteger;
-	if (base == 10)
-		biginteger = new Sk.builtin.biginteger(s);
-	else
-		biginteger = new Sk.builtin.biginteger(s,base);
-
-	if (neg)
-		biginteger = biginteger.negate();
-
-	return new Sk.builtin.lng(biginteger);
-
+    return new Sk.builtin.lng(biginteger);
 };
 goog.exportSymbol("Sk.longFromStr", Sk.longFromStr);
 
-Sk.builtin.lng.prototype.clone = function()
-{
-	return new Sk.builtin.lng(this);
+Sk.builtin.lng.prototype.toInt$ = function () {
+    return this.biginteger.intValue();
 };
 
-Sk.builtin.lng.prototype.nb$add = function(other)
-{
-	if (other instanceof Sk.builtin.lng) {
-		return new Sk.builtin.lng(this.biginteger.add(other.biginteger));
-	}
+Sk.builtin.lng.prototype.clone = function () {
+    return new Sk.builtin.lng(this);
+};
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return new Sk.builtin.lng(this.biginteger.add(other));
-	}
+Sk.builtin.lng.prototype.nb$add = function (other) {
+    var thisAsFloat;
+    if (other instanceof Sk.builtin.bool) {
+        other = new Sk.builtin.lng(Sk.builtin.asnum$(other));
+    }
 
-	return new Sk.builtin.lng(this.biginteger.add(new Sk.builtin.biginteger(other)));
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.float$) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$add(other);
+        }
+        //    Promote an int to long
+        other = new Sk.builtin.lng(other.v);
+    }
+
+    if (other instanceof Sk.builtin.lng) {
+        return new Sk.builtin.lng(this.biginteger.add(other.biginteger));
+    }
+
+    if (other instanceof Sk.builtin.biginteger) {
+        return new Sk.builtin.lng(this.biginteger.add(other));
+    }
+
+    return new Sk.builtin.lng(this.biginteger.add(new Sk.builtin.biginteger(other)));
 };
 
 Sk.builtin.lng.prototype.nb$inplace_add = Sk.builtin.lng.prototype.nb$add;
 
-Sk.builtin.lng.prototype.nb$subtract = function(other)
-{
-	if (other instanceof Sk.builtin.lng) {
-		return new Sk.builtin.lng(this.biginteger.subtract(other.biginteger));
-	}
+Sk.builtin.lng.prototype.nb$subtract = function (other) {
+    var thisAsFloat;
+    if (other instanceof Sk.builtin.bool) {
+        other = new Sk.builtin.lng(Sk.builtin.asnum$(other));
+    }
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return new Sk.builtin.lng(this.biginteger.subtract(other));
-	}
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.float$) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$subtract(other);
+        }
+        //    Promote an int to long
+        other = new Sk.builtin.lng(other.v);
+    }
 
-	return new Sk.builtin.lng(this.biginteger.subtract(new Sk.builtin.biginteger(other)));
+    if (other instanceof Sk.builtin.lng) {
+        return new Sk.builtin.lng(this.biginteger.subtract(other.biginteger));
+    }
+
+    if (other instanceof Sk.builtin.biginteger) {
+        return new Sk.builtin.lng(this.biginteger.subtract(other));
+    }
+
+    return new Sk.builtin.lng(this.biginteger.subtract(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.nb$multiply = function(other)
-{
-	if (other instanceof Sk.builtin.lng) {
-		return new Sk.builtin.lng(this.biginteger.multiply(other.biginteger));
-	}
+Sk.builtin.lng.prototype.nb$inplace_subtract = Sk.builtin.lng.prototype.nb$subtract;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return new Sk.builtin.lng(this.biginteger.multiply(other));
-	}
+Sk.builtin.lng.prototype.nb$multiply = function (other) {
+    if (other instanceof Sk.builtin.bool) {
+        other = new Sk.builtin.lng(Sk.builtin.asnum$(other));
+    }
 
-	return new Sk.builtin.lng(this.biginteger.multiply(new Sk.builtin.biginteger(other)));
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.float$) {
+            var thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$multiply(other);
+        }
+        other = new Sk.builtin.lng(other.v);
+    }
+
+    if (other instanceof Sk.builtin.lng) {
+        return new Sk.builtin.lng(this.biginteger.multiply(other.biginteger));
+    }
+
+    if (other instanceof Sk.builtin.biginteger) {
+        return new Sk.builtin.lng(this.biginteger.multiply(other));
+    }
+
+    return new Sk.builtin.lng(this.biginteger.multiply(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.nb$divide = function(other)
-{
-	var result;
-	if (Sk.builtin.lng.dividemode$ == Sk.builtin.lng.FLOAT_DIVIDE$ || Sk.builtin.lng.dividemode$ == Sk.builtin.lng.VARIABLE_DIVIDE$) {
-		if (other instanceof Sk.builtin.lng) {
-			result = this.biginteger.divideAndRemainder(other.biginteger);
-		} else if (other instanceof Sk.builtin.biginteger) {
-			result = this.biginteger.divideAndRemainder(other);
-		} else {
-			result = this.biginteger.divideAndRemainder(new Sk.builtin.biginteger(other));
-		}
+Sk.builtin.lng.prototype.nb$inplace_multiply = Sk.builtin.lng.prototype.nb$multiply;
 
-		//	result = Array of quotient [0], remainder [1]
+Sk.builtin.lng.prototype.nb$divide = function (other) {
+    var thisAsFloat, thisneg, otherneg, result;
+    if (other instanceof Sk.builtin.bool) {
+        other = new Sk.builtin.lng(Sk.builtin.asnum$(other));
+    }
 
-		if (result [1].compare(Sk.builtin.biginteger.ZERO) != 0) {
-			//	Non-zero remainder -- this will be a float no matter what
-			return parseFloat(this.biginteger.toString()) / parseFloat(other.biginteger.toString());
-		} else {
-			//	No remainder
-			if (Sk.builtin.lng.dividemode$ == Sk.builtin.lng.FLOAT_DIVIDE$)
-				return parseFloat(result [0].toString());		//	Float option with no remainder, return quotient as float
-			else
-				return new Sk.builtin.lng(result [0]);			//	Variable option with no remainder, return new long from quotient
-		}
-	}
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.float$) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$divide(other);
+        }
+        //    Promote an int to long
+        other = new Sk.builtin.lng(other.v);
+    }
 
-//	Standard, long result mode
-	if (other instanceof Sk.builtin.lng) {
-		result = new Sk.builtin.lng(this.biginteger.divide(other.biginteger));
-	} else if (other instanceof Sk.builtin.biginteger) {
-		result = new Sk.builtin.lng(this.biginteger.divide(other));
-	} else {
-		result = new Sk.builtin.lng(this.biginteger.divide(new Sk.builtin.biginteger(other)));
-	}
+    //    Standard, long result mode
 
-	return result;
+    if (!(other instanceof Sk.builtin.lng)) {
+        other = new Sk.builtin.lng(other);
+    }
+
+    //    Special logic to round DOWN towards negative infinity for negative results
+    thisneg = this.nb$isnegative();
+    otherneg = other.nb$isnegative();
+    if ((thisneg && !otherneg) || (otherneg && !thisneg)) {
+        result = this.biginteger.divideAndRemainder(other.biginteger);
+        //    If remainder is zero or positive, just return division result
+        if (result[1].trueCompare(Sk.builtin.biginteger.ZERO) === 0) {
+            //    No remainder, just return result
+            return new Sk.builtin.lng(result[0]);
+        }
+        //    Reminder... subtract 1 from the result (like rounding to neg infinity)
+        result = result[0].subtract(Sk.builtin.biginteger.ONE);
+        return new Sk.builtin.lng(result);
+    }
+    return new Sk.builtin.lng(this.biginteger.divide(other.biginteger));
 };
 
-Sk.builtin.lng.prototype.nb$floor_divide = function(other)
-{
-	if (other instanceof Sk.builtin.lng) {
-		return new Sk.builtin.lng(this.biginteger.divide(other.biginteger));
-	}
+Sk.builtin.lng.prototype.nb$inplace_divide = Sk.builtin.lng.prototype.nb$divide;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return new Sk.builtin.lng(this.biginteger.divide(other));
-	}
+Sk.builtin.lng.prototype.nb$floor_divide = function (other) {
+    if (other instanceof Sk.builtin.bool) {
+        other = new Sk.builtin.lng(Sk.builtin.asnum$(other));
+    }
 
-	return new Sk.builtin.lng(this.biginteger.divide(new Sk.builtin.biginteger(other)));
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.float$) {
+            var thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$floor_divide(other);
+        }
+    }
+
+    return this.nb$divide(other);
 };
 
-Sk.builtin.lng.prototype.nb$remainder = function(other)
-{
-	if (other instanceof Sk.builtin.lng) {
-		return new Sk.builtin.lng(this.biginteger.remainder(other.biginteger));
-	}
+Sk.builtin.lng.prototype.nb$inplace_floor_divide = Sk.builtin.lng.prototype.nb$floor_divide;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return new Sk.builtin.lng(this.biginteger.remainder(other));
-	}
+Sk.builtin.lng.prototype.nb$remainder = function (other) {
+    var thisAsFloat, tmp;
+    if (other instanceof Sk.builtin.bool) {
+        other = new Sk.builtin.lng(Sk.builtin.asnum$(other));
+    }
 
-	return new Sk.builtin.lng(this.biginteger.remainder(new Sk.builtin.biginteger(other)));
+    if (this.biginteger.trueCompare(Sk.builtin.biginteger.ZERO) === 0) {
+        if (other instanceof Sk.builtin.nmber && other.skType === Sk.builtin.nmber.float$) {
+            return new Sk.builtin.nmber(0, Sk.builtin.nmber.float$);
+        }
+        return new Sk.builtin.lng(0);
+    }
+
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.float$) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$remainder(other);
+        }
+        //    Promote an int to long
+        other = new Sk.builtin.lng(other.v);
+    }
+
+    if (!(other instanceof Sk.builtin.lng)) {
+        other = new Sk.builtin.lng(other);
+    }
+
+    tmp = new Sk.builtin.lng(this.biginteger.remainder(other.biginteger));
+    if (this.nb$isnegative()) {
+        if (other.nb$ispositive() && tmp.nb$nonzero()) {
+            tmp = tmp.nb$add(other).nb$remainder(other);
+        }
+    } else {
+        if (other.nb$isnegative() && tmp.nb$nonzero()) {
+            tmp = tmp.nb$add(other);
+        }
+    }
+    return tmp;
 };
 
-Sk.builtin.lng.prototype.nb$power = function(n)
-{
-	if (n instanceof Sk.builtin.lng) {
-		return new Sk.builtin.lng(this.biginteger.pow(n.biginteger));
-	}
+Sk.builtin.lng.prototype.nb$inplace_remainder = Sk.builtin.lng.prototype.nb$remainder;
 
-	if (n instanceof Sk.builtin.biginteger) {
-		return new Sk.builtin.lng(this.biginteger.pow(n));
-	}
+/**
+ * @param {number|Object} n
+ * @param {number|Object=} mod
+ * @suppress {checkTypes}
+ */
+Sk.builtin.lng.prototype.nb$power = function (n, mod) {
+    var thisAsFloat;
+    if (mod !== undefined) {
+        n = new Sk.builtin.biginteger(Sk.builtin.asnum$(n));
+        mod = new Sk.builtin.biginteger(Sk.builtin.asnum$(mod));
 
-	return new Sk.builtin.lng(this.biginteger.pow(new Sk.builtin.biginteger(n)));
+        return new Sk.builtin.lng(this.biginteger.modPowInt(n, mod));
+    }
+    if (typeof n === "number") {
+        if (n < 0) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$power(n);
+        }
+        return new Sk.builtin.lng(this.biginteger.pow(new Sk.builtin.biginteger(n)));
+    }
+
+    if (n instanceof Sk.builtin.bool) {
+        return new Sk.builtin.lng(this.biginteger.pow(new Sk.builtin.biginteger(Sk.builtin.asnum$(n))));
+    }
+
+    if (n instanceof Sk.builtin.nmber) {
+        if (n.skType === Sk.builtin.nmber.float$ || n.v < 0) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$power(n);
+        }
+        //    Promote an int to long
+        n = new Sk.builtin.lng(n.v);
+    }
+
+    if (n instanceof Sk.builtin.lng) {
+        if (n.nb$isnegative()) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$power(n);
+        }
+        return new Sk.builtin.lng(this.biginteger.pow(n.biginteger));
+    }
+
+    if (n instanceof Sk.builtin.biginteger) {
+        if (n.isnegative()) {
+            thisAsFloat = new Sk.builtin.nmber(this.str$(10, true), Sk.builtin.nmber.float$);
+            return thisAsFloat.nb$power(n);
+        }
+        return new Sk.builtin.lng(this.biginteger.pow(n));
+    }
+
+    return new Sk.builtin.lng(this.biginteger.pow(new Sk.builtin.biginteger(n)));
 };
 
-Sk.builtin.lng.prototype.nb$negative = function()
-{
-	return new Sk.builtin.lng(this.biginteger.negate());
+Sk.builtin.lng.prototype.nb$inplace_power = Sk.builtin.lng.prototype.nb$power;
+
+Sk.builtin.lng.prototype.nb$lshift = function (other) {
+    if (other instanceof Sk.builtin.lng) {
+        if (other.biginteger.signum() < 0) {
+            throw new Sk.builtin.ValueError("negative shift count");
+        }
+        return new Sk.builtin.lng(this.biginteger.shiftLeft(other.biginteger));
+    }
+    if (other instanceof Sk.builtin.biginteger) {
+        if (other.signum() < 0) {
+            throw new Sk.builtin.ValueError("negative shift count");
+        }
+        return new Sk.builtin.lng(this.biginteger.shiftLeft(other));
+    }
+
+    if (other < 0) {
+        throw new Sk.builtin.ValueError("negative shift count");
+    }
+    other = Sk.builtin.asnum$(other);
+    return new Sk.builtin.lng(this.biginteger.shiftLeft(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.nb$positive = function() { return this; };
+Sk.builtin.lng.prototype.nb$inplace_lshift = Sk.builtin.lng.prototype.nb$lshift;
 
-Sk.builtin.lng.prototype.nb$nonzero = function()
-{
-	return this.biginteger.compare(Sk.builtin.biginteger.ZERO) !== 0;
+Sk.builtin.lng.prototype.nb$rshift = function (other) {
+    if (other instanceof Sk.builtin.lng) {
+        if (other.biginteger.signum() < 0) {
+            throw new Sk.builtin.ValueError("negative shift count");
+        }
+        return new Sk.builtin.lng(this.biginteger.shiftRight(other.biginteger));
+    }
+    if (other instanceof Sk.builtin.biginteger) {
+        if (other.signum() < 0) {
+            throw new Sk.builtin.ValueError("negative shift count");
+        }
+        return new Sk.builtin.lng(this.biginteger.shiftRight(other));
+    }
+
+    if (other < 0) {
+        throw new Sk.builtin.ValueError("negative shift count");
+    }
+    other = Sk.builtin.asnum$(other);
+    return new Sk.builtin.lng(this.biginteger.shiftRight(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.compare = function(other)
-{
-	if (other instanceof Sk.builtin.lng) {
-		return this.biginteger.compare(other.biginteger);
-	}
+Sk.builtin.lng.prototype.nb$inplace_rshift = Sk.builtin.lng.prototype.nb$rshift;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return this.biginteger.compare(other);
-	}
+Sk.builtin.lng.prototype.nb$and = function (other) {
+    if (other instanceof Sk.builtin.lng) {
+        return new Sk.builtin.lng(this.biginteger.and(other.biginteger));
+    }
+    if (other instanceof Sk.builtin.biginteger) {
+        return new Sk.builtin.lng(this.biginteger.and(other));
+    }
 
-	return this.biginteger.compare(new Sk.builtin.biginteger(other));
-}
-
-Sk.builtin.lng.prototype.__eq__ = function(me, other) {
-	if (other instanceof Sk.builtin.lng) {
-		return me.biginteger.compare(other.biginteger) == 0;
-	}
-
-	if (other instanceof Sk.builtin.biginteger) {
-		return me.biginteger.compare(other) == 0;
-	}
-
-	return me.biginteger.compare(new Sk.builtin.biginteger(other)) == 0;
+    other = Sk.builtin.asnum$(other);
+    return new Sk.builtin.lng(this.biginteger.and(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.__ne__ = function(me, other) {
-	if (other instanceof Sk.builtin.lng) {
-		return me.biginteger.compare(other.biginteger) != 0;
-	}
+Sk.builtin.lng.prototype.nb$inplace_and = Sk.builtin.lng.prototype.nb$and;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return me.biginteger.compare(other) != 0;
-	}
+Sk.builtin.lng.prototype.nb$or = function (other) {
+    if (other instanceof Sk.builtin.lng) {
+        return new Sk.builtin.lng(this.biginteger.or(other.biginteger));
+    }
+    if (other instanceof Sk.builtin.biginteger) {
+        return new Sk.builtin.lng(this.biginteger.or(other));
+    }
 
-	return me.biginteger.compare(new Sk.builtin.biginteger(other)) != 0;
+    other = Sk.builtin.asnum$(other);
+    return new Sk.builtin.lng(this.biginteger.or(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.__lt__ = function(me, other) {
-	if (other instanceof Sk.builtin.lng) {
-		return me.biginteger.compare(other.biginteger) < 0;
-	}
+Sk.builtin.lng.prototype.nb$inplace_or = Sk.builtin.lng.prototype.nb$or;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return me.biginteger.compare(other) < 0;
-	}
+Sk.builtin.lng.prototype.nb$xor = function (other) {
+    if (other instanceof Sk.builtin.lng) {
+        return new Sk.builtin.lng(this.biginteger.xor(other.biginteger));
+    }
+    if (other instanceof Sk.builtin.biginteger) {
+        return new Sk.builtin.lng(this.biginteger.xor(other));
+    }
 
-	return me.biginteger.compare(new Sk.builtin.biginteger(other)) < 0;
+    other = Sk.builtin.asnum$(other);
+    return new Sk.builtin.lng(this.biginteger.xor(new Sk.builtin.biginteger(other)));
 };
 
-Sk.builtin.lng.prototype.__le__ = function(me, other) {
-	if (other instanceof Sk.builtin.lng) {
-		return me.biginteger.compare(other.biginteger) <= 0;
-	}
+Sk.builtin.lng.prototype.nb$inplace_xor = Sk.builtin.lng.prototype.nb$xor;
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return me.biginteger.compare(other) <= 0;
-	}
-
-	return me.biginteger.compare(new Sk.builtin.biginteger(other)) <= 0;
+Sk.builtin.lng.prototype.nb$negative = function () {
+    return new Sk.builtin.lng(this.biginteger.negate());
 };
 
-Sk.builtin.lng.prototype.__gt__ = function(me, other) {
-	if (other instanceof Sk.builtin.lng) {
-		return me.biginteger.compare(other.biginteger) > 0;
-	}
+Sk.builtin.lng.prototype.nb$positive = function () { return this.clone(); };
 
-	if (other instanceof Sk.builtin.biginteger) {
-		return me.biginteger.compare(other) > 0;
-	}
-
-	return me.biginteger.compare(new Sk.builtin.biginteger(other)) > 0;
+Sk.builtin.lng.prototype.nb$nonzero = function () {
+    return this.biginteger.trueCompare(Sk.builtin.biginteger.ZERO) !== 0;
 };
 
-Sk.builtin.lng.prototype.__ge__ = function(me, other) {
-	if (other instanceof Sk.builtin.lng) {
-		return me.biginteger.compare(other.biginteger) >= 0;
-	}
-
-	if (other instanceof Sk.builtin.biginteger) {
-		return me.biginteger.compare(other) >= 0;
-	}
-
-	return me.biginteger.compare(new Sk.builtin.biginteger(other)) >= 0;
+Sk.builtin.lng.prototype.nb$isnegative = function () {
+    return this.biginteger.isnegative();
 };
 
-Sk.builtin.lng.prototype['$r'] = function()
-{
+Sk.builtin.lng.prototype.nb$ispositive = function () {
+    return !this.biginteger.isnegative();
+};
+
+Sk.builtin.lng.prototype.longCompare = function (other) {
+    var tmp, thisAsFloat, otherAsLong;
+
+    if (typeof other === "boolean") {
+        other = other ? 1 : 0;
+    }
+
+    if (typeof other === "number") {
+        other = new Sk.builtin.lng(other);
+    }
+
+    if (other instanceof Sk.builtin.nmber) {
+        if (other.skType === Sk.builtin.nmber.int$ || other.v % 1 === 0) {
+            otherAsLong = new Sk.builtin.lng(other.v);
+            return this.longCompare(otherAsLong);
+        }
+        thisAsFloat = new Sk.builtin.nmber(this, Sk.builtin.nmber.float$);
+        return thisAsFloat.numberCompare(other);
+    }
+
+    if (other instanceof Sk.builtin.lng) {
+        tmp = this.biginteger.subtract(other.biginteger);
+    } else if (other instanceof Sk.builtin.biginteger) {
+        tmp = this.biginteger.subtract(other);
+    } else {
+        tmp = this.biginteger.subtract(new Sk.builtin.biginteger(other));
+    }
+
+    return tmp;
+};
+
+//tests fail if ===
+Sk.builtin.lng.prototype.__eq__ = function (me, other) {
+    return me.longCompare(other) == 0 && !(other instanceof Sk.builtin.none);
+};
+
+Sk.builtin.lng.prototype.__ne__ = function (me, other) {
+    return me.longCompare(other) != 0 || (other instanceof Sk.builtin.none);
+};
+
+Sk.builtin.lng.prototype.__lt__ = function (me, other) {
+    return me.longCompare(other) < 0;
+};
+
+Sk.builtin.lng.prototype.__le__ = function (me, other) {
+    return me.longCompare(other) <= 0;
+};
+
+Sk.builtin.lng.prototype.__gt__ = function (me, other) {
+    return me.longCompare(other) > 0;
+};
+
+Sk.builtin.lng.prototype.__ge__ = function (me, other) {
+    return me.longCompare(other) >= 0;
+};
+
+Sk.builtin.lng.prototype.$r = function () {
     return new Sk.builtin.str(this.str$(10, true) + "L");
 };
 
-Sk.builtin.lng.prototype.tp$str = function()
-{
+Sk.builtin.lng.prototype.tp$str = function () {
     return new Sk.builtin.str(this.str$(10, true));
 };
 
-Sk.builtin.lng.prototype.str$ = function(base, sign)
-{
-	if (sign === undefined) sign = true;
+Sk.builtin.lng.prototype.str$ = function (base, sign) {
+    if (sign === undefined) { sign = true; }
 
-	var work = sign ? this.biginteger : this.biginteger.abs();
+    var work = sign ? this.biginteger : this.biginteger.abs();
 
-	if (base === undefined || base === 10) {
-		return work.toString();
-	}
+    if (base === undefined || base === 10) {
+        return work.toString();
+    }
 
-	//	Another base... convert...
-	return work.toString(base);
-};
-Sk.builtin.int_ = function(x, base)
-{
-    if (x instanceof Sk.builtin.str)
-    {
-        // todo; this should handle longs too
-        if (base === undefined) base = 10; // default radix is 10, not dwim
-		if ( x.v.substring(0,2).toLowerCase() == '0x' && base != 16 && base != 0) {
-			throw new Sk.builtin.ValueError("int: Argument: " + x.v + " is not a valid literal");
-		}
-		if ( x.v.substring(0,2).toLowerCase() == '0b' ) { 
-			if (base != 2 && base != 0) {
-				throw new Sk.builtin.ValueError("int: Argument: " + x.v + " is not a valid literal");
-			} else {
-				x.v = x.v.substring(2);
-				base = 2;
-			}
-		}
+    //    Another base... convert...
+    return work.toString(base);
+};/* jslint nomen: true, bitwise: true */
+/* global Sk: true */
 
-        if (!isNaN(x.v) && x.v.indexOf(".") < 0)
-            return parseInt(x.v, base);
-        else {
-            throw new Sk.builtin.ValueError("int: Argument: " + x.v + " is not a valid literal");
+// Takes a JavaScript string and returns a number using the
+// parser and negater functions (for int/long right now)
+//
+// parser should take a string that is a postive number which only
+// contains characters that are valid in the given base and a base and
+// return a number
+//
+// negater should take a number and return its negation
+//
+// fname is a string containing the function name to be used in error
+// messages
+Sk.str2number = function (s, base, parser, negater, fname) {
+    'use strict';
+    var origs = s,
+        neg = false,
+        i,
+        ch,
+        val;
+
+    // strip whitespace from ends
+    // s = s.trim();
+    s = s.replace(/^\s+|\s+$/g, '');
+
+    // check for minus sign
+    if (s.charAt(0) === '-') {
+        neg = true;
+        s = s.substring(1);
+    }
+
+    // check for plus sign
+    if (s.charAt(0) === '+') {
+        s = s.substring(1);
+    }
+
+    if (base === undefined) { base = 10; } // default radix is 10, not dwim
+
+    if (base < 2 || base > 36) {
+        if (base !== 0) {
+            throw new Sk.builtin.ValueError(fname + "() base must be >= 2 and <= 36");
+        }
+    }
+
+    if (s.substring(0, 2).toLowerCase() === '0x') {
+        if (base === 16 || base === 0) {
+            s = s.substring(2);
+            base = 16;
+        } else if (base < 34) {
+            throw new Sk.builtin.ValueError("invalid literal for " + fname + "() with base " + base + ": '" + origs + "'");
+        }
+    } else if (s.substring(0, 2).toLowerCase() === '0b') {
+        if (base === 2 || base === 0) {
+            s = s.substring(2);
+            base = 2;
+        } else if (base < 12) {
+            throw new Sk.builtin.ValueError("invalid literal for " + fname + "() with base " + base + ": '" + origs + "'");
+        }
+    } else if (s.substring(0, 2).toLowerCase() === '0o') {
+        if (base === 8 || base === 0) {
+            s = s.substring(2);
+            base = 8;
+        } else if (base < 25) {
+            throw new Sk.builtin.ValueError("invalid literal for " + fname + "() with base " + base + ": '" + origs + "'");
+        }
+    } else if (s.charAt(0) === '0') {
+        if (s === '0') { return 0; }
+        if (base === 8 || base === 0) {
+            base = 8;
+        }
+    }
+
+    if (base === 0) { base = 10; }
+
+    if (s.length === 0) {
+        throw new Sk.builtin.ValueError("invalid literal for " + fname + "() with base " + base + ": '" + origs + "'");
+    }
+
+    // check all characters are valid
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s.charCodeAt(i);
+        val = base;
+        if ((ch >= 48) && (ch <= 57)) {
+            // 0-9
+            val = ch - 48;
+        } else if ((ch >= 65) && (ch <= 90)) {
+            // A-Z
+            val = ch - 65 + 10;
+        } else if ((ch >= 97) && (ch <= 122)) {
+            // a-z
+            val = ch - 97 + 10;
         }
 
+        if (val >= base) {
+            throw new Sk.builtin.ValueError("invalid literal for " + fname + "() with base " + base + ": '" + origs + "'");
+        }
     }
+
+    // parse number
+    val = parser(s, base);
+    if (neg) {
+        val = negater(val);
+    }
+    return val;
+};
+
+Sk.builtin.int_ = function (x, base) {
+    'use strict';
+    var val;
+    if ((x !== undefined) && (!Sk.builtin.checkString(x) && !Sk.builtin.checkNumber(x))) {
+        if (x instanceof Sk.builtin.bool) {
+            x = Sk.builtin.asnum$(x);
+        } else {
+            throw new Sk.builtin.TypeError("int() argument must be a string or a number, not '" + Sk.abstr.typeName(x) + "'");
+        }
+    }
+
+    if (x instanceof Sk.builtin.str) {
+        base = Sk.builtin.asnum$(base);
+        val = Sk.str2number(x.v, base, parseInt, function (x) { return -x; }, "int");
+        if ((val > Sk.builtin.lng.threshold$) || (val < -Sk.builtin.lng.threshold$)) {
+            // Too big for int, convert to long
+            return new Sk.builtin.lng(x, base);
+        }
+
+        return new Sk.builtin.nmber(val, Sk.builtin.nmber.int$);
+    }
+    if (base !== undefined) {
+        throw new Sk.builtin.TypeError("int() can't convert non-string with explicit base");
+    }
+
+    if (x instanceof Sk.builtin.lng) {
+        if (x.cantBeInt()) {
+            return new Sk.builtin.lng(x);
+        }
+        return new Sk.builtin.nmber(x.toInt$(), Sk.builtin.nmber.int$);
+    }
+
     // sneaky way to do truncate, floor doesn't work < 0, round doesn't work on the .5> side
     // bitwise ops convert to 32bit int in the "C-truncate-way" we want.
-    return x | 0;
+    x = Sk.builtin.asnum$(x);
+    return new Sk.builtin.nmber(x | 0, Sk.builtin.nmber.int$);
 };
+Sk.builtin.int_.co_varnames = [ "base" ];
+Sk.builtin.int_.co_numargs = 2;
+Sk.builtin.int_.$defaults = [ new Sk.builtin.nmber(10, Sk.builtin.nmber.int$) ];
 
 Sk.builtin.int_.prototype.tp$name = "int";
 Sk.builtin.int_.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('int', Sk.builtin.int_);
 Sk.builtin.float_ = function(x)
 {
+    if (x === undefined)
+    {
+        return new Sk.builtin.nmber(0.0, Sk.builtin.nmber.float$);
+    }
+
     if (x instanceof Sk.builtin.str)
     {
-        if (x.v === "inf") return Infinity;
-        if (x.v === "-inf") return -Infinity;
-        if (!isNaN(x.v))
-            return parseFloat(x.v);
+		var tmp;
+
+	if (x.v.match(/^-inf$/i)) {
+	    tmp = -Infinity;
+	}
+	else if (x.v.match(/^[+]?inf$/i)) {
+	    tmp = Infinity;
+	}
+	else if (x.v.match(/^[-+]?nan$/i)) {
+	    tmp = NaN;
+	}
+
+        else if (!isNaN(x.v))
+            tmp = parseFloat(x.v);
         else {
             throw new Sk.builtin.ValueError("float: Argument: " + x.v + " is not number");
         }
+		return new Sk.builtin.nmber(tmp, Sk.builtin.nmber.float$);
     }
-    return x;
+
+    // Floats are just numbers
+    if (typeof x === "number" || x instanceof Sk.builtin.nmber
+	|| x instanceof Sk.builtin.lng)
+    {
+	x = Sk.builtin.asnum$(x);
+        return new Sk.builtin.nmber(x, Sk.builtin.nmber.float$);
+    }
+
+    // Convert booleans
+    if (x instanceof Sk.builtin.bool)
+    {
+	x = Sk.builtin.asnum$(x);
+	return new Sk.builtin.nmber(x, Sk.builtin.nmber.float$);
+    }
+
+    throw new Sk.builtin.TypeError("float() argument must be a string or a number");
 };
 
 Sk.builtin.float_.prototype.tp$name = "float";
 Sk.builtin.float_.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('float', Sk.builtin.float_);
 /**
  * @constructor
- * @param {number} start
- * @param {number=} stop
- * @param {null|number=} step
+ * @param {Object} start
+ * @param {Object=} stop
+ * @param {Object=} step
  */
 Sk.builtin.slice = function slice(start, stop, step)
 {
+    if (Sk.builtin.asnum$(step) === 0) {
+	throw new Sk.builtin.ValueError("slice step cannot be zero");
+    }
+
     if (!(this instanceof Sk.builtin.slice)) return new Sk.builtin.slice(start, stop, step);
 
     if (stop === undefined && step === undefined)
     {
         stop = start;
-        start = null;
+        start = Sk.builtin.none.none$;
     }
-    if (!start) start = null;
-    if (stop === undefined) stop = null;
-    if (step === undefined) step = null;
+    if (stop === undefined) stop = Sk.builtin.none.none$;
+    if (step === undefined) step = Sk.builtin.none.none$;
     this.start = start;
     this.stop = stop;
     this.step = step;
+
+    this.__class__ = Sk.builtin.slice;
+
+    this['$d'] = new Sk.builtin.dict([Sk.builtin.slice$start, this.start,
+                                      Sk.builtin.slice$stop, this.stop,
+                                      Sk.builtin.slice$step, this.step]);
+
     return this;
 };
 
-Sk.builtin.slice.prototype.tp$str = function()
+Sk.builtin.slice.prototype.tp$name = 'slice';
+Sk.builtin.slice.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('slice', Sk.builtin.slice);
+
+Sk.builtin.slice.prototype['$r'] = function()
 {
     var a = Sk.builtin.repr(this.start).v;
     var b = Sk.builtin.repr(this.stop).v;
@@ -9093,44 +14558,103 @@ Sk.builtin.slice.prototype.tp$str = function()
     return new Sk.builtin.str("slice(" + a + ", " + b + ", " + c + ")");
 };
 
+Sk.builtin.slice.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
+
+Sk.builtin.slice.prototype.tp$richcompare = function(w, op)
+{
+    // w not a slice
+    if (!w.__class__ || w.__class__ != Sk.builtin.slice)
+    {
+        // shortcuts for eq/not
+        if (op === 'Eq') return false;
+        if (op === 'NotEq') return true;
+
+        // todo; other types should have an arbitrary order
+        return false;
+    }
+
+    // This is how CPython does it
+    var t1, t2;
+    t1 = new Sk.builtin.tuple([this.start,this.stop,this.step]);
+    t2 = new Sk.builtin.tuple([w.start,w.stop,w.step]);
+    
+    return t1.tp$richcompare(t2, op);
+};
+
 Sk.builtin.slice.prototype.indices = function(length)
 {
+    if ((!Sk.builtin.checkInt(this.start)
+             && !Sk.builtin.checkNone(this.start))
+            || (!Sk.builtin.checkInt(this.stop)
+                && !Sk.builtin.checkNone(this.stop))
+            || (!Sk.builtin.checkInt(this.step)
+                && !Sk.builtin.checkNone(this.step))) {
+            throw new Sk.builtin.TypeError("slice indices must be integers or None");
+    }
+
+	    var start = Sk.builtin.asnum$(this.start),
+	        stop  = Sk.builtin.asnum$(this.stop),
+	        step  = Sk.builtin.asnum$(this.step);
+
+	length = Sk.builtin.asnum$(length);
     // this seems ugly, better way?
-    var start = this.start, stop = this.stop, step = this.step, i;
+    var i;
     if (step === null) step = 1;
     if (step > 0)
     {
         if (start === null) start = 0;
         if (stop === null) stop = length;
-        if (start < 0) start = length + start;
+        if (stop > length) {
+            stop = length;
+        }
+        if (start < 0) {
+            start = length + start;
+            if (start < 0) {
+                start = 0;
+            }
+        }
         if (stop < 0) stop = length + stop;
     }
     else
     {
         if (start === null) start = length - 1;
-        else if (start < 0) start = length + start;
-        if (stop === null) stop = -1;
-        else if (stop < 0) stop = length + stop;
+        if (start >= length) {
+            start = length - 1;
+        }
+        if (stop === null) {
+            stop = -1;
+        } else if (stop < 0) {
+            stop = length + stop;
+            if (stop < 0) {
+                stop = -1;
+            }
+        }
+        if (start < 0) start = length + start;
     }
     return [start, stop, step];
 };
 
 Sk.builtin.slice.prototype.sssiter$ = function(wrt, f)
-{
-    var sss = this.indices(typeof wrt === "number" ? wrt : wrt.v.length);
+{   
+	var wrtv = Sk.builtin.asnum$(wrt);
+    var sss = this.indices(typeof wrtv === "number" ? wrtv : wrt.v.length);
     if (sss[2] > 0)
     {
         var i;
         for (i = sss[0]; i < sss[1]; i += sss[2])
-            if (f(i, wrt) === false) return;
+            if (f(i, wrtv) === false) return;	//	wrt or wrtv? RNL
     }
     else
     {
         for (i = sss[0]; i > sss[1]; i += sss[2])
-            if (f(i, wrt) === false) return;
+            if (f(i, wrtv) === false) return;	//	wrt or wrtv? RNL
 
     }
 };
+
+Sk.builtin.slice$start = new Sk.builtin.str("start");
+Sk.builtin.slice$stop = new Sk.builtin.str("stop");
+Sk.builtin.slice$step = new Sk.builtin.str("step");
 /**
  * @constructor
  * @param {Array.<Object>} S
@@ -9145,11 +14669,11 @@ Sk.builtin.set = function(S)
     }
 
     this.set_reset_();
-    S = new Sk.builtin.list(S);
+    var S_list = new Sk.builtin.list(S);
     // python sorts sets on init, but not thereafter.
     // Skulpt seems to init a new set each time you add/remove something
     //Sk.builtin.list.prototype['sort'].func_code(S);
-    for (var it = S.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
+    for (var it = S_list.tp$iter(), i = it.tp$iternext(); i !== undefined; i = it.tp$iternext())
     {
         Sk.builtin.set.prototype['add'].func_code(this, i);
     }
@@ -9194,6 +14718,17 @@ Sk.builtin.set.prototype.tp$richcompare = function(w, op)
 
     if (this === w && Sk.misceval.opAllowsEquality(op))
         return true;
+
+    // w not a set
+    if (!w.__class__ || w.__class__ != Sk.builtin.set)
+    {
+        // shortcuts for eq/not
+        if (op === 'Eq') return false;
+        if (op === 'NotEq') return true;
+
+        // todo; other types should have an arbitrary order
+        return false;
+    }
 
     var vl = this.sq$length();
     var wl = w.sq$length();
@@ -9255,10 +14790,10 @@ Sk.builtin.set.prototype['isdisjoint'] = new Sk.builtin.func(function(self, othe
         var isIn = Sk.abstr.sequenceContains(other, item);
         if (isIn)
         {
-            return false;
+            return Sk.builtin.bool.false$;
         }
     }
-    return true;
+    return Sk.builtin.bool.true$;
 });
 
 Sk.builtin.set.prototype['issubset'] = new Sk.builtin.func(function(self, other)
@@ -9268,17 +14803,17 @@ Sk.builtin.set.prototype['issubset'] = new Sk.builtin.func(function(self, other)
     if (selfLength > otherLength)
     {
         // every item in this set can't be in other if it's shorter!
-        return false;
+        return Sk.builtin.bool.false$;
     }
     for (var it = self.tp$iter(), item = it.tp$iternext(); item !== undefined; item = it.tp$iternext())
     {
         var isIn = Sk.abstr.sequenceContains(other, item);
         if (!isIn)
         {
-            return false;
+            return Sk.builtin.bool.false$;
         }
     }
-    return true;
+    return Sk.builtin.bool.true$;
 });
 
 Sk.builtin.set.prototype['issuperset'] = new Sk.builtin.func(function(self, other)
@@ -9336,10 +14871,10 @@ Sk.builtin.set.prototype['update'] = new Sk.builtin.func(function(self, other)
     {
         Sk.builtin.set.prototype['add'].func_code(self, item);
     }
-    return null;
+    return Sk.builtin.none.none$;
 });
 
-Sk.builtin.set.prototype['intersection_update'] = new Sk.builtin.func(function(self)
+Sk.builtin.set.prototype['intersection_update'] = new Sk.builtin.func(function(self, other)
 {
     for (var it = self.tp$iter(), item = it.tp$iternext(); item !== undefined; item = it.tp$iternext())
     {
@@ -9352,7 +14887,7 @@ Sk.builtin.set.prototype['intersection_update'] = new Sk.builtin.func(function(s
             }
         }
     }
-    return null;
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.set.prototype['difference_update'] = new Sk.builtin.func(function(self, other)
@@ -9368,7 +14903,7 @@ Sk.builtin.set.prototype['difference_update'] = new Sk.builtin.func(function(sel
             }
         }
     }
-    return null;
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.set.prototype['symmetric_difference_update'] = new Sk.builtin.func(function(self, other)
@@ -9376,29 +14911,21 @@ Sk.builtin.set.prototype['symmetric_difference_update'] = new Sk.builtin.func(fu
     var sd = Sk.builtin.set.prototype['symmetric_difference'].func_code(self, other);
     self.set_reset_();
     Sk.builtin.set.prototype['update'].func_code(self, sd);
-    return null;
+    return Sk.builtin.none.none$;
 });
 
 
 Sk.builtin.set.prototype['add'] = new Sk.builtin.func(function(self, item)
 {
     self.v.mp$ass_subscript(item, true);
-    return null;
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.set.prototype['discard'] = new Sk.builtin.func(function(self, item)
 {
-    if (self.v.mp$subscript(item) !== undefined)
-    {
-        var kf = Sk.builtin.hash;
-        var k = kf(item);
-        if (self.v[k] !== undefined) {
-            self.v.size -= 1;
-            delete self.v[k];
-        }
-        //self.v.mp$ass_subscript(item, null);
-    }
-    return null;
+    Sk.builtin.dict.prototype['pop'].func_code(self.v, item, 
+					       Sk.builtin.none.none$);
+    return Sk.builtin.none.none$;
 });
 
 Sk.builtin.set.prototype['pop'] = new Sk.builtin.func(function(self)
@@ -9415,15 +14942,8 @@ Sk.builtin.set.prototype['pop'] = new Sk.builtin.func(function(self)
 
 Sk.builtin.set.prototype['remove'] = new Sk.builtin.func(function(self, item)
 {
-    if (Sk.abstr.sequenceContains(self, item))
-    {
-        Sk.builtin.set.prototype['discard'].func_code(self, item);
-    }
-    else
-    {
-        throw new Sk.builtin.KeyError(item);
-    }
-    return null;
+    self.v.mp$del_subscript(item);
+    return Sk.builtin.none.none$;
 });
 
 
@@ -9460,6 +14980,7 @@ Sk.builtin.generator = function(code, globals, args, closure, closure2)
     this['gi$resumeat'] = 0;
     this['gi$sentvalue'] = undefined;
     this['gi$locals'] = {};
+    this['gi$cells'] = {};
     if (args.length > 0)
     {
         // store arguments into locals because they have to be maintained
@@ -9500,8 +15021,8 @@ Sk.builtin.generator.prototype.tp$iternext = function(yielded)
     var ret = this.func_code.apply(this.func_globals, args); 
     //print("ret", JSON.stringify(ret));
     this.gi$running = false;
-    //goog.asserts.assert(ret !== undefined);
-    if (ret !== null)
+    goog.asserts.assert(ret !== undefined);
+    if (ret !== Sk.builtin.none.none$)
     {
         // returns a pair: resume target and yielded value
         this['gi$resumeat'] = ret[0];
@@ -9540,7 +15061,7 @@ Sk.builtin.generator.prototype['send'] = new Sk.builtin.func(function(self, valu
  */
 Sk.builtin.makeGenerator = function(next, data)
 {
-  var gen = new Sk.builtin.generator();
+  var gen = new Sk.builtin.generator(null,null,null);
   gen.tp$iternext = next;
 
   for (var key in data)
@@ -9566,10 +15087,16 @@ Sk.builtin.file = function(name, mode, buffering)
     this.name = name;
     this.closed = false;
 	if ( Sk.inBrowser ) {  // todo:  Maybe provide a replaceable function for non-import files
-	    if (document.all) {
-		    this.data$ = document.getElementById(name.v).innerText;
-	    } else { // stupid Firefox
-	        this.data$ = document.getElementById(name.v).textContent;
+        var elem = document.getElementById(name.v);
+        if ( elem == null) {
+            throw new Sk.builtin.IOError("[Errno 2] No such file or directory: '"+name.v+"'");
+        } else {
+           if( elem.nodeName.toLowerCase() == "textarea") {
+               this.data$ = elem.value;
+           }
+           else {
+	           this.data$ = elem.textContent;
+	       }
 	    }
 	} else {
   		this.data$ = Sk.read(name.v);
@@ -9583,7 +15110,7 @@ Sk.builtin.file = function(name, mode, buffering)
     this.pos$ = 0;
 
 	this.__class__ = Sk.builtin.file;
-	
+
     return this;
 };
 
@@ -9724,9 +15251,11 @@ Sk.ffi.remapToPy = function(obj)
     }
     else if (typeof obj === "string")
         return new Sk.builtin.str(obj);
-    else if (typeof obj === "number" || typeof obj === "boolean")
+    else if (typeof obj === "number")
+		return new Sk.builtin.nmber(obj, undefined);
+	else if (typeof obj === "boolean")
         return obj;
-    goog.asserts.fail("unhandled remap type");
+    goog.asserts.fail("unhandled remap type " + typeof(obj));
 };
 goog.exportSymbol("Sk.ffi.remapToPy", Sk.ffi.remapToPy);
 
@@ -9751,12 +15280,20 @@ Sk.ffi.remapToJs = function(obj)
         }
         return ret;
     }
-    else if (obj instanceof Sk.builtin.list)
+    else if (obj instanceof Sk.builtin.list || obj instanceof Sk.builtin.tuple)
     {
         var ret = [];
         for (var i = 0; i < obj.v.length; ++i)
             ret.push(Sk.ffi.remapToJs(obj.v[i]));
         return ret;
+    }
+    else if (obj instanceof Sk.builtin.nmber)
+    {
+        return Sk.builtin.asnum$(obj);
+    }
+    else if (obj instanceof Sk.builtin.lng)
+    {
+        return Sk.builtin.asnum$(obj);
     }
     else if (obj === null || typeof obj === "number" || typeof obj === "boolean")
         return obj;
@@ -9810,6 +15347,10 @@ goog.exportSymbol("Sk.ffi.stdwrap", Sk.ffi.stdwrap);
  */
 Sk.ffi.basicwrap = function(obj)
 {
+	if (obj instanceof Sk.builtin.nmber)
+		return Sk.builtin.asnum$(obj);
+	if (obj instanceof Sk.builtin.lng)
+		return Sk.builtin.asnum$(obj);
     if (typeof obj === "number" || typeof obj === "boolean")
         return obj;
     if (typeof obj === "string")
@@ -9901,105 +15442,61 @@ Sk.ffi.checkArgs = function(name, args, count)
 };
 goog.exportSymbol("Sk.ffi.checkArgs", Sk.ffi.checkArgs);
 /**
- * @fileoverview
- * @suppress {undefinedVars|missingProperties}
+ * @constructor
+ * @param {Object} iterable
+ * @param {number=} start
+ * @extends Sk.builtin.object
  */
-Sk.canvas = {};
-
-// --------------------------------------------------------------
-Sk.canvas.show = function(canvas)
+Sk.builtin.enumerate = function(iterable, start)
 {
-  if (!window.canvasModal)
-  {
-    // Create the modal dialog for the first time if needed.
-    var outer = $('<div>')
-        .addClass('modal hide')
-        .attr('id', 'Sk-canvasModal')
-        .css('width', 'auto');
+    if (!(this instanceof Sk.builtin.enumerate)) return new Sk.builtin.enumerate(iterable, start);
 
-    var header = $('<div>')
-        .addClass('modal-header')
-        .append(
-            '<button type="button" class="close" data-dismiss="modal"'
-            + ' aria-hidden="true">&times;</button>'
-            + '<h3><i class="icon-reorder"></i>&nbsp;Picture</h3>')
-        .css('cursor', 'move');
+    Sk.builtin.pyCheckArgs("enumerate", arguments, 1, 2);
+    if (!Sk.builtin.checkIterable(iterable)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(iterable) + "' object is not iterable");
+    }
+    if (start !== undefined) {
+        if (!Sk.misceval.isIndex(start)) {
+            throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(start) + "' object cannot be interpreted as an index");
+        } else {
+	    start = Sk.misceval.asIndex(start);
+	}
+    }
+    else {
+	start = 0;
+    }
 
-    var body = $('<div>').addClass('modal-body');
-    var footer = $('<div>').addClass('modal-footer');
+    var it = iterable.tp$iter();
 
-    outer.append(header);
-    outer.append(body);
-    outer.append(footer);
-    $('body').append(outer);
+    this.tp$iter = function() { return this; };
+    this.$index = start;
+    this.tp$iternext = function () {
+        // todo; StopIteration
+        var next = it.tp$iternext();
+        if (next === undefined) return undefined;
+	var idx = Sk.builtin.assk$(this.$index++, Sk.builtin.nmber.int$);
+        return new Sk.builtin.tuple([idx, next]);
+    };
 
-    window.canvasModal = outer;
-    outer.modal({ backdrop: false, keyboard: true });
-    outer.draggable({ handle: '.modal-header' });
-  }
+    this.__class__ = Sk.builtin.enumerate;
 
-  $('.modal-body', window.canvasModal)
-    .empty()
-    .append(canvas);
+    return this;
+}
 
-  $('.modal-footer', window.canvasModal)
-    .empty()
-    .append(
-      '<form class="form-inline pull-left">' +
-      '<label for="canvas-x">X:</label>' +
-      '<input type="number" id="canvas-x" class="input-mini"/>' +
-      '<label for="canvas-y">Y:</label>' +
-      '<input type="number" id="canvas-y" class="input-mini"/>' +
-      '</form>')
-    .append(
-      '<table class="pull-right"><tbody><tr>' +
-      '<td class="canvas-color-label">R:</td><td id="canvas-red"></td>' +
-      '<td class="canvas-color-label">G:</td><td id="canvas-green"></td>' +
-      '<td class="canvas-color-label">B:</td><td id="canvas-blue"></td>' +
-      '<td id="canvas-color-swatch"></td>' +
-      '</tr></tbody></table>');
+Sk.builtin.enumerate.prototype.tp$name = "enumerate";
+Sk.builtin.enumerate.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj('enumerate', Sk.builtin.enumerate);
 
-  Sk.canvas._addMouseEvents(canvas, window.canvasModal);
+Sk.builtin.enumerate.prototype.tp$getattr = Sk.builtin.object.prototype.GenericGetAttr;
 
-  window.canvasModal.css('marginLeft', '-' + (canvas.width + 30) / 2 + 'px');
-  window.canvasModal.modal('show');
-};
-
-
-// --------------------------------------------------------------
-Sk.canvas.hide = function()
+Sk.builtin.enumerate.prototype['__iter__'] = new Sk.builtin.func(function(self)
 {
-  window.canvasModal.modal('hide');
-};
+    return self.tp$iter();
+});								 
 
-
-// --------------------------------------------------------------
-Sk.canvas._addMouseEvents = function(canvas, modal)
+Sk.builtin.enumerate.prototype['next'] = new Sk.builtin.func(function(self)
 {
-  $(canvas).mousemove(function(e) {
-    var x = e.offsetX;
-    var y = e.offsetY;
-
-    $('#canvas-x', modal).val(x);
-    $('#canvas-y', modal).val(y);
-
-    var ctx = canvas.getContext('2d');
-    var colordata = ctx.getImageData(x, y, 1, 1).data;
-    var r = colordata[0];
-    var g = colordata[1];
-    var b = colordata[2];
-
-    var rgb = 'rgb(' + r + ', ' + g + ', ' + b + ')';
-    $('#canvas-red', modal).text(r);
-    $('#canvas-green', modal).text(g);
-    $('#canvas-blue', modal).text(b);
-    $('#canvas-color-swatch', modal).css('background-color', rgb);
-  });
-};
-
-
-goog.exportSymbol("Sk.canvas.show", Sk.canvas.show);
-goog.exportSymbol("Sk.canvas.hide", Sk.canvas.hide);
+    return self.tp$iternext();
+});								 
 /*
  * This is a port of tokenize.py by Ka-Ping Yee.
  *
@@ -10174,7 +15671,8 @@ var ContStr = group("[uUbB]?[rR]?'[^\\n'\\\\]*(?:\\\\.[^\\n'\\\\]*)*" +
                 '[uUbB]?[rR]?"[^\\n"\\\\]*(?:\\\\.[^\\n"\\\\]*)*' +
                 group('"', '\\\\\\r?\\n'));
 var PseudoExtras = group('\\\\\\r?\\n', Comment_, Triple);
-var PseudoToken = group(PseudoExtras, Number_, Funny, ContStr, Ident);
+// Need to prefix with "^" as we only want to match what's next
+var PseudoToken = "^" + group(PseudoExtras, Number_, Funny, ContStr, Ident);
 
 var pseudoprog;
 var single3prog;
@@ -10283,6 +15781,7 @@ Sk.Tokenizer.prototype.generateTokens = function(line)
         {
             throw new Sk.builtin.TokenError("EOF in multi-line string", this.filename, this.strstart[0], this.strstart[1], this.contline);
         }
+        this.endprog.lastIndex = 0;
         endmatch = this.endprog.test(line);
         if (endmatch)
         {
@@ -10389,6 +15888,7 @@ Sk.Tokenizer.prototype.generateTokens = function(line)
             pos += 1;
             capos = line.charAt(pos);
         }
+        pseudoprog.lastIndex = 0;
         var pseudomatch = pseudoprog.exec(line.substring(pos));
         if (pseudomatch)
         {
@@ -10418,6 +15918,7 @@ Sk.Tokenizer.prototype.generateTokens = function(line)
             else if (triple_quoted.hasOwnProperty(token))
             {
                 this.endprog = endprogs[token];
+                this.endprog.lastIndex = 0;
                 endmatch = this.endprog.test(line.substring(pos));
                 if (endmatch)
                 {
@@ -10610,33 +16111,32 @@ sym:
  parameters: 312,
  pass_stmt: 313,
  power: 314,
- print_stmt: 315,
- raise_stmt: 316,
- return_stmt: 317,
- shift_expr: 318,
- simple_stmt: 319,
+ raise_stmt: 315,
+ return_stmt: 316,
+ shift_expr: 317,
+ simple_stmt: 318,
  single_input: 256,
- sliceop: 320,
- small_stmt: 321,
- stmt: 322,
- subscript: 323,
- subscriptlist: 324,
- suite: 325,
- term: 326,
- test: 327,
- testlist: 328,
- testlist1: 329,
- testlist_gexp: 330,
- testlist_safe: 331,
- trailer: 332,
- try_stmt: 333,
- varargslist: 334,
- while_stmt: 335,
- with_stmt: 336,
- with_var: 337,
- xor_expr: 338,
- yield_expr: 339,
- yield_stmt: 340},
+ sliceop: 319,
+ small_stmt: 320,
+ stmt: 321,
+ subscript: 322,
+ subscriptlist: 323,
+ suite: 324,
+ term: 325,
+ test: 326,
+ testlist: 327,
+ testlist1: 328,
+ testlist_gexp: 329,
+ testlist_safe: 330,
+ trailer: 331,
+ try_stmt: 332,
+ varargslist: 333,
+ while_stmt: 334,
+ with_stmt: 335,
+ with_var: 336,
+ xor_expr: 337,
+ yield_expr: 338,
+ yield_stmt: 339},
 number2symbol:
 {256: 'single_input',
  257: 'and_expr',
@@ -10697,32 +16197,31 @@ number2symbol:
  312: 'parameters',
  313: 'pass_stmt',
  314: 'power',
- 315: 'print_stmt',
- 316: 'raise_stmt',
- 317: 'return_stmt',
- 318: 'shift_expr',
- 319: 'simple_stmt',
- 320: 'sliceop',
- 321: 'small_stmt',
- 322: 'stmt',
- 323: 'subscript',
- 324: 'subscriptlist',
- 325: 'suite',
- 326: 'term',
- 327: 'test',
- 328: 'testlist',
- 329: 'testlist1',
- 330: 'testlist_gexp',
- 331: 'testlist_safe',
- 332: 'trailer',
- 333: 'try_stmt',
- 334: 'varargslist',
- 335: 'while_stmt',
- 336: 'with_stmt',
- 337: 'with_var',
- 338: 'xor_expr',
- 339: 'yield_expr',
- 340: 'yield_stmt'},
+ 315: 'raise_stmt',
+ 316: 'return_stmt',
+ 317: 'shift_expr',
+ 318: 'simple_stmt',
+ 319: 'sliceop',
+ 320: 'small_stmt',
+ 321: 'stmt',
+ 322: 'subscript',
+ 323: 'subscriptlist',
+ 324: 'suite',
+ 325: 'term',
+ 326: 'test',
+ 327: 'testlist',
+ 328: 'testlist1',
+ 329: 'testlist_gexp',
+ 330: 'testlist_safe',
+ 331: 'trailer',
+ 332: 'try_stmt',
+ 333: 'varargslist',
+ 334: 'while_stmt',
+ 335: 'with_stmt',
+ 336: 'with_var',
+ 337: 'xor_expr',
+ 338: 'yield_expr',
+ 339: 'yield_stmt'},
 dfas:
 {256: [[[[1, 1], [2, 1], [3, 2]], [[0, 1]], [[2, 1]]],
        {2: 1,
@@ -10757,74 +16256,74 @@ dfas:
         32: 1,
         33: 1,
         34: 1,
-        35: 1,
-        36: 1}],
- 257: [[[[37, 1]], [[38, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 258: [[[[39, 1]], [[40, 0], [0, 1]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
         35: 1}],
- 259: [[[[41, 1], [42, 2], [43, 3]],
-        [[44, 4]],
-        [[45, 5], [0, 2]],
-        [[44, 6]],
-        [[45, 7], [0, 4]],
-        [[41, 1], [42, 2], [43, 3], [0, 5]],
+ 257: [[[[36, 1]], [[37, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 258: [[[[38, 1]], [[39, 0], [0, 1]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1}],
+ 259: [[[[40, 1], [41, 2], [42, 3]],
+        [[43, 4]],
+        [[44, 5], [0, 2]],
+        [[43, 6]],
+        [[44, 7], [0, 4]],
+        [[40, 1], [41, 2], [42, 3], [0, 5]],
         [[0, 6]],
-        [[42, 4], [43, 3]]],
+        [[41, 4], [42, 3]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1,
-        36: 1,
-        41: 1,
-        43: 1}],
- 260: [[[[44, 1]], [[46, 2], [47, 3], [0, 1]], [[0, 2]], [[44, 2]]],
+        40: 1,
+        42: 1}],
+ 260: [[[[43, 1]], [[45, 2], [46, 3], [0, 1]], [[0, 2]], [[43, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 261: [[[[48, 1]], [[24, 0], [35, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 262: [[[[19, 1]], [[44, 2]], [[45, 3], [0, 2]], [[44, 4]], [[0, 4]]],
-       {19: 1}],
- 263: [[[[17, 1], [8, 2], [11, 5], [28, 4], [9, 3], [13, 6], [20, 2]],
-        [[17, 1], [0, 1]],
-        [[0, 2]],
-        [[49, 7], [50, 2]],
-        [[51, 2], [52, 8], [53, 8]],
-        [[54, 9], [55, 2]],
-        [[56, 10]],
-        [[50, 2]],
-        [[51, 2]],
-        [[55, 2]],
-        [[13, 2]]],
-       {8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 28: 1}],
- 264: [[[[57, 1],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 261: [[[[47, 1]], [[23, 0], [34, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 262: [[[[18, 1]], [[43, 2]], [[44, 3], [0, 2]], [[43, 4]], [[0, 4]]],
+       {18: 1}],
+ 263: [[[[19, 1], [8, 1], [9, 4], [27, 3], [11, 2], [12, 5], [16, 6]],
+        [[0, 1]],
+        [[48, 7], [49, 1]],
+        [[50, 1], [51, 8], [52, 8]],
+        [[53, 9], [54, 1]],
+        [[55, 10]],
+        [[16, 6], [0, 6]],
+        [[49, 1]],
+        [[50, 1]],
+        [[54, 1]],
+        [[12, 1]]],
+       {8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 27: 1}],
+ 264: [[[[56, 1],
+         [57, 1],
          [58, 1],
          [59, 1],
          [60, 1],
@@ -10834,10 +16333,10 @@ dfas:
          [64, 1],
          [65, 1],
          [66, 1],
-         [67, 1],
-         [68, 1]],
+         [67, 1]],
         [[0, 1]]],
-       {57: 1,
+       {56: 1,
+        57: 1,
         58: 1,
         59: 1,
         60: 1,
@@ -10847,129 +16346,128 @@ dfas:
         64: 1,
         65: 1,
         66: 1,
-        67: 1,
-        68: 1}],
- 265: [[[[31, 1]], [[0, 1]]], {31: 1}],
+        67: 1}],
+ 265: [[[[30, 1]], [[0, 1]]], {30: 1}],
  266: [[[[10, 1]],
-        [[20, 2]],
-        [[69, 3], [28, 4]],
-        [[70, 5]],
-        [[51, 6], [71, 7]],
+        [[19, 2]],
+        [[68, 3], [27, 4]],
+        [[69, 5]],
+        [[50, 6], [70, 7]],
         [[0, 5]],
-        [[69, 3]],
-        [[51, 6]]],
+        [[68, 3]],
+        [[50, 6]]],
        {10: 1}],
- 267: [[[[72, 1],
-         [73, 1],
-         [7, 2],
-         [74, 1],
+ 267: [[[[71, 1],
          [72, 1],
+         [7, 2],
+         [73, 1],
+         [71, 1],
+         [74, 1],
          [75, 1],
-         [76, 1],
-         [77, 3],
-         [78, 1],
-         [79, 1]],
+         [76, 3],
+         [77, 1],
+         [78, 1]],
         [[0, 1]],
-        [[75, 1]],
+        [[74, 1]],
         [[7, 1], [0, 3]]],
-       {7: 1, 72: 1, 73: 1, 74: 1, 75: 1, 76: 1, 77: 1, 78: 1, 79: 1}],
- 268: [[[[80, 1]], [[81, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 269: [[[[82, 1],
+       {7: 1, 71: 1, 72: 1, 73: 1, 74: 1, 75: 1, 76: 1, 77: 1, 78: 1}],
+ 268: [[[[79, 1]], [[80, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 269: [[[[81, 1],
+         [82, 1],
          [83, 1],
          [84, 1],
          [85, 1],
          [86, 1],
          [87, 1],
-         [88, 1],
-         [89, 1]],
+         [88, 1]],
         [[0, 1]]],
-       {4: 1, 10: 1, 14: 1, 16: 1, 27: 1, 30: 1, 33: 1, 34: 1}],
- 270: [[[[32, 1]], [[0, 1]]], {32: 1}],
- 271: [[[[90, 1]], [[88, 2], [85, 2]], [[0, 2]]], {33: 1}],
- 272: [[[[33, 1]],
-        [[91, 2]],
-        [[2, 4], [28, 3]],
-        [[51, 5], [92, 6]],
+       {4: 1, 10: 1, 13: 1, 15: 1, 26: 1, 29: 1, 32: 1, 33: 1}],
+ 270: [[[[31, 1]], [[0, 1]]], {31: 1}],
+ 271: [[[[89, 1]], [[87, 2], [84, 2]], [[0, 2]]], {32: 1}],
+ 272: [[[[32, 1]],
+        [[90, 2]],
+        [[2, 4], [27, 3]],
+        [[50, 5], [91, 6]],
         [[0, 4]],
         [[2, 4]],
-        [[51, 5]]],
-       {33: 1}],
- 273: [[[[93, 1]], [[93, 1], [0, 1]]], {33: 1}],
- 274: [[[[21, 1]], [[94, 2]], [[0, 2]]], {21: 1}],
- 275: [[[[44, 1]],
-        [[69, 2]],
-        [[44, 3]],
-        [[45, 4], [0, 3]],
-        [[44, 1], [0, 4]]],
+        [[50, 5]]],
+       {32: 1}],
+ 273: [[[[92, 1]], [[92, 1], [0, 1]]], {32: 1}],
+ 274: [[[[20, 1]], [[93, 2]], [[0, 2]]], {20: 1}],
+ 275: [[[[43, 1]],
+        [[68, 2]],
+        [[43, 3]],
+        [[44, 4], [0, 3]],
+        [[43, 1], [0, 4]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 276: [[[[91, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]], {20: 1}],
- 277: [[[[96, 1]], [[45, 0], [0, 1]]], {20: 1}],
- 278: [[[[20, 1]], [[97, 0], [0, 1]]], {20: 1}],
- 279: [[[[20, 1]], [[0, 1]]], {20: 1}],
- 280: [[[[71, 1]], [[2, 1], [98, 2]], [[0, 2]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 276: [[[[90, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]], {19: 1}],
+ 277: [[[[95, 1]], [[44, 0], [0, 1]]], {19: 1}],
+ 278: [[[[19, 1]], [[96, 0], [0, 1]]], {19: 1}],
+ 279: [[[[19, 1]], [[0, 1]]], {19: 1}],
+ 280: [[[[70, 1]], [[2, 1], [97, 2]], [[0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 281: [[[[99, 1]],
-        [[44, 2], [0, 1]],
-        [[95, 3], [45, 3], [0, 2]],
-        [[44, 4]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 281: [[[[98, 1]],
+        [[43, 2], [0, 1]],
+        [[94, 3], [44, 3], [0, 2]],
+        [[43, 4]],
         [[0, 4]]],
-       {99: 1}],
- 282: [[[[15, 1]],
-        [[80, 2]],
-        [[75, 3], [0, 2]],
-        [[44, 4]],
-        [[45, 5], [0, 4]],
-        [[44, 6]],
+       {98: 1}],
+ 282: [[[[14, 1]],
+        [[79, 2]],
+        [[74, 3], [0, 2]],
+        [[43, 4]],
+        [[44, 5], [0, 4]],
+        [[43, 6]],
         [[0, 6]]],
-       {15: 1}],
- 283: [[[[100, 1]], [[101, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 284: [[[[71, 1]],
-        [[102, 2], [47, 3], [0, 1]],
-        [[71, 4], [53, 4]],
-        [[71, 5], [53, 5]],
+       {14: 1}],
+ 283: [[[[99, 1]], [[100, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 284: [[[[70, 1]],
+        [[101, 2], [46, 3], [0, 1]],
+        [[70, 4], [52, 4]],
+        [[70, 5], [52, 5]],
         [[0, 4]],
-        [[47, 3], [0, 5]]],
+        [[46, 3], [0, 5]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 285: [[[[80, 1]], [[45, 2], [0, 1]], [[80, 1], [0, 2]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 286: [[[[103, 2], [24, 1], [6, 1], [35, 1]], [[104, 2]], [[0, 2]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 287: [[[[2, 0], [98, 1], [105, 0]], [[0, 1]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 285: [[[[79, 1]], [[44, 2], [0, 1]], [[79, 1], [0, 2]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 286: [[[[102, 2], [23, 1], [6, 1], [34, 1]], [[103, 2]], [[0, 2]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 287: [[[[2, 0], [97, 1], [104, 0]], [[0, 1]]],
        {2: 1,
         4: 1,
         5: 1,
@@ -11003,152 +16501,139 @@ dfas:
         33: 1,
         34: 1,
         35: 1,
-        36: 1,
-        98: 1}],
- 288: [[[[106, 1], [107, 1], [108, 1], [109, 1], [110, 1]], [[0, 1]]],
-       {5: 1, 18: 1, 25: 1, 31: 1, 32: 1}],
- 289: [[[[27, 1]],
-        [[94, 2]],
-        [[75, 3]],
-        [[71, 4]],
-        [[69, 5]],
-        [[70, 6]],
-        [[111, 7], [0, 6]],
-        [[69, 8]],
-        [[70, 9]],
-        [[0, 9]]],
-       {27: 1}],
- 290: [[[[28, 1], [20, 2]], [[112, 3]], [[0, 2]], [[51, 2]]], {20: 1, 28: 1}],
- 291: [[[[113, 1]], [[45, 2], [0, 1]], [[113, 1], [0, 2]]], {20: 1, 28: 1}],
- 292: [[[[4, 1]], [[20, 2]], [[114, 3]], [[69, 4]], [[70, 5]], [[0, 5]]],
-       {4: 1}],
- 293: [[[[27, 1]],
-        [[94, 2]],
-        [[75, 3]],
-        [[115, 4]],
-        [[116, 5], [0, 4]],
-        [[0, 5]]],
-       {27: 1}],
- 294: [[[[30, 1]], [[117, 2]], [[116, 3], [0, 2]], [[0, 3]]], {30: 1}],
- 295: [[[[46, 1], [118, 1]], [[0, 1]]], {27: 1, 30: 1}],
- 296: [[[[26, 1]], [[20, 2]], [[45, 1], [0, 2]]], {26: 1}],
- 297: [[[[30, 1]],
-        [[44, 2]],
-        [[69, 3]],
+        97: 1}],
+ 288: [[[[105, 1], [106, 1], [107, 1], [108, 1], [109, 1]], [[0, 1]]],
+       {5: 1, 17: 1, 24: 1, 30: 1, 31: 1}],
+ 289: [[[[26, 1]],
+        [[93, 2]],
+        [[74, 3]],
         [[70, 4]],
-        [[111, 5], [119, 1], [0, 4]],
+        [[68, 5]],
         [[69, 6]],
-        [[70, 7]],
-        [[0, 7]]],
-       {30: 1}],
- 298: [[[[20, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]], {20: 1}],
- 299: [[[[120, 1]], [[45, 2], [0, 1]], [[120, 1], [0, 2]]], {20: 1}],
- 300: [[[[29, 1]],
-        [[91, 2], [97, 3]],
-        [[23, 4]],
-        [[91, 2], [23, 4], [97, 3]],
-        [[121, 5], [41, 5], [28, 6]],
-        [[0, 5]],
-        [[121, 7]],
-        [[51, 5]]],
-       {29: 1}],
- 301: [[[[23, 1]], [[122, 2]], [[0, 2]]], {23: 1}],
- 302: [[[[123, 1], [124, 1]], [[0, 1]]], {23: 1, 29: 1}],
- 303: [[[[36, 1]], [[69, 2], [125, 3]], [[44, 4]], [[69, 2]], [[0, 4]]],
-       {36: 1}],
- 304: [[[[27, 1]],
-        [[94, 2]],
-        [[75, 3]],
-        [[126, 4]],
-        [[127, 5], [0, 4]],
+        [[110, 7], [0, 6]],
+        [[68, 8]],
+        [[69, 9]],
+        [[0, 9]]],
+       {26: 1}],
+ 290: [[[[27, 1], [19, 2]], [[111, 3]], [[0, 2]], [[50, 2]]], {19: 1, 27: 1}],
+ 291: [[[[112, 1]], [[44, 2], [0, 1]], [[112, 1], [0, 2]]], {19: 1, 27: 1}],
+ 292: [[[[4, 1]], [[19, 2]], [[113, 3]], [[68, 4]], [[69, 5]], [[0, 5]]],
+       {4: 1}],
+ 293: [[[[26, 1]],
+        [[93, 2]],
+        [[74, 3]],
+        [[114, 4]],
+        [[115, 5], [0, 4]],
         [[0, 5]]],
-       {27: 1}],
- 305: [[[[30, 1]], [[117, 2]], [[127, 3], [0, 2]], [[0, 3]]], {30: 1}],
- 306: [[[[128, 1], [129, 1]], [[0, 1]]], {27: 1, 30: 1}],
- 307: [[[[44, 1]],
-        [[128, 2], [45, 3], [0, 1]],
+       {26: 1}],
+ 294: [[[[29, 1]], [[116, 2]], [[115, 3], [0, 2]], [[0, 3]]], {29: 1}],
+ 295: [[[[45, 1], [117, 1]], [[0, 1]]], {26: 1, 29: 1}],
+ 296: [[[[25, 1]], [[19, 2]], [[44, 1], [0, 2]]], {25: 1}],
+ 297: [[[[29, 1]],
+        [[43, 2]],
+        [[68, 3]],
+        [[69, 4]],
+        [[110, 5], [118, 1], [0, 4]],
+        [[68, 6]],
+        [[69, 7]],
+        [[0, 7]]],
+       {29: 1}],
+ 298: [[[[19, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]], {19: 1}],
+ 299: [[[[119, 1]], [[44, 2], [0, 1]], [[119, 1], [0, 2]]], {19: 1}],
+ 300: [[[[28, 1]],
+        [[90, 2], [96, 3]],
+        [[22, 4]],
+        [[90, 2], [22, 4], [96, 3]],
+        [[120, 5], [40, 5], [27, 6]],
+        [[0, 5]],
+        [[120, 7]],
+        [[50, 5]]],
+       {28: 1}],
+ 301: [[[[22, 1]], [[121, 2]], [[0, 2]]], {22: 1}],
+ 302: [[[[122, 1], [123, 1]], [[0, 1]]], {22: 1, 28: 1}],
+ 303: [[[[35, 1]], [[68, 2], [124, 3]], [[43, 4]], [[68, 2]], [[0, 4]]],
+       {35: 1}],
+ 304: [[[[26, 1]],
+        [[93, 2]],
+        [[74, 3]],
+        [[125, 4]],
+        [[126, 5], [0, 4]],
+        [[0, 5]]],
+       {26: 1}],
+ 305: [[[[29, 1]], [[116, 2]], [[126, 3], [0, 2]], [[0, 3]]], {29: 1}],
+ 306: [[[[127, 1], [128, 1]], [[0, 1]]], {26: 1, 29: 1}],
+ 307: [[[[43, 1]],
+        [[127, 2], [44, 3], [0, 1]],
         [[0, 2]],
-        [[44, 4], [0, 3]],
-        [[45, 3], [0, 4]]],
+        [[43, 4], [0, 3]],
+        [[44, 3], [0, 4]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 308: [[[[7, 1], [130, 2]], [[39, 2]], [[0, 2]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1}],
- 309: [[[[36, 1]], [[69, 2], [125, 3]], [[117, 4]], [[69, 2]], [[0, 4]]],
-       {36: 1}],
- 310: [[[[131, 1], [115, 1]], [[0, 1]]],
+ 308: [[[[7, 1], [129, 2]], [[38, 2]], [[0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 311: [[[[132, 1]], [[133, 0], [0, 1]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1}],
+ 309: [[[[35, 1]], [[68, 2], [124, 3]], [[116, 4]], [[68, 2]], [[0, 4]]],
+       {35: 1}],
+ 310: [[[[130, 1], [114, 1]], [[0, 1]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1}],
- 312: [[[[28, 1]], [[51, 2], [125, 3]], [[0, 2]], [[51, 2]]], {28: 1}],
- 313: [[[[22, 1]], [[0, 1]]], {22: 1}],
- 314: [[[[134, 1]], [[135, 1], [43, 2], [0, 1]], [[104, 3]], [[0, 3]]],
-       {8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 28: 1}],
- 315: [[[[12, 1]],
-        [[28, 2]],
-        [[51, 3], [44, 4], [136, 5]],
-        [[0, 3]],
-        [[51, 3], [45, 6]],
-        [[44, 7]],
-        [[44, 4], [51, 3]],
-        [[51, 3], [45, 8]],
-        [[44, 9]],
-        [[51, 3], [45, 10]],
-        [[51, 3], [44, 9]]],
-       {12: 1}],
- 316: [[[[5, 1]],
-        [[44, 2], [0, 1]],
-        [[45, 3], [0, 2]],
-        [[44, 4]],
-        [[45, 5], [0, 4]],
-        [[44, 6]],
+ 311: [[[[131, 1]], [[132, 0], [0, 1]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1}],
+ 312: [[[[27, 1]], [[50, 2], [124, 3]], [[0, 2]], [[50, 2]]], {27: 1}],
+ 313: [[[[21, 1]], [[0, 1]]], {21: 1}],
+ 314: [[[[133, 1]], [[134, 1], [42, 2], [0, 1]], [[103, 3]], [[0, 3]]],
+       {8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 27: 1}],
+ 315: [[[[5, 1]],
+        [[43, 2], [0, 1]],
+        [[44, 3], [0, 2]],
+        [[43, 4]],
+        [[44, 5], [0, 4]],
+        [[43, 6]],
         [[0, 6]]],
        {5: 1}],
- 317: [[[[18, 1]], [[71, 2], [0, 1]], [[0, 2]]], {18: 1}],
- 318: [[[[137, 1]], [[136, 0], [138, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 319: [[[[139, 1]], [[2, 2], [140, 3]], [[0, 2]], [[139, 1], [2, 2]]],
+ 316: [[[[17, 1]], [[70, 2], [0, 1]], [[0, 2]]], {17: 1}],
+ 317: [[[[135, 1]], [[136, 0], [137, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 318: [[[[138, 1]], [[2, 2], [139, 3]], [[0, 2]], [[138, 1], [2, 2]]],
        {5: 1,
         6: 1,
         7: 1,
@@ -11156,8 +16641,8 @@ dfas:
         9: 1,
         11: 1,
         12: 1,
-        13: 1,
-        15: 1,
+        14: 1,
+        16: 1,
         17: 1,
         18: 1,
         19: 1,
@@ -11167,23 +16652,21 @@ dfas:
         23: 1,
         24: 1,
         25: 1,
-        26: 1,
+        27: 1,
         28: 1,
-        29: 1,
+        30: 1,
         31: 1,
-        32: 1,
-        35: 1,
-        36: 1}],
- 320: [[[[69, 1]], [[44, 2], [0, 1]], [[0, 2]]], {69: 1}],
- 321: [[[[141, 1],
+        34: 1,
+        35: 1}],
+ 319: [[[[68, 1]], [[43, 2], [0, 1]], [[0, 2]]], {68: 1}],
+ 320: [[[[140, 1],
+         [141, 1],
          [142, 1],
          [143, 1],
          [144, 1],
          [145, 1],
          [146, 1],
-         [147, 1],
-         [148, 1],
-         [149, 1]],
+         [147, 1]],
         [[0, 1]]],
        {5: 1,
         6: 1,
@@ -11192,8 +16675,8 @@ dfas:
         9: 1,
         11: 1,
         12: 1,
-        13: 1,
-        15: 1,
+        14: 1,
+        16: 1,
         17: 1,
         18: 1,
         19: 1,
@@ -11203,14 +16686,13 @@ dfas:
         23: 1,
         24: 1,
         25: 1,
-        26: 1,
+        27: 1,
         28: 1,
-        29: 1,
+        30: 1,
         31: 1,
-        32: 1,
-        35: 1,
-        36: 1}],
- 322: [[[[1, 1], [3, 1]], [[0, 1]]],
+        34: 1,
+        35: 1}],
+ 321: [[[[1, 1], [3, 1]], [[0, 1]]],
        {4: 1,
         5: 1,
         6: 1,
@@ -11242,49 +16724,48 @@ dfas:
         32: 1,
         33: 1,
         34: 1,
-        35: 1,
-        36: 1}],
- 323: [[[[44, 1], [69, 2], [97, 3]],
-        [[69, 2], [0, 1]],
-        [[150, 4], [44, 5], [0, 2]],
-        [[97, 6]],
-        [[0, 4]],
-        [[150, 4], [0, 5]],
-        [[97, 4]]],
+        35: 1}],
+ 322: [[[[43, 1], [68, 2], [96, 3]],
+        [[68, 2], [0, 1]],
+        [[43, 4], [148, 5], [0, 2]],
+        [[96, 6]],
+        [[148, 5], [0, 4]],
+        [[0, 5]],
+        [[96, 5]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1,
-        36: 1,
-        69: 1,
-        97: 1}],
- 324: [[[[151, 1]], [[45, 2], [0, 1]], [[151, 1], [0, 2]]],
+        68: 1,
+        96: 1}],
+ 323: [[[[149, 1]], [[44, 2], [0, 1]], [[149, 1], [0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
         35: 1,
-        36: 1,
-        69: 1,
-        97: 1}],
- 325: [[[[1, 1], [2, 2]],
+        68: 1,
+        96: 1}],
+ 324: [[[[1, 1], [2, 2]],
         [[0, 1]],
-        [[152, 3]],
-        [[105, 4]],
-        [[153, 1], [105, 4]]],
+        [[150, 3]],
+        [[104, 4]],
+        [[151, 1], [104, 4]]],
        {2: 1,
         5: 1,
         6: 1,
@@ -11293,8 +16774,8 @@ dfas:
         9: 1,
         11: 1,
         12: 1,
-        13: 1,
-        15: 1,
+        14: 1,
+        16: 1,
         17: 1,
         18: 1,
         19: 1,
@@ -11304,174 +16785,174 @@ dfas:
         23: 1,
         24: 1,
         25: 1,
-        26: 1,
+        27: 1,
         28: 1,
-        29: 1,
+        30: 1,
         31: 1,
-        32: 1,
-        35: 1,
-        36: 1}],
- 326: [[[[104, 1]], [[154, 0], [41, 0], [155, 0], [156, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 327: [[[[115, 1], [157, 2]],
-        [[30, 3], [0, 1]],
+        34: 1,
+        35: 1}],
+ 325: [[[[103, 1]], [[152, 0], [40, 0], [153, 0], [154, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 326: [[[[114, 1], [155, 2]],
+        [[29, 3], [0, 1]],
         [[0, 2]],
-        [[115, 4]],
-        [[111, 5]],
-        [[44, 2]]],
+        [[114, 4]],
+        [[110, 5]],
+        [[43, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 328: [[[[44, 1]], [[45, 2], [0, 1]], [[44, 1], [0, 2]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 327: [[[[43, 1]], [[44, 2], [0, 1]], [[43, 1], [0, 2]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 329: [[[[44, 1]], [[45, 0], [0, 1]]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 328: [[[[43, 1]], [[44, 0], [0, 1]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 330: [[[[44, 1]],
-        [[46, 2], [45, 3], [0, 1]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 329: [[[[43, 1]],
+        [[45, 2], [44, 3], [0, 1]],
         [[0, 2]],
+        [[43, 4], [0, 3]],
+        [[44, 3], [0, 4]]],
+       {6: 1,
+        7: 1,
+        8: 1,
+        9: 1,
+        11: 1,
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 330: [[[[116, 1]],
+        [[44, 2], [0, 1]],
+        [[116, 3]],
         [[44, 4], [0, 3]],
-        [[45, 3], [0, 4]]],
+        [[116, 3], [0, 4]]],
        {6: 1,
         7: 1,
         8: 1,
         9: 1,
         11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 331: [[[[117, 1]],
-        [[45, 2], [0, 1]],
-        [[117, 3]],
-        [[45, 4], [0, 3]],
-        [[117, 3], [0, 4]]],
-       {6: 1,
-        7: 1,
-        8: 1,
-        9: 1,
-        11: 1,
-        13: 1,
-        17: 1,
-        20: 1,
-        24: 1,
-        28: 1,
-        35: 1,
-        36: 1}],
- 332: [[[[28, 1], [97, 2], [11, 3]],
-        [[51, 4], [92, 5]],
-        [[20, 4]],
-        [[158, 6]],
+        12: 1,
+        16: 1,
+        19: 1,
+        23: 1,
+        27: 1,
+        34: 1,
+        35: 1}],
+ 331: [[[[27, 1], [96, 2], [11, 3]],
+        [[50, 4], [91, 5]],
+        [[19, 4]],
+        [[156, 6]],
         [[0, 4]],
-        [[51, 4]],
-        [[55, 4]]],
-       {11: 1, 28: 1, 97: 1}],
- 333: [[[[14, 1]],
-        [[69, 2]],
-        [[70, 3]],
-        [[159, 4], [160, 5]],
-        [[69, 6]],
-        [[69, 7]],
-        [[70, 8]],
-        [[70, 9]],
-        [[159, 4], [111, 10], [160, 5], [0, 8]],
+        [[50, 4]],
+        [[49, 4]]],
+       {11: 1, 27: 1, 96: 1}],
+ 332: [[[[13, 1]],
+        [[68, 2]],
+        [[69, 3]],
+        [[157, 4], [158, 5]],
+        [[68, 6]],
+        [[68, 7]],
+        [[69, 8]],
+        [[69, 9]],
+        [[157, 4], [110, 10], [158, 5], [0, 8]],
         [[0, 9]],
-        [[69, 11]],
-        [[70, 12]],
-        [[160, 5], [0, 12]]],
-       {14: 1}],
- 334: [[[[41, 1], [113, 2], [43, 3]],
-        [[20, 4]],
-        [[47, 5], [45, 6], [0, 2]],
-        [[20, 7]],
-        [[45, 8], [0, 4]],
-        [[44, 9]],
-        [[41, 1], [113, 2], [43, 3], [0, 6]],
+        [[68, 11]],
+        [[69, 12]],
+        [[158, 5], [0, 12]]],
+       {13: 1}],
+ 333: [[[[40, 1], [112, 2], [42, 3]],
+        [[19, 4]],
+        [[46, 5], [44, 6], [0, 2]],
+        [[19, 7]],
+        [[44, 8], [0, 4]],
+        [[43, 9]],
+        [[40, 1], [112, 2], [42, 3], [0, 6]],
         [[0, 7]],
-        [[43, 3]],
-        [[45, 6], [0, 9]]],
-       {20: 1, 28: 1, 41: 1, 43: 1}],
- 335: [[[[16, 1]],
-        [[44, 2]],
-        [[69, 3]],
-        [[70, 4]],
-        [[111, 5], [0, 4]],
-        [[69, 6]],
-        [[70, 7]],
+        [[42, 3]],
+        [[44, 6], [0, 9]]],
+       {19: 1, 27: 1, 40: 1, 42: 1}],
+ 334: [[[[15, 1]],
+        [[43, 2]],
+        [[68, 3]],
+        [[69, 4]],
+        [[110, 5], [0, 4]],
+        [[68, 6]],
+        [[69, 7]],
         [[0, 7]]],
-       {16: 1}],
- 336: [[[[34, 1]],
-        [[44, 2]],
-        [[69, 3], [161, 4]],
-        [[70, 5]],
-        [[69, 3]],
+       {15: 1}],
+ 335: [[[[33, 1]],
+        [[43, 2]],
+        [[68, 3], [159, 4]],
+        [[69, 5]],
+        [[68, 3]],
         [[0, 5]]],
-       {34: 1}],
- 337: [[[[95, 1]], [[80, 2]], [[0, 2]]], {95: 1}],
- 338: [[[[162, 1]], [[163, 0], [0, 1]]],
-       {6: 1, 8: 1, 9: 1, 11: 1, 13: 1, 17: 1, 20: 1, 24: 1, 28: 1, 35: 1}],
- 339: [[[[25, 1]], [[71, 2], [0, 1]], [[0, 2]]], {25: 1}],
- 340: [[[[53, 1]], [[0, 1]]], {25: 1}]},
+       {33: 1}],
+ 336: [[[[94, 1]], [[79, 2]], [[0, 2]]], {94: 1}],
+ 337: [[[[160, 1]], [[161, 0], [0, 1]]],
+       {6: 1, 8: 1, 9: 1, 11: 1, 12: 1, 16: 1, 19: 1, 23: 1, 27: 1, 34: 1}],
+ 338: [[[[24, 1]], [[70, 2], [0, 1]], [[0, 2]]], {24: 1}],
+ 339: [[[[52, 1]], [[0, 1]]], {24: 1}]},
 states:
 [[[[1, 1], [2, 1], [3, 2]], [[0, 1]], [[2, 1]]],
- [[[37, 1]], [[38, 0], [0, 1]]],
- [[[39, 1]], [[40, 0], [0, 1]]],
- [[[41, 1], [42, 2], [43, 3]],
-  [[44, 4]],
-  [[45, 5], [0, 2]],
-  [[44, 6]],
-  [[45, 7], [0, 4]],
-  [[41, 1], [42, 2], [43, 3], [0, 5]],
+ [[[36, 1]], [[37, 0], [0, 1]]],
+ [[[38, 1]], [[39, 0], [0, 1]]],
+ [[[40, 1], [41, 2], [42, 3]],
+  [[43, 4]],
+  [[44, 5], [0, 2]],
+  [[43, 6]],
+  [[44, 7], [0, 4]],
+  [[40, 1], [41, 2], [42, 3], [0, 5]],
   [[0, 6]],
-  [[42, 4], [43, 3]]],
- [[[44, 1]], [[46, 2], [47, 3], [0, 1]], [[0, 2]], [[44, 2]]],
- [[[48, 1]], [[24, 0], [35, 0], [0, 1]]],
- [[[19, 1]], [[44, 2]], [[45, 3], [0, 2]], [[44, 4]], [[0, 4]]],
- [[[17, 1], [8, 2], [11, 5], [28, 4], [9, 3], [13, 6], [20, 2]],
-  [[17, 1], [0, 1]],
-  [[0, 2]],
-  [[49, 7], [50, 2]],
-  [[51, 2], [52, 8], [53, 8]],
-  [[54, 9], [55, 2]],
-  [[56, 10]],
-  [[50, 2]],
-  [[51, 2]],
-  [[55, 2]],
-  [[13, 2]]],
- [[[57, 1],
+  [[41, 4], [42, 3]]],
+ [[[43, 1]], [[45, 2], [46, 3], [0, 1]], [[0, 2]], [[43, 2]]],
+ [[[47, 1]], [[23, 0], [34, 0], [0, 1]]],
+ [[[18, 1]], [[43, 2]], [[44, 3], [0, 2]], [[43, 4]], [[0, 4]]],
+ [[[19, 1], [8, 1], [9, 4], [27, 3], [11, 2], [12, 5], [16, 6]],
+  [[0, 1]],
+  [[48, 7], [49, 1]],
+  [[50, 1], [51, 8], [52, 8]],
+  [[53, 9], [54, 1]],
+  [[55, 10]],
+  [[16, 6], [0, 6]],
+  [[49, 1]],
+  [[50, 1]],
+  [[54, 1]],
+  [[12, 1]]],
+ [[[56, 1],
+   [57, 1],
    [58, 1],
    [59, 1],
    [60, 1],
@@ -11481,234 +16962,221 @@ states:
    [64, 1],
    [65, 1],
    [66, 1],
-   [67, 1],
-   [68, 1]],
+   [67, 1]],
+  [[0, 1]]],
+ [[[30, 1]], [[0, 1]]],
+ [[[10, 1]],
+  [[19, 2]],
+  [[68, 3], [27, 4]],
+  [[69, 5]],
+  [[50, 6], [70, 7]],
+  [[0, 5]],
+  [[68, 3]],
+  [[50, 6]]],
+ [[[71, 1],
+   [72, 1],
+   [7, 2],
+   [73, 1],
+   [71, 1],
+   [74, 1],
+   [75, 1],
+   [76, 3],
+   [77, 1],
+   [78, 1]],
+  [[0, 1]],
+  [[74, 1]],
+  [[7, 1], [0, 3]]],
+ [[[79, 1]], [[80, 0], [0, 1]]],
+ [[[81, 1], [82, 1], [83, 1], [84, 1], [85, 1], [86, 1], [87, 1], [88, 1]],
   [[0, 1]]],
  [[[31, 1]], [[0, 1]]],
- [[[10, 1]],
-  [[20, 2]],
-  [[69, 3], [28, 4]],
-  [[70, 5]],
-  [[51, 6], [71, 7]],
-  [[0, 5]],
-  [[69, 3]],
-  [[51, 6]]],
- [[[72, 1],
-   [73, 1],
-   [7, 2],
-   [74, 1],
-   [72, 1],
-   [75, 1],
-   [76, 1],
-   [77, 3],
-   [78, 1],
-   [79, 1]],
-  [[0, 1]],
-  [[75, 1]],
-  [[7, 1], [0, 3]]],
- [[[80, 1]], [[81, 0], [0, 1]]],
- [[[82, 1], [83, 1], [84, 1], [85, 1], [86, 1], [87, 1], [88, 1], [89, 1]],
-  [[0, 1]]],
- [[[32, 1]], [[0, 1]]],
- [[[90, 1]], [[88, 2], [85, 2]], [[0, 2]]],
- [[[33, 1]],
-  [[91, 2]],
-  [[2, 4], [28, 3]],
-  [[51, 5], [92, 6]],
+ [[[89, 1]], [[87, 2], [84, 2]], [[0, 2]]],
+ [[[32, 1]],
+  [[90, 2]],
+  [[2, 4], [27, 3]],
+  [[50, 5], [91, 6]],
   [[0, 4]],
   [[2, 4]],
-  [[51, 5]]],
- [[[93, 1]], [[93, 1], [0, 1]]],
- [[[21, 1]], [[94, 2]], [[0, 2]]],
- [[[44, 1]], [[69, 2]], [[44, 3]], [[45, 4], [0, 3]], [[44, 1], [0, 4]]],
- [[[91, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]],
- [[[96, 1]], [[45, 0], [0, 1]]],
- [[[20, 1]], [[97, 0], [0, 1]]],
- [[[20, 1]], [[0, 1]]],
- [[[71, 1]], [[2, 1], [98, 2]], [[0, 2]]],
- [[[99, 1]],
-  [[44, 2], [0, 1]],
-  [[95, 3], [45, 3], [0, 2]],
-  [[44, 4]],
+  [[50, 5]]],
+ [[[92, 1]], [[92, 1], [0, 1]]],
+ [[[20, 1]], [[93, 2]], [[0, 2]]],
+ [[[43, 1]], [[68, 2]], [[43, 3]], [[44, 4], [0, 3]], [[43, 1], [0, 4]]],
+ [[[90, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]],
+ [[[95, 1]], [[44, 0], [0, 1]]],
+ [[[19, 1]], [[96, 0], [0, 1]]],
+ [[[19, 1]], [[0, 1]]],
+ [[[70, 1]], [[2, 1], [97, 2]], [[0, 2]]],
+ [[[98, 1]],
+  [[43, 2], [0, 1]],
+  [[94, 3], [44, 3], [0, 2]],
+  [[43, 4]],
   [[0, 4]]],
- [[[15, 1]],
-  [[80, 2]],
-  [[75, 3], [0, 2]],
-  [[44, 4]],
-  [[45, 5], [0, 4]],
-  [[44, 6]],
+ [[[14, 1]],
+  [[79, 2]],
+  [[74, 3], [0, 2]],
+  [[43, 4]],
+  [[44, 5], [0, 4]],
+  [[43, 6]],
   [[0, 6]]],
- [[[100, 1]], [[101, 0], [0, 1]]],
- [[[71, 1]],
-  [[102, 2], [47, 3], [0, 1]],
-  [[71, 4], [53, 4]],
-  [[71, 5], [53, 5]],
+ [[[99, 1]], [[100, 0], [0, 1]]],
+ [[[70, 1]],
+  [[101, 2], [46, 3], [0, 1]],
+  [[70, 4], [52, 4]],
+  [[70, 5], [52, 5]],
   [[0, 4]],
-  [[47, 3], [0, 5]]],
- [[[80, 1]], [[45, 2], [0, 1]], [[80, 1], [0, 2]]],
- [[[103, 2], [24, 1], [6, 1], [35, 1]], [[104, 2]], [[0, 2]]],
- [[[2, 0], [98, 1], [105, 0]], [[0, 1]]],
- [[[106, 1], [107, 1], [108, 1], [109, 1], [110, 1]], [[0, 1]]],
- [[[27, 1]],
-  [[94, 2]],
-  [[75, 3]],
-  [[71, 4]],
-  [[69, 5]],
-  [[70, 6]],
-  [[111, 7], [0, 6]],
-  [[69, 8]],
-  [[70, 9]],
-  [[0, 9]]],
- [[[28, 1], [20, 2]], [[112, 3]], [[0, 2]], [[51, 2]]],
- [[[113, 1]], [[45, 2], [0, 1]], [[113, 1], [0, 2]]],
- [[[4, 1]], [[20, 2]], [[114, 3]], [[69, 4]], [[70, 5]], [[0, 5]]],
- [[[27, 1]], [[94, 2]], [[75, 3]], [[115, 4]], [[116, 5], [0, 4]], [[0, 5]]],
- [[[30, 1]], [[117, 2]], [[116, 3], [0, 2]], [[0, 3]]],
- [[[46, 1], [118, 1]], [[0, 1]]],
- [[[26, 1]], [[20, 2]], [[45, 1], [0, 2]]],
- [[[30, 1]],
-  [[44, 2]],
-  [[69, 3]],
+  [[46, 3], [0, 5]]],
+ [[[79, 1]], [[44, 2], [0, 1]], [[79, 1], [0, 2]]],
+ [[[102, 2], [23, 1], [6, 1], [34, 1]], [[103, 2]], [[0, 2]]],
+ [[[2, 0], [97, 1], [104, 0]], [[0, 1]]],
+ [[[105, 1], [106, 1], [107, 1], [108, 1], [109, 1]], [[0, 1]]],
+ [[[26, 1]],
+  [[93, 2]],
+  [[74, 3]],
   [[70, 4]],
-  [[111, 5], [119, 1], [0, 4]],
+  [[68, 5]],
   [[69, 6]],
-  [[70, 7]],
-  [[0, 7]]],
- [[[20, 1]], [[95, 2], [0, 1]], [[20, 3]], [[0, 3]]],
- [[[120, 1]], [[45, 2], [0, 1]], [[120, 1], [0, 2]]],
+  [[110, 7], [0, 6]],
+  [[68, 8]],
+  [[69, 9]],
+  [[0, 9]]],
+ [[[27, 1], [19, 2]], [[111, 3]], [[0, 2]], [[50, 2]]],
+ [[[112, 1]], [[44, 2], [0, 1]], [[112, 1], [0, 2]]],
+ [[[4, 1]], [[19, 2]], [[113, 3]], [[68, 4]], [[69, 5]], [[0, 5]]],
+ [[[26, 1]], [[93, 2]], [[74, 3]], [[114, 4]], [[115, 5], [0, 4]], [[0, 5]]],
+ [[[29, 1]], [[116, 2]], [[115, 3], [0, 2]], [[0, 3]]],
+ [[[45, 1], [117, 1]], [[0, 1]]],
+ [[[25, 1]], [[19, 2]], [[44, 1], [0, 2]]],
  [[[29, 1]],
-  [[91, 2], [97, 3]],
-  [[23, 4]],
-  [[91, 2], [23, 4], [97, 3]],
-  [[121, 5], [41, 5], [28, 6]],
+  [[43, 2]],
+  [[68, 3]],
+  [[69, 4]],
+  [[110, 5], [118, 1], [0, 4]],
+  [[68, 6]],
+  [[69, 7]],
+  [[0, 7]]],
+ [[[19, 1]], [[94, 2], [0, 1]], [[19, 3]], [[0, 3]]],
+ [[[119, 1]], [[44, 2], [0, 1]], [[119, 1], [0, 2]]],
+ [[[28, 1]],
+  [[90, 2], [96, 3]],
+  [[22, 4]],
+  [[90, 2], [22, 4], [96, 3]],
+  [[120, 5], [40, 5], [27, 6]],
   [[0, 5]],
-  [[121, 7]],
-  [[51, 5]]],
- [[[23, 1]], [[122, 2]], [[0, 2]]],
- [[[123, 1], [124, 1]], [[0, 1]]],
- [[[36, 1]], [[69, 2], [125, 3]], [[44, 4]], [[69, 2]], [[0, 4]]],
- [[[27, 1]], [[94, 2]], [[75, 3]], [[126, 4]], [[127, 5], [0, 4]], [[0, 5]]],
- [[[30, 1]], [[117, 2]], [[127, 3], [0, 2]], [[0, 3]]],
- [[[128, 1], [129, 1]], [[0, 1]]],
- [[[44, 1]],
-  [[128, 2], [45, 3], [0, 1]],
+  [[120, 7]],
+  [[50, 5]]],
+ [[[22, 1]], [[121, 2]], [[0, 2]]],
+ [[[122, 1], [123, 1]], [[0, 1]]],
+ [[[35, 1]], [[68, 2], [124, 3]], [[43, 4]], [[68, 2]], [[0, 4]]],
+ [[[26, 1]], [[93, 2]], [[74, 3]], [[125, 4]], [[126, 5], [0, 4]], [[0, 5]]],
+ [[[29, 1]], [[116, 2]], [[126, 3], [0, 2]], [[0, 3]]],
+ [[[127, 1], [128, 1]], [[0, 1]]],
+ [[[43, 1]],
+  [[127, 2], [44, 3], [0, 1]],
   [[0, 2]],
-  [[44, 4], [0, 3]],
-  [[45, 3], [0, 4]]],
- [[[7, 1], [130, 2]], [[39, 2]], [[0, 2]]],
- [[[36, 1]], [[69, 2], [125, 3]], [[117, 4]], [[69, 2]], [[0, 4]]],
- [[[131, 1], [115, 1]], [[0, 1]]],
- [[[132, 1]], [[133, 0], [0, 1]]],
- [[[28, 1]], [[51, 2], [125, 3]], [[0, 2]], [[51, 2]]],
- [[[22, 1]], [[0, 1]]],
- [[[134, 1]], [[135, 1], [43, 2], [0, 1]], [[104, 3]], [[0, 3]]],
- [[[12, 1]],
-  [[28, 2]],
-  [[51, 3], [44, 4], [136, 5]],
-  [[0, 3]],
-  [[51, 3], [45, 6]],
-  [[44, 7]],
-  [[44, 4], [51, 3]],
-  [[51, 3], [45, 8]],
-  [[44, 9]],
-  [[51, 3], [45, 10]],
-  [[51, 3], [44, 9]]],
+  [[43, 4], [0, 3]],
+  [[44, 3], [0, 4]]],
+ [[[7, 1], [129, 2]], [[38, 2]], [[0, 2]]],
+ [[[35, 1]], [[68, 2], [124, 3]], [[116, 4]], [[68, 2]], [[0, 4]]],
+ [[[130, 1], [114, 1]], [[0, 1]]],
+ [[[131, 1]], [[132, 0], [0, 1]]],
+ [[[27, 1]], [[50, 2], [124, 3]], [[0, 2]], [[50, 2]]],
+ [[[21, 1]], [[0, 1]]],
+ [[[133, 1]], [[134, 1], [42, 2], [0, 1]], [[103, 3]], [[0, 3]]],
  [[[5, 1]],
-  [[44, 2], [0, 1]],
-  [[45, 3], [0, 2]],
-  [[44, 4]],
-  [[45, 5], [0, 4]],
-  [[44, 6]],
+  [[43, 2], [0, 1]],
+  [[44, 3], [0, 2]],
+  [[43, 4]],
+  [[44, 5], [0, 4]],
+  [[43, 6]],
   [[0, 6]]],
- [[[18, 1]], [[71, 2], [0, 1]], [[0, 2]]],
- [[[137, 1]], [[136, 0], [138, 0], [0, 1]]],
- [[[139, 1]], [[2, 2], [140, 3]], [[0, 2]], [[139, 1], [2, 2]]],
- [[[69, 1]], [[44, 2], [0, 1]], [[0, 2]]],
- [[[141, 1],
+ [[[17, 1]], [[70, 2], [0, 1]], [[0, 2]]],
+ [[[135, 1]], [[136, 0], [137, 0], [0, 1]]],
+ [[[138, 1]], [[2, 2], [139, 3]], [[0, 2]], [[138, 1], [2, 2]]],
+ [[[68, 1]], [[43, 2], [0, 1]], [[0, 2]]],
+ [[[140, 1],
+   [141, 1],
    [142, 1],
    [143, 1],
    [144, 1],
    [145, 1],
    [146, 1],
-   [147, 1],
-   [148, 1],
-   [149, 1]],
+   [147, 1]],
   [[0, 1]]],
  [[[1, 1], [3, 1]], [[0, 1]]],
- [[[44, 1], [69, 2], [97, 3]],
-  [[69, 2], [0, 1]],
-  [[150, 4], [44, 5], [0, 2]],
-  [[97, 6]],
-  [[0, 4]],
-  [[150, 4], [0, 5]],
-  [[97, 4]]],
- [[[151, 1]], [[45, 2], [0, 1]], [[151, 1], [0, 2]]],
- [[[1, 1], [2, 2]], [[0, 1]], [[152, 3]], [[105, 4]], [[153, 1], [105, 4]]],
- [[[104, 1]], [[154, 0], [41, 0], [155, 0], [156, 0], [0, 1]]],
- [[[115, 1], [157, 2]],
-  [[30, 3], [0, 1]],
+ [[[43, 1], [68, 2], [96, 3]],
+  [[68, 2], [0, 1]],
+  [[43, 4], [148, 5], [0, 2]],
+  [[96, 6]],
+  [[148, 5], [0, 4]],
+  [[0, 5]],
+  [[96, 5]]],
+ [[[149, 1]], [[44, 2], [0, 1]], [[149, 1], [0, 2]]],
+ [[[1, 1], [2, 2]], [[0, 1]], [[150, 3]], [[104, 4]], [[151, 1], [104, 4]]],
+ [[[103, 1]], [[152, 0], [40, 0], [153, 0], [154, 0], [0, 1]]],
+ [[[114, 1], [155, 2]],
+  [[29, 3], [0, 1]],
   [[0, 2]],
-  [[115, 4]],
-  [[111, 5]],
-  [[44, 2]]],
- [[[44, 1]], [[45, 2], [0, 1]], [[44, 1], [0, 2]]],
- [[[44, 1]], [[45, 0], [0, 1]]],
- [[[44, 1]],
-  [[46, 2], [45, 3], [0, 1]],
+  [[114, 4]],
+  [[110, 5]],
+  [[43, 2]]],
+ [[[43, 1]], [[44, 2], [0, 1]], [[43, 1], [0, 2]]],
+ [[[43, 1]], [[44, 0], [0, 1]]],
+ [[[43, 1]],
+  [[45, 2], [44, 3], [0, 1]],
   [[0, 2]],
+  [[43, 4], [0, 3]],
+  [[44, 3], [0, 4]]],
+ [[[116, 1]],
+  [[44, 2], [0, 1]],
+  [[116, 3]],
   [[44, 4], [0, 3]],
-  [[45, 3], [0, 4]]],
- [[[117, 1]],
-  [[45, 2], [0, 1]],
-  [[117, 3]],
-  [[45, 4], [0, 3]],
-  [[117, 3], [0, 4]]],
- [[[28, 1], [97, 2], [11, 3]],
-  [[51, 4], [92, 5]],
-  [[20, 4]],
-  [[158, 6]],
+  [[116, 3], [0, 4]]],
+ [[[27, 1], [96, 2], [11, 3]],
+  [[50, 4], [91, 5]],
+  [[19, 4]],
+  [[156, 6]],
   [[0, 4]],
-  [[51, 4]],
-  [[55, 4]]],
- [[[14, 1]],
-  [[69, 2]],
-  [[70, 3]],
-  [[159, 4], [160, 5]],
-  [[69, 6]],
-  [[69, 7]],
-  [[70, 8]],
-  [[70, 9]],
-  [[159, 4], [111, 10], [160, 5], [0, 8]],
-  [[0, 9]],
-  [[69, 11]],
-  [[70, 12]],
-  [[160, 5], [0, 12]]],
- [[[41, 1], [113, 2], [43, 3]],
-  [[20, 4]],
-  [[47, 5], [45, 6], [0, 2]],
-  [[20, 7]],
-  [[45, 8], [0, 4]],
-  [[44, 9]],
-  [[41, 1], [113, 2], [43, 3], [0, 6]],
-  [[0, 7]],
-  [[43, 3]],
-  [[45, 6], [0, 9]]],
- [[[16, 1]],
-  [[44, 2]],
+  [[50, 4]],
+  [[49, 4]]],
+ [[[13, 1]],
+  [[68, 2]],
   [[69, 3]],
-  [[70, 4]],
-  [[111, 5], [0, 4]],
-  [[69, 6]],
-  [[70, 7]],
+  [[157, 4], [158, 5]],
+  [[68, 6]],
+  [[68, 7]],
+  [[69, 8]],
+  [[69, 9]],
+  [[157, 4], [110, 10], [158, 5], [0, 8]],
+  [[0, 9]],
+  [[68, 11]],
+  [[69, 12]],
+  [[158, 5], [0, 12]]],
+ [[[40, 1], [112, 2], [42, 3]],
+  [[19, 4]],
+  [[46, 5], [44, 6], [0, 2]],
+  [[19, 7]],
+  [[44, 8], [0, 4]],
+  [[43, 9]],
+  [[40, 1], [112, 2], [42, 3], [0, 6]],
+  [[0, 7]],
+  [[42, 3]],
+  [[44, 6], [0, 9]]],
+ [[[15, 1]],
+  [[43, 2]],
+  [[68, 3]],
+  [[69, 4]],
+  [[110, 5], [0, 4]],
+  [[68, 6]],
+  [[69, 7]],
   [[0, 7]]],
- [[[34, 1]], [[44, 2]], [[69, 3], [161, 4]], [[70, 5]], [[69, 3]], [[0, 5]]],
- [[[95, 1]], [[80, 2]], [[0, 2]]],
- [[[162, 1]], [[163, 0], [0, 1]]],
- [[[25, 1]], [[71, 2], [0, 1]], [[0, 2]]],
- [[[53, 1]], [[0, 1]]]],
+ [[[33, 1]], [[43, 2]], [[68, 3], [159, 4]], [[69, 5]], [[68, 3]], [[0, 5]]],
+ [[[94, 1]], [[79, 2]], [[0, 2]]],
+ [[[160, 1]], [[161, 0], [0, 1]]],
+ [[[24, 1]], [[70, 2], [0, 1]], [[0, 2]]],
+ [[[52, 1]], [[0, 1]]]],
 labels:
 [[0, 'EMPTY'],
- [319, null],
+ [318, null],
  [4, null],
  [269, null],
  [1, 'def'],
@@ -11719,7 +17187,6 @@ labels:
  [26, null],
  [1, 'class'],
  [9, null],
- [1, 'print'],
  [25, null],
  [1, 'try'],
  [1, 'exec'],
@@ -11744,26 +17211,26 @@ labels:
  [1, 'with'],
  [14, null],
  [1, 'lambda'],
- [318, null],
+ [317, null],
  [19, null],
  [308, null],
  [1, 'and'],
  [16, null],
  [260, null],
  [36, null],
- [327, null],
+ [326, null],
  [12, null],
  [293, null],
  [22, null],
- [326, null],
- [275, null],
- [27, null],
- [8, null],
- [330, null],
- [339, null],
+ [325, null],
  [307, null],
  [10, null],
+ [8, null],
  [329, null],
+ [338, null],
+ [275, null],
+ [27, null],
+ [328, null],
  [46, null],
  [39, null],
  [41, null],
@@ -11777,8 +17244,8 @@ labels:
  [38, null],
  [45, null],
  [11, null],
- [325, null],
- [328, null],
+ [324, null],
+ [327, null],
  [29, null],
  [21, null],
  [28, null],
@@ -11789,12 +17256,12 @@ labels:
  [20, null],
  [283, null],
  [267, null],
- [333, null],
+ [332, null],
  [297, null],
  [289, null],
  [266, null],
- [336, null],
  [335, null],
+ [334, null],
  [292, null],
  [271, null],
  [273, null],
@@ -11807,17 +17274,17 @@ labels:
  [23, null],
  [0, null],
  [1, 'except'],
- [338, null],
+ [337, null],
  [18, null],
  [264, null],
  [314, null],
  [286, null],
- [322, null],
+ [321, null],
  [265, null],
  [270, null],
+ [315, null],
  [316, null],
- [317, null],
- [340, null],
+ [339, null],
  [1, 'else'],
  [291, null],
  [290, null],
@@ -11832,8 +17299,8 @@ labels:
  [277, null],
  [301, null],
  [300, null],
- [334, null],
- [331, null],
+ [333, null],
+ [330, null],
  [306, null],
  [304, null],
  [305, null],
@@ -11842,119 +17309,117 @@ labels:
  [258, null],
  [1, 'or'],
  [263, null],
- [332, null],
- [35, null],
+ [331, null],
  [261, null],
+ [35, null],
  [34, null],
- [321, null],
+ [320, null],
  [13, null],
  [288, null],
- [274, null],
+ [262, null],
  [284, null],
  [313, null],
- [315, null],
- [262, null],
+ [274, null],
  [282, null],
  [296, null],
  [302, null],
- [320, null],
- [323, null],
+ [319, null],
+ [322, null],
  [5, null],
  [6, null],
  [48, null],
  [17, null],
  [24, null],
  [303, null],
- [324, null],
+ [323, null],
  [281, null],
  [1, 'finally'],
- [337, null],
+ [336, null],
  [257, null],
  [33, null]],
 keywords:
-{'and': 40,
- 'as': 95,
- 'assert': 19,
- 'break': 31,
+{'and': 39,
+ 'as': 94,
+ 'assert': 18,
+ 'break': 30,
  'class': 10,
- 'continue': 32,
+ 'continue': 31,
  'def': 4,
- 'del': 21,
- 'elif': 119,
- 'else': 111,
- 'except': 99,
- 'exec': 15,
- 'finally': 160,
- 'for': 27,
- 'from': 29,
- 'global': 26,
- 'if': 30,
- 'import': 23,
- 'in': 75,
- 'is': 77,
- 'lambda': 36,
+ 'del': 20,
+ 'elif': 118,
+ 'else': 110,
+ 'except': 98,
+ 'exec': 14,
+ 'finally': 158,
+ 'for': 26,
+ 'from': 28,
+ 'global': 25,
+ 'if': 29,
+ 'import': 22,
+ 'in': 74,
+ 'is': 76,
+ 'lambda': 35,
  'not': 7,
- 'or': 133,
- 'pass': 22,
- 'print': 12,
+ 'or': 132,
+ 'pass': 21,
  'raise': 5,
- 'return': 18,
- 'try': 14,
- 'while': 16,
- 'with': 34,
- 'yield': 25},
+ 'return': 17,
+ 'try': 13,
+ 'while': 15,
+ 'with': 33,
+ 'yield': 24},
 tokens:
-{0: 98,
- 1: 20,
+{0: 97,
+ 1: 19,
  2: 8,
- 3: 17,
+ 3: 16,
  4: 2,
- 5: 152,
- 6: 153,
- 7: 28,
- 8: 51,
+ 5: 150,
+ 6: 151,
+ 7: 27,
+ 8: 50,
  9: 11,
- 10: 55,
- 11: 69,
- 12: 45,
- 13: 140,
- 14: 35,
- 15: 24,
- 16: 41,
- 17: 155,
- 18: 101,
- 19: 38,
- 20: 79,
- 21: 73,
- 22: 47,
- 23: 97,
- 24: 156,
- 25: 13,
+ 10: 49,
+ 11: 68,
+ 12: 44,
+ 13: 139,
+ 14: 34,
+ 15: 23,
+ 16: 40,
+ 17: 153,
+ 18: 100,
+ 19: 37,
+ 20: 78,
+ 21: 72,
+ 22: 46,
+ 23: 96,
+ 24: 154,
+ 25: 12,
  26: 9,
- 27: 50,
- 28: 74,
- 29: 72,
- 30: 76,
- 31: 78,
+ 27: 54,
+ 28: 73,
+ 29: 71,
+ 30: 75,
+ 31: 77,
  32: 6,
- 33: 163,
- 34: 138,
+ 33: 161,
+ 34: 137,
  35: 136,
- 36: 43,
- 37: 63,
- 38: 67,
- 39: 58,
- 40: 66,
- 41: 59,
- 42: 61,
- 43: 62,
- 44: 64,
- 45: 68,
- 46: 57,
- 47: 60,
- 48: 154,
- 49: 65,
- 50: 33},
+ 36: 42,
+ 37: 62,
+ 38: 66,
+ 39: 57,
+ 40: 65,
+ 41: 58,
+ 42: 60,
+ 43: 61,
+ 44: 63,
+ 45: 67,
+ 46: 56,
+ 47: 59,
+ 48: 152,
+ 49: 64,
+ 50: 32},
 start: 256
 };
 // low level parser to a concrete syntax tree, derived from cpython's lib2to3
@@ -11973,8 +17438,9 @@ start: 256
  *
  * can throw ParseError
  */
-function Parser(grammar)
+function Parser(filename, grammar)
 {
+    this.filename = filename;
     this.grammar = grammar;
     return this;
 }
@@ -12090,14 +17556,14 @@ OUTERWHILE:
             this.pop();
             if (this.stack.length === 0)
             {
-                throw new Sk.builtin.ParseError("too much input");
+                throw new Sk.builtin.ParseError("too much input", this.filename);
             }
         }
         else
         {
             // no transition
             var errline = context[0][0];
-            throw new Sk.builtin.ParseError("bad input on line " + errline.toString(), "", errline, context);	//	RNL
+            throw new Sk.builtin.ParseError("bad input", this.filename, errline, context);	//	RNL
 //          throw new Sk.builtin.ParseError("bad input on line " + errline.toString());		RNL
         }
     }
@@ -12118,8 +17584,12 @@ Parser.prototype.classify = function(type, value, context)
         }
     }
     ilabel = this.grammar.tokens.hasOwnProperty(type) && this.grammar.tokens[type];
-    if (!ilabel)
-        throw new Sk.builtin.ParseError("bad token", type, value, context);
+    if (!ilabel) {
+        // throw new Sk.builtin.ParseError("bad token", type, value, context);
+        // Questionable modification to put line number in position 2
+        // like everywhere else and filename in position 1.
+        throw new Sk.builtin.ParseError("bad token", this.filename, context[0][0], context);
+    }
     return ilabel;
 };
 
@@ -12211,7 +17681,7 @@ Parser.prototype.pop = function()
 function makeParser(filename, style)
 {
     if (style === undefined) style = "file_input";
-    var p = new Parser(Sk.ParseTables);
+    var p = new Parser(filename, Sk.ParseTables);
     // for closure's benefit
     if (style === "file_input")
         p.setup(Sk.ParseTables.sym.file_input);
@@ -12264,7 +17734,7 @@ function makeParser(filename, style)
         if (ret)
         {
             if (ret !== "done") {
-                throw "ParseError: incomplete input";
+                throw new Sk.builtin.ParseError("incomplete input", this.filename);
 			}
             return p.rootnode;
         }
@@ -12507,18 +17977,6 @@ function AugAssign(/* {expr_ty} */ target, /* {operator_ty} */ op, /* {expr_ty}
     this.target = target;
     this.op = op;
     this.value = value;
-    this.lineno = lineno;
-    this.col_offset = col_offset;
-    return this;
-}
-
-/** @constructor */
-function Print(/* {expr_ty} */ dest, /* {asdl_seq *} */ values, /* {bool} */
-                    nl, /* {int} */ lineno, /* {int} */ col_offset)
-{
-    this.dest = dest;
-    this.values = values;
-    this.nl = nl;
     this.lineno = lineno;
     this.col_offset = col_offset;
     return this;
@@ -13077,12 +18535,6 @@ AugAssign.prototype._fields = [
     "op", function(n) { return n.op; },
     "value", function(n) { return n.value; }
 ];
-Print.prototype._astname = "Print";
-Print.prototype._fields = [
-    "dest", function(n) { return n.dest; },
-    "values", function(n) { return n.values; },
-    "nl", function(n) { return n.nl; }
-];
 For_.prototype._astname = "For";
 For_.prototype._fields = [
     "target", function(n) { return n.target; },
@@ -13454,10 +18906,10 @@ function numStmts(n)
     return 0;
 }
 
-function forbiddenCheck(c, n, x)
+function forbiddenCheck(c, n, x, lineno)
 {
-    if (x === "None") throw new Sk.builtin.SyntaxError("assignment to None");
-    if (x === "True" || x === "False") throw new Sk.builtin.SyntaxError("assignment to True or False is forbidden");
+    if (x === "None") throw new Sk.builtin.SyntaxError("assignment to None", c.c_filename, lineno);
+    if (x === "True" || x === "False") throw new Sk.builtin.SyntaxError("assignment to True or False is forbidden", c.c_filename, lineno);
 }
 
 /**
@@ -13476,7 +18928,7 @@ function setContext(c, e, ctx, n)
     {
         case Attribute:
         case Name:
-            if (ctx === Store) forbiddenCheck(c, n, e.attr);
+            if (ctx === Store) forbiddenCheck(c, n, e.attr, n.lineno);
             e.ctx = ctx;
             break;
         case Subscript:
@@ -13488,7 +18940,7 @@ function setContext(c, e, ctx, n)
             break;
         case Tuple:
             if (e.elts.length === 0)
-                throw new Sk.builtin.SyntaxError("can't assign to ()");
+                throw new Sk.builtin.SyntaxError("can't assign to ()", c.c_filename, n.lineno);
             e.ctx = ctx;
             s = e.elts;
             break;
@@ -13528,7 +18980,7 @@ function setContext(c, e, ctx, n)
     }
     if (exprName)
     {
-        throw new Sk.builtin.SyntaxError("can't " + (ctx === Store ? "assign to" : "delete") + " " + exprName);
+        throw new Sk.builtin.SyntaxError("can't " + (ctx === Store ? "assign to" : "delete") + " " + exprName, c.c_filename, n.lineno);
     }
 
     if (s)
@@ -13713,7 +19165,7 @@ function astForTryStmt(c, n)
     }
     else if (CHILD(n, nc - 3).type !== SYM.except_clause)
     {
-        throw new Sk.builtin.SyntaxError("malformed 'try' statement");
+        throw new Sk.builtin.SyntaxError("malformed 'try' statement", c.c_filename, n.lineno);
     }
 
     if (nexcept > 0)
@@ -13989,7 +19441,7 @@ function aliasForImportName(c, n)
             case TOK.T_STAR:
                 return new alias(strobj("*"), null);
             default:
-                throw new Sk.builtin.SyntaxError("unexpected import name");
+                throw new Sk.builtin.SyntaxError("unexpected import name", c.c_filename, n.lineno);
         }
     break; }
 }
@@ -14051,10 +19503,10 @@ function astForImportStmt(c, n)
                 n = CHILD(n, idx);
                 nchildren = NCH(n);
                 if (nchildren % 2 === 0)
-                    throw new Sk.builtin.SyntaxError("trailing comma not allowed without surrounding parentheses");
+                    throw new Sk.builtin.SyntaxError("trailing comma not allowed without surrounding parentheses", c.c_filename, n.lineno);
                 break;
             default:
-                throw new Sk.builtin.SyntaxError("Unexpected node-type in from-import");
+                throw new Sk.builtin.SyntaxError("Unexpected node-type in from-import", c.c_filename, n.lineno);
         }
         var aliases = [];
         if (n.type === TOK.T_STAR)
@@ -14065,7 +19517,7 @@ function astForImportStmt(c, n)
         var modname = mod ? mod.name.v : "";
         return new ImportFrom(strobj(modname), aliases, ndots, lineno, col_offset);
     }
-    throw new Sk.builtin.SyntaxError("unknown import statement");
+    throw new Sk.builtin.SyntaxError("unknown import statement", c.c_filename, n.lineno);
 }
 
 function astForTestlistGexp(c, n)
@@ -14254,9 +19706,9 @@ function astForCall(c, n, func)
         }
     }
     if (ngens > 1 || (ngens && (nargs || nkeywords)))
-        throw new Sk.builtin.SyntaxError("Generator expression must be parenthesized if not sole argument");
+        throw new Sk.builtin.SyntaxError("Generator expression must be parenthesized if not sole argument", c.c_filename, n.lineno);
     if (nargs + nkeywords + ngens > 255)
-        throw new Sk.builtin.SyntaxError("more than 255 arguments");
+        throw new Sk.builtin.SyntaxError("more than 255 arguments", c.c_filename, n.lineno);
     var args = [];
     var keywords = [];
     nargs = 0;
@@ -14270,8 +19722,8 @@ function astForCall(c, n, func)
         {
             if (NCH(ch) === 1)
             {
-                if (nkeywords) throw new Sk.builtin.SyntaxError("non-keyword arg after keyword arg");
-                if (vararg) throw new Sk.builtin.SyntaxError("only named arguments may follow *expression");
+                if (nkeywords) throw new Sk.builtin.SyntaxError("non-keyword arg after keyword arg", c.c_filename, n.lineno);
+                if (vararg) throw new Sk.builtin.SyntaxError("only named arguments may follow *expression", c.c_filename, n.lineno);
                 args[nargs++] = astForExpr(c, CHILD(ch, 0));
             }
             else if (CHILD(ch, 1).type === SYM.gen_for)
@@ -14279,14 +19731,14 @@ function astForCall(c, n, func)
             else
             {
                 var e = astForExpr(c, CHILD(ch, 0));
-                if (e.constructor === Lambda) throw new Sk.builtin.SyntaxError("lambda cannot contain assignment");
-                else if (e.constructor !== Name) throw new Sk.builtin.SyntaxError("keyword can't be an expression");
+                if (e.constructor === Lambda) throw new Sk.builtin.SyntaxError("lambda cannot contain assignment", c.c_filename, n.lineno);
+                else if (e.constructor !== Name) throw new Sk.builtin.SyntaxError("keyword can't be an expression", c.c_filename, n.lineno);
                 var key = e.id;
-                forbiddenCheck(c, CHILD(ch, 0), key);
+                forbiddenCheck(c, CHILD(ch, 0), key, n.lineno);
                 for (var k = 0; k < nkeywords; ++k)
                 {
                     var tmp = keywords[k].arg;
-                    if (tmp === key) throw new Sk.builtin.SyntaxError("keyword argument repeated");
+                    if (tmp === key) throw new Sk.builtin.SyntaxError("keyword argument repeated", c.c_filename, n.lineno);
                 }
                 keywords[nkeywords++] = new keyword(key, astForExpr(c, CHILD(ch, 2)));
             }
@@ -14449,8 +19901,8 @@ function astForArguments(c, n)
                         /* def f((x)=4): pass should raise an error.
                            def f((x, (y))): pass will just incur the tuple unpacking warning. */
                         if (parenthesized && !complexArgs)
-                            throw new Sk.builtin.SyntaxError("parenthesized arg with default");
-                        throw new Sk.builtin.SyntaxError("non-default argument follows default argument");
+                            throw new Sk.builtin.SyntaxError("parenthesized arg with default", c.c_filename, n.lineno);
+                        throw new Sk.builtin.SyntaxError("non-default argument follows default argument", c.c_filename, n.lineno);
                     }
 
                     if (NCH(ch) === 3)
@@ -14459,7 +19911,7 @@ function astForArguments(c, n)
                         // def foo((x)): is not complex, special case.
                         if (NCH(ch) !== 1)
                         {
-                            throw new Sk.builtin.SyntaxError("tuple parameter unpacking has been removed", this.c_filename, n.lineno);
+                            throw new Sk.builtin.SyntaxError("tuple parameter unpacking has been removed", c.c_filename, n.lineno);
                         }
                         else
                         {
@@ -14474,22 +19926,22 @@ function astForArguments(c, n)
                     }
                     if (CHILD(ch, 0).type === TOK.T_NAME)
                     {
-                        forbiddenCheck(c, n, CHILD(ch, 0).value);
+                        forbiddenCheck(c, n, CHILD(ch, 0).value, n.lineno);
                         var id = strobj(CHILD(ch, 0).value);
                         args[k++] = new Name(id, Param, ch.lineno, ch.col_offset);
                     }
                     i += 2;
                     if (parenthesized)
-                        throw new Sk.builtin.SyntaxError("parenthesized argument names are invalid");
+                        throw new Sk.builtin.SyntaxError("parenthesized argument names are invalid", c.c_filename, n.lineno);
                 break; }
                 break;
             case TOK.T_STAR:
-                forbiddenCheck(c, CHILD(n, i + 1), CHILD(n, i + 1).value);
+                forbiddenCheck(c, CHILD(n, i + 1), CHILD(n, i + 1).value, n.lineno);
                 vararg = strobj(CHILD(n, i + 1).value);
                 i += 3;
                 break;
             case TOK.T_DOUBLESTAR:
-                forbiddenCheck(c, CHILD(n, i + 1), CHILD(n, i + 1).value);
+                forbiddenCheck(c, CHILD(n, i + 1), CHILD(n, i + 1).value, n.lineno);
                 kwarg = strobj(CHILD(n, i + 1).value);
                 i += 3;
                 break;
@@ -14505,7 +19957,7 @@ function astForFuncdef(c, n, decoratorSeq)
     /* funcdef: 'def' NAME parameters ':' suite */
     REQ(n, SYM.funcdef);
     var name = strobj(CHILD(n, 1).value);
-    forbiddenCheck(c, CHILD(n, 1), CHILD(n, 1).value);
+    forbiddenCheck(c, CHILD(n, 1), CHILD(n, 1).value, n.lineno);
     var args = astForArguments(c, CHILD(n, 2));
     var body = astForSuite(c, CHILD(n, 4));
     return new FunctionDef(name, args, body, decoratorSeq, n.lineno, n.col_offset);
@@ -14525,7 +19977,7 @@ function astForClassdef(c, n, decoratorSeq)
 {
     /* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
     REQ(n, SYM.classdef);
-    forbiddenCheck(c, n, CHILD(n, 1).value);
+    forbiddenCheck(c, n, CHILD(n, 1).value, n.lineno);
     var classname = strobj(CHILD(n, 1).value);
     if (NCH(n) === 4)
         return new ClassDef(classname, [], astForSuite(c, CHILD(n, 3)), decoratorSeq, n.lineno, n.col_offset);
@@ -14753,17 +20205,17 @@ function astForExprStmt(c, n)
         var expr1 = astForTestlist(c, ch);
         switch (expr1.constructor)
         {
-            case GeneratorExp: throw new Sk.builtin.SyntaxError("augmented assignment to generator expression not possible");
-            case Yield: throw new Sk.builtin.SyntaxError("augmented assignment to yield expression not possible");
+            case GeneratorExp: throw new Sk.builtin.SyntaxError("augmented assignment to generator expression not possible", c.c_filename, n.lineno);
+            case Yield: throw new Sk.builtin.SyntaxError("augmented assignment to yield expression not possible", c.c_filename, n.lineno);
             case Name:
                 var varName = expr1.id;
-                forbiddenCheck(c, ch, varName);
+                forbiddenCheck(c, ch, varName, n.lineno);
                 break;
             case Attribute:
             case Subscript:
                 break;
             default:
-                throw new Sk.builtin.SyntaxError("illegal expression for augmented assignment");
+                throw new Sk.builtin.SyntaxError("illegal expression for augmented assignment", c.c_filename, n.lineno);
         }
         setContext(c, expr1, Store, ch);
 
@@ -14784,7 +20236,7 @@ function astForExprStmt(c, n)
         for (var i = 0; i < NCH(n) - 2; i += 2)
         {
             var ch = CHILD(n, i);
-            if (ch.type === SYM.yield_expr) throw new Sk.builtin.SyntaxError("assignment to yield expression not possible");
+            if (ch.type === SYM.yield_expr) throw new Sk.builtin.SyntaxError("assignment to yield expression not possible", c.c_filename, n.lineno);
             var e = astForTestlist(c, ch);
             setContext(c, e, Store, CHILD(n, i));
             targets[i / 2] = e;
@@ -14824,36 +20276,41 @@ function parsestr(c, s)
         var ret = '';
         for (var i = 0; i < len; ++i)
         {
-            var c = s[i];
+            var c = s.charAt(i);
             if (c === '\\')
             {
                 ++i;
-                c = s[i];
+                c = s.charAt(i);
                 if (c === 'n') ret += "\n";
                 else if (c === '\\') ret += "\\";
                 else if (c === 't') ret += "\t";
                 else if (c === 'r') ret += "\r";
+                else if (c === 'b') ret += "\b";
+                else if (c === 'f') ret += "\f";
+                else if (c === 'v') ret += "\v";
                 else if (c === '0') ret += "\0";
                 else if (c === '"') ret += '"';
                 else if (c === '\'') ret += '\'';
                 else if (c === '\n') /* escaped newline, join lines */ {}
                 else if (c === 'x')
                 {
-                    var d0 = s[++i];
-                    var d1 = s[++i];
+                    var d0 = s.charAt(++i);
+                    var d1 = s.charAt(++i);
                     ret += String.fromCharCode(parseInt(d0+d1, 16));
                 }
                 else if (c === 'u' || c === 'U')
                 {
-                    var d0 = s[++i];
-                    var d1 = s[++i];
-                    var d2 = s[++i];
-                    var d3 = s[++i];
+                    var d0 = s.charAt(++i);
+                    var d1 = s.charAt(++i);
+                    var d2 = s.charAt(++i);
+                    var d3 = s.charAt(++i);
                     ret += String.fromCharCode(parseInt(d0+d1, 16), parseInt(d2+d3, 16));
                 }
                 else
                 {
-                    goog.asserts.fail("unhandled escape: '" + c.charCodeAt(0) + "'");
+                    // Leave it alone
+                    ret += "\\" + c;
+                    // goog.asserts.fail("unhandled escape: '" + c.charCodeAt(0) + "'");
                 }
             }
             else
@@ -14904,48 +20361,88 @@ function parsestrplus(c, n)
     var ret = new Sk.builtin.str("");
     for (var i = 0; i < NCH(n); ++i)
     {
-        ret = ret.sq$concat(parsestr(c, CHILD(n, i).value));
+        try {
+            ret = ret.sq$concat(parsestr(c, CHILD(n, i).value));
+        } catch (x) {
+            throw new Sk.builtin.SyntaxError("invalid string (possibly contains a unicode character)", c.c_filename, CHILD(n, i).lineno);
+        }
     }
     return ret;
 }
 
-function parsenumber(c, s)
+function parsenumber(c, s, lineno)
 {
-    // todo; no complex support
-
     var end = s.charAt(s.length - 1);
-    if (end === 'l' || end === 'L')
-        return Sk.longFromStr(s.substr(0, s.length - 1));
-    var k = goog.global.eval(s);
-    if ((k > Sk.builtin.lng.threshold$ || k < -Sk.builtin.lng.threshold$)
-            && Math.floor(k) === k
-            && (s.indexOf('e') === -1 && s.indexOf('E') === -1))
-    {
-        return Sk.longFromStr(s);
+
+    // todo; no complex support
+    if (end === 'j' || end === 'J') {
+	throw new Sk.builtin.SyntaxError("complex numbers are currently unsupported", c.c_filename, lineno);
     }
 
-    // todo; we don't currently distinguish between int and float so str is wrong
-    // for these.
-    if (s.indexOf('.') !== -1
-            || s.indexOf('e') !== -1
-            || s.indexOf('E') !== -1)
+    // Handle longs
+    if (end === 'l' || end === 'L') {
+        return Sk.longFromStr(s.substr(0, s.length - 1), 0);
+    }
+    
+    // todo; we don't currently distinguish between int and float so
+    // str is wrong for these.
+    if (s.indexOf('.') !== -1)
     {
-        return parseFloat(s);
+        return new Sk.builtin.nmber(parseFloat(s), Sk.builtin.nmber.float$);
     }
 
-    // ugly gunk to placate an overly-nanny closure-compiler: 
-    // http://code.google.com/p/closure-compiler/issues/detail?id=111
-    // this is all just to emulate "parseInt(s)" with no radix.
+    // Handle integers of various bases
     var tmp = s;
-    if (s.charAt(0) === '-') tmp = s.substr(1);
-    if (tmp.charAt(0) === '0' && (tmp.charAt(1) === 'x' || tmp.charAt(1) === 'X'))
-        return parseInt(s, 16);
-    else if (tmp.charAt(0) === '0' && (tmp.charAt(1) === 'b' || tmp.charAt(1) === 'B'))
-        return parseInt(s, 2);
-    else if (tmp.charAt(0) === '0')
-        return parseInt(s, 8);
-    else
-        return parseInt(s, 10);
+    var val;
+    var neg = false;
+    if (s.charAt(0) === '-') {
+        tmp = s.substr(1);
+        neg = true;
+    }
+
+    if (tmp.charAt(0) === '0' && (tmp.charAt(1) === 'x' || tmp.charAt(1) === 'X')) {
+        // Hex
+        tmp = tmp.substring(2);
+        val = parseInt(tmp, 16);
+    } else if ((s.indexOf('e') !== -1) || (s.indexOf('E') !== -1)) {
+	// Float with exponent (needed to make sure e/E wasn't hex first)
+	return new Sk.builtin.nmber(parseFloat(s), Sk.builtin.nmber.float$);
+    } else if (tmp.charAt(0) === '0' && (tmp.charAt(1) === 'b' || tmp.charAt(1) === 'B')) {
+        // Binary
+        tmp = tmp.substring(2);
+        val = parseInt(tmp, 2);
+    } else if (tmp.charAt(0) === '0') {
+        if (tmp === "0") {
+            // Zero
+            val = 0;
+        } else {
+            // Octal
+            tmp = tmp.substring(1);
+            if ((tmp.charAt(0) === 'o') || (tmp.charAt(0) === 'O')) {
+                tmp = tmp.substring(1);
+            }
+            val = parseInt(tmp, 8);            
+        }
+    }
+    else {
+        // Decimal
+        val = parseInt(tmp, 10);
+    }
+
+    // Convert to long
+    if (val > Sk.builtin.lng.threshold$
+        && Math.floor(val) === val
+        && (s.indexOf('e') === -1 && s.indexOf('E') === -1))
+    {
+        return Sk.longFromStr(s, 0);
+    }
+
+    // Small enough, return parsed number
+    if (neg) {
+        return new Sk.builtin.nmber(-val, Sk.builtin.int$);
+    } else {
+        return new Sk.builtin.nmber(val, Sk.builtin.int$);
+    }
 }
 
 function astForSlice(c, n)
@@ -15014,7 +20511,7 @@ function astForAtom(c, n)
         case TOK.T_STRING:
             return new Str(parsestrplus(c, n), n.lineno, n.col_offset);
         case TOK.T_NUMBER:
-            return new Num(parsenumber(c, ch.value), n.lineno, n.col_offset);
+        return new Num(parsenumber(c, ch.value, n.lineno), n.lineno, n.col_offset);
         case TOK.T_LPAR: // various uses for parens
             ch = CHILD(n, 1);
             if (ch.type === TOK.T_RPAR)
@@ -15046,7 +20543,7 @@ function astForAtom(c, n)
             }
             return new Dict(keys, values, n.lineno, n.col_offset);
         case TOK.T_BACKQUOTE:
-            throw new Sk.builtin.SyntaxError("backquote not supported, use repr()");
+            throw new Sk.builtin.SyntaxError("backquote not supported, use repr()", c.c_filename, n.lineno);
         default:
             goog.asserts.fail("unhandled atom", ch.type);
     }
@@ -15189,28 +20686,6 @@ function astForExpr(c, n)
     break; }
 }
 
-function astForPrintStmt(c, n)
-{
-    /* print_stmt: 'print' '(' ( [ test (',' test)* [','] ]
-                             | '>>' test [ (',' test)+ [','] ] ) ')'
-     */
-    var start = 2;
-    var dest = null;
-    REQ(n, SYM.print_stmt);
-    if (NCH(n) >= 3 && CHILD(n, 2).type === TOK.T_RIGHTSHIFT)
-    {
-        dest = astForExpr(c, CHILD(n, 3));
-        start = 5;
-    }
-    var seq = [];
-    for (var i = start, j = 0; i < NCH(n) - 1; i += 2, ++j)
-    {
-        seq[j] = astForExpr(c, CHILD(n, i));
-    }
-    var nl = (CHILD(n, NCH(n) - 2)).type === TOK.T_COMMA ? false : true;
-    return new Print(dest, seq, nl, n.lineno, n.col_offset);
-}
-
 function astForStmt(c, n)
 {
     if (n.type === SYM.stmt)
@@ -15227,14 +20702,13 @@ function astForStmt(c, n)
     {
         REQ(n, SYM.small_stmt);
         n = CHILD(n, 0);
-        /* small_stmt: expr_stmt | print_stmt  | del_stmt | pass_stmt
+        /* small_stmt: expr_stmt | del_stmt | pass_stmt
                      | flow_stmt | import_stmt | global_stmt | exec_stmt
                      | assert_stmt
         */
         switch (n.type)
         {
             case SYM.expr_stmt: return astForExprStmt(c, n);
-            case SYM.print_stmt: return astForPrintStmt(c, n);
             case SYM.del_stmt: return astForDelStmt(c, n);
             case SYM.pass_stmt: return new Pass(n.lineno, n.col_offset);
             case SYM.flow_stmt: return astForFlowStmt(c, n);
@@ -15641,6 +21115,7 @@ SymbolTable.prototype.SEQExpr = function(nodes)
 
 SymbolTable.prototype.enterBlock = function(name, blockType, ast, lineno)
 {
+    name = fixReservedNames(name);
     //print("enterBlock:", name);
     var prev = null;
     if (this.cur)
@@ -15677,46 +21152,47 @@ SymbolTable.prototype.visitParams = function(args, toplevel)
         if (arg.constructor === Name)
         {
             goog.asserts.assert(arg.ctx === Param || (arg.ctx === Store && !toplevel));
-            this.addDef(arg.id, DEF_PARAM);
+            this.addDef(arg.id, DEF_PARAM, arg.lineno);
         }
         else
         {
             // Tuple isn't supported
-            throw new SyntaxError("invalid expression in parameter list");
+            throw new Sk.builtin.SyntaxError("invalid expression in parameter list", this.filename);
         }
     }
 }
 
-SymbolTable.prototype.visitArguments = function(a)
+SymbolTable.prototype.visitArguments = function(a, lineno)
 {
     if (a.args) this.visitParams(a.args, true);
     if (a.vararg)
     {
-        this.addDef(a.vararg, DEF_PARAM);
+        this.addDef(a.vararg, DEF_PARAM, lineno);
         this.cur.varargs = true;
     }
     if (a.kwarg)
     {
-        this.addDef(a.kwarg, DEF_PARAM);
+        this.addDef(a.kwarg, DEF_PARAM, lineno);
         this.cur.varkeywords = true;
     }
 };
 
-SymbolTable.prototype.newTmpname = function()
+SymbolTable.prototype.newTmpname = function(lineno)
 {
-    this.addDef(new Sk.builtin.str("_[" + (++this.tmpname) + "]"), DEF_LOCAL);
+    this.addDef(new Sk.builtin.str("_[" + (++this.tmpname) + "]"), DEF_LOCAL, lineno);
 }
 
-SymbolTable.prototype.addDef = function(name, flag)
+SymbolTable.prototype.addDef = function(name, flag, lineno)
 {
     //print("addDef:", name.v, flag);
     var mangled = mangleName(this.curClass, new Sk.builtin.str(name)).v;
+    mangled = fixReservedNames(mangled);
     var val = this.cur.symFlags[mangled];
     if (val !== undefined)
     {
         if ((flag & DEF_PARAM) && (val & DEF_PARAM))
         {
-            throw new Sk.builtin.SyntaxError("duplicate argument '" + name + "' in function definition");
+            throw new Sk.builtin.SyntaxError("duplicate argument '" + name.v + "' in function definition", this.filename, lineno);
         }
         val |= flag;
     }
@@ -15765,16 +21241,16 @@ SymbolTable.prototype.visitStmt = function(s)
     switch (s.constructor)
     {
         case FunctionDef:
-            this.addDef(s.name, DEF_LOCAL);
+            this.addDef(s.name, DEF_LOCAL, s.lineno);
             if (s.args.defaults) this.SEQExpr(s.args.defaults);
             if (s.decorator_list) this.SEQExpr(s.decorator_list);
             this.enterBlock(s.name.v, FunctionBlock, s, s.lineno);
-            this.visitArguments(s.args);
+            this.visitArguments(s.args, s.lineno);
             this.SEQStmt(s.body);
             this.exitBlock();
             break;
         case ClassDef:
-            this.addDef(s.name, DEF_LOCAL);
+            this.addDef(s.name, DEF_LOCAL, s.lineno);
             this.SEQExpr(s.bases);
             if (s.decorator_list) this.SEQExpr(s.decorator_list);
             this.enterBlock(s.name.v, ClassBlock, s, s.lineno);
@@ -15790,7 +21266,7 @@ SymbolTable.prototype.visitStmt = function(s)
                 this.visitExpr(s.value);
                 this.cur.returnsValue = true;
                 if (this.cur.generator)
-                    throw new SyntaxError("'return' with argument inside generator");
+                    throw new Sk.builtin.SyntaxError("'return' with argument inside generator", this.filename);
             }
             break;
         case Delete_:
@@ -15803,10 +21279,6 @@ SymbolTable.prototype.visitStmt = function(s)
         case AugAssign:
             this.visitExpr(s.target);
             this.visitExpr(s.value);
-            break;
-        case Print:
-            if (s.dest) this.visitExpr(s.dest);
-            this.SEQExpr(s.values);
             break;
         case For_:
             this.visitExpr(s.target);
@@ -15852,7 +21324,7 @@ SymbolTable.prototype.visitStmt = function(s)
             break;
         case Import_:
         case ImportFrom:
-            this.visitAlias(s.names);
+            this.visitAlias(s.names, s.lineno);
             break;
         case Exec:
             this.visitExpr(s.body);
@@ -15868,15 +21340,17 @@ SymbolTable.prototype.visitStmt = function(s)
             for (var i = 0; i < nameslen; ++i)
             {
                 var name = mangleName(this.curClass, s.names[i]).v;
+                name = fixReservedNames(name);
                 var cur = this.cur.symFlags[name];
                 if (cur & (DEF_LOCAL | USE))
                 {
-                    if (cur & DEF_LOCAL)
-                        throw new SyntaxError("name '" + name + "' is assigned to before global declaration");
+                    if (cur & DEF_LOCAL) {
+                        throw new Sk.builtin.SyntaxError("name '" + name + "' is assigned to before global declaration", this.filename, s.lineno);
+                    }
                     else
-                        throw new SyntaxError("name '" + name + "' is used prior to global declaration");
+                        throw new Sk.builtin.SyntaxError("name '" + name + "' is used prior to global declaration", this.filename, s.lineno);
                 }
-                this.addDef(new Sk.builtin.str(name), DEF_GLOBAL);
+                this.addDef(new Sk.builtin.str(name), DEF_GLOBAL, s.lineno);
             }
             break;
         case Expr:
@@ -15888,11 +21362,11 @@ SymbolTable.prototype.visitStmt = function(s)
             // nothing
             break;
         case With_:
-            this.newTmpname();
+            this.newTmpname(s.lineno);
             this.visitExpr(s.context_expr);
             if (s.optional_vars)
             {
-                this.newTmpname();
+                this.newTmpname(s.lineno);
                 this.visitExpr(s.optional_vars);
             }
             this.SEQStmt(s.body);
@@ -15920,11 +21394,11 @@ SymbolTable.prototype.visitExpr = function(e)
             this.visitExpr(e.operand);
             break;
         case Lambda:
-            this.addDef(new Sk.builtin.str("lambda"), DEF_LOCAL);
+            this.addDef(new Sk.builtin.str("lambda"), DEF_LOCAL, e.lineno);
             if (e.args.defaults)
                 this.SEQExpr(e.args.defaults);
             this.enterBlock("lambda", FunctionBlock, e, e.lineno);
-            this.visitArguments(e.args);
+            this.visitArguments(e.args, e.lineno);
             this.visitExpr(e.body);
             this.exitBlock();
             break;
@@ -15938,7 +21412,7 @@ SymbolTable.prototype.visitExpr = function(e)
             this.SEQExpr(e.values);
             break;
         case ListComp:
-            this.newTmpname();
+            this.newTmpname(e.lineno);
             this.visitExpr(e.elt);
             this.visitComprehension(e.generators, 0);
             break;
@@ -15949,7 +21423,7 @@ SymbolTable.prototype.visitExpr = function(e)
             if (e.value) this.visitExpr(e.value);
             this.cur.generator = true;
             if (this.cur.returnsValue)
-                throw new SyntaxError("'return' with argument inside generator");
+                throw new Sk.builtin.SyntaxError("'return' with argument inside generator", this.filename);
             break;
         case Compare:
             this.visitExpr(e.left);
@@ -15976,7 +21450,7 @@ SymbolTable.prototype.visitExpr = function(e)
             this.visitSlice(e.slice);
             break;
         case Name:
-            this.addDef(e.id, e.ctx === Load ? USE : DEF_LOCAL);
+            this.addDef(e.id, e.ctx === Load ? USE : DEF_LOCAL, e.lineno);
             break;
         case List:
         case Tuple:
@@ -15999,7 +21473,7 @@ SymbolTable.prototype.visitComprehension = function(lcs, startAt)
     }
 };
 
-SymbolTable.prototype.visitAlias = function(names)
+SymbolTable.prototype.visitAlias = function(names, lineno)
 {
     /* Compute store_name, the name actually bound by the import
         operation.  It is diferent than a->name when a->name is a
@@ -16014,11 +21488,11 @@ SymbolTable.prototype.visitAlias = function(names)
         if (dot !== -1)
             storename = name.substr(0, dot);
         if (name !== "*")
-            this.addDef(new Sk.builtin.str(storename), DEF_IMPORT);
+            this.addDef(new Sk.builtin.str(storename), DEF_IMPORT, lineno);
         else
         {
             if (this.cur.blockType !== ModuleBlock)
-                throw new SyntaxError("import * only allowed at module level");
+                throw new Sk.builtin.SyntaxError("import * only allowed at module level", this.filename);
         }
     }
 };
@@ -16030,7 +21504,7 @@ SymbolTable.prototype.visitGenexp = function(e)
     this.visitExpr(outermost.iter);
     this.enterBlock("genexpr", FunctionBlock, e, e.lineno);
     this.cur.generator = true;
-    this.addDef(new Sk.builtin.str(".0"), DEF_PARAM);
+    this.addDef(new Sk.builtin.str(".0"), DEF_PARAM, e.lineno);
     this.visitExpr(outermost.target);
     this.SEQExpr(outermost.ifs);
     this.visitComprehension(e.generators, 1);
@@ -16168,7 +21642,7 @@ SymbolTable.prototype.analyzeName = function(ste, dict, name, flags, bound, loca
 {
     if (flags & DEF_GLOBAL)
     {
-        if (flags & DEF_PARAM) throw new Sk.builtin.SyntaxError("name '" + name + "' is local and global");
+        if (flags & DEF_PARAM) throw new Sk.builtin.SyntaxError("name '" + name + "' is local and global", this.filename, ste.lineno);
         dict[name] = GLOBAL_EXPLICIT;
         global[name] = null;
         if (bound && bound[name] !== undefined) delete bound[name];
@@ -16299,6 +21773,7 @@ goog.exportSymbol("Sk.dumpSymtab", Sk.dumpSymtab);
 var out;
 
 Sk._futureResult = null;
+Sk.gensymcount = 0;
 
 /**
  * @constructor
@@ -16320,7 +21795,7 @@ function Compiler(filename, st, flags, sourceCodeForAnnotation)
 
     this.result = [];
 
-    this.gensymcount = 0;
+    // this.gensymcount = 0;
 
     this.allUnits = [];
 
@@ -16403,7 +21878,7 @@ Compiler.prototype.gensym = function(hint)
 {
     hint = hint || '';
     hint = '$' + hint;
-    hint += this.gensymcount++;
+    hint += Sk.gensymcount++;
     return hint;
 };
 
@@ -16423,7 +21898,7 @@ var reservedWords_ = { 'abstract': true, 'as': true, 'boolean': true,
     'interface': true, 'is': true, 'long': true, 'namespace': true,
     'native': true, 'new': true, 'null': true, 'package': true,
     'private': true, 'protected': true, 'public': true, 'return': true,
-    'short': true, 'static': true, 'super': true, 'switch': true,
+    'short': true, 'static': true, 'super': false, 'switch': true,
     'synchronized': true, 'this': true, 'throw': true, 'throws': true,
     'transient': true, 'true': true, 'try': true, 'typeof': true, 'use': true,
     'var': true, 'void': true, 'volatile': true, 'while': true, 'with': true
@@ -16436,19 +21911,42 @@ function fixReservedWords(name)
     return name + "_$rw$";
 }
 
+var reservedNames_ = { '__defineGetter__': true, '__defineSetter__': true, 
+    'apply': true, 'call': true, 'eval': true, 'hasOwnProperty': true, 
+    'isPrototypeOf': true, 
+    '__lookupGetter__': true, '__lookupSetter__': true, 
+    '__noSuchMethod__': true, 'propertyIsEnumerable': true,
+    'toSource': true, 'toLocaleString': true, 'toString': true,
+    'unwatch': true, 'valueOf': true, 'watch': true, 'length': true
+};
+
+function fixReservedNames(name)
+{
+    if (reservedNames_[name])
+        return name + "_$rn$";
+    return name;
+}
+
 function mangleName(priv, ident)
 {
     var name = ident.v;
+    var strpriv = null;
+
     if (priv === null || name === null || name.charAt(0) !== '_' || name.charAt(1) !== '_')
         return ident;
     // don't mangle __id__
     if (name.charAt(name.length - 1) === '_' && name.charAt(name.length - 2) === '_')
         return ident;
     // don't mangle classes that are all _ (obscure much?)
-    if (priv.v.replace(/_/g, '') === '')
+    strpriv = priv.v;
+    strpriv.replace(/_/g, '');
+    if (strpriv === '')
         return ident;
-    priv = priv.v.replace(/^_*/, '');
-    return '_' + priv + name;
+
+    strpriv = priv.v;
+    strpriv.replace(/^_*/, '');
+    strpriv = new Sk.builtin.str('_' + strpriv + name);
+    return strpriv;
 }
 
 /**
@@ -16466,6 +21964,15 @@ Compiler.prototype._gr = function(hint, rest)
     }
     out(";");
     return v;
+}
+
+/**
+* Function to test if an interrupt should occur if the program has been running for too long.
+* This function is executed at every test/branch operation.
+*/
+Compiler.prototype._interruptTest = function() { // Added by RNL
+	out("if (Sk.execStart === undefined) {Sk.execStart=new Date()}");
+  	out("if (Sk.execLimit != null && new Date() - Sk.execStart > Sk.execLimit) {throw new Sk.builtin.TimeLimitError(Sk.timeoutMsg())}");
 }
 
 Compiler.prototype._jumpfalse = function(test, block)
@@ -16603,7 +22110,7 @@ Compiler.prototype.ccompare = function(e)
     for (var i = 0; i < n; ++i)
     {
         var rhs = this.vexpr(e.comparators[i]);
-        var res = this._gr('compare', "Sk.misceval.richCompareBool(", cur, ",", rhs, ",'", e.ops[i].prototype._astname, "')");
+        var res = this._gr('compare', "Sk.builtin.bool(Sk.misceval.richCompareBool(", cur, ",", rhs, ",'", e.ops[i].prototype._astname, "'))");
         out(fres, '=', res, ';');
         this._jumpfalse(res, done);
         cur = rhs;
@@ -16654,70 +22161,60 @@ Compiler.prototype.ccall = function(e)
     return retval;
 };
 
-Compiler.prototype.csimpleslice = function(s, ctx, obj, dataToStore)
-{
-    goog.asserts.assert(s.step === null);
-    var lower = 'null', upper = 'null';
-    if (s.lower)
-        lower = this.vexpr(s.lower);
-    if (s.upper)
-        upper = this.vexpr(s.upper);
-
-    // todo; don't require making a slice obj, and move logic into general sequence place
-    switch (ctx)
-    {
-        case AugLoad:
-        case Load:
-            return this._gr("simpsliceload", "Sk.misceval.applySlice(", obj, ",", lower, ",", upper, ")");
-        case AugStore:
-        case Store:
-            out("Sk.misceval.assignSlice(", obj, ",", lower, ",", upper, ",", dataToStore, ");");
-            break;
-        case Del:
-            out("Sk.misceval.assignSlice(", obj, ",", lower, ",", upper, ",null);");
-            break;
-        case Param:
-        default:
-            goog.asserts.fail("invalid simple slice");
-    }
-};
-
-Compiler.prototype.cslice = function(s, ctx, obj, dataToStore)
+Compiler.prototype.cslice = function(s)
 {
     goog.asserts.assert(s instanceof Slice);
-    var low = s.lower ? this.vexpr(s.lower) : 'null';
-    var high = s.upper ? this.vexpr(s.upper) : 'null';
-    var step = s.step ? this.vexpr(s.step) : 'null';
+    var low = s.lower ? this.vexpr(s.lower) : s.step ? 'Sk.builtin.none.none$' : 'new Sk.builtin.nmber(0)'; // todo;ideally, these numbers would be constants
+    var high = s.upper ? this.vexpr(s.upper) : s.step ? 'Sk.builtin.none.none$' : 'new Sk.builtin.nmber(2147483647)';
+    var step = s.step ? this.vexpr(s.step) : 'Sk.builtin.none.none$';
     return this._gr('slice', "new Sk.builtins['slice'](", low, ",", high, ",", step, ")");
 };
 
-Compiler.prototype.vslice = function(s, ctx, obj, dataToStore)
+Compiler.prototype.eslice = function(dims)
 {
-    var kindname = null;
+    goog.asserts.assert(dims instanceof Array);
+    var dimSubs = [], subs;
+    for(var i = 0; i < dims.length; i++) {
+        dimSubs.push(this.vslicesub(dims[i]));
+    }
+    return this._gr('extslice', "new Sk.builtins['tuple']([", dimSubs, "])");
+};
+
+Compiler.prototype.vslicesub = function(s)
+{
     var subs;
     switch (s.constructor)
     {
+        case Number:
+        case String:
+            // Already compiled, should only happen for augmented assignments
+            subs = s;
+            break;
         case Index:
-            kindname = "index";
             subs = this.vexpr(s.value);
             break;
         case Slice:
-            if (!s.step)
-                return this.csimpleslice(s, ctx, obj, dataToStore);
-            if (ctx !== AugStore)
-                subs = this.cslice(s, ctx, obj, dataToStore);
+            subs = this.cslice(s);
             break;
         case Ellipsis:
+            goog.asserts.fail("todo compile.js Ellipsis;");
+            break;
         case ExtSlice:
-            goog.asserts.fail("todo;");
+            subs = this.eslice(s.dims);
             break;
         default:
             goog.asserts.fail("invalid subscript kind");
     }
-    return this.chandlesubscr(kindname, ctx, obj, subs, dataToStore);
+    return subs;
+}
+
+Compiler.prototype.vslice = function(s, ctx, obj, dataToStore)
+{
+    var subs = this.vslicesub(s);
+    return this.chandlesubscr(ctx, obj, subs, dataToStore);
 };
 
-Compiler.prototype.chandlesubscr = function(kindname, ctx, obj, subs, data)
+Compiler.prototype.chandlesubscr = function(ctx, obj, subs, data)
 {
     if (ctx === Load || ctx === AugLoad)
         return this._gr('lsubscr', "Sk.abstr.objectGetItem(", obj, ",", subs, ")");
@@ -16800,10 +22297,15 @@ Compiler.prototype.vexpr = function(e, data, augstoreval)
         case Compare:
             return this.ccompare(e);
         case Call:
-            return this.ccall(e);
+            var result = this.ccall(e);
+            // After the function call, we've returned to this line
+            this.annotateSource(e);
+            return result;
         case Num:
             if (typeof e.n === "number")
                 return e.n;
+	    else if (e.n instanceof Sk.builtin.nmber)
+		return "new Sk.builtin.nmber(" + e.n.v + ",'" + e.n.skType + "')";
             else if (e.n instanceof Sk.builtin.lng)
                 return "Sk.longFromStr('" + e.n.tp$str().v + "')";
             goog.asserts.fail("unhandled Num type");
@@ -16813,22 +22315,27 @@ Compiler.prototype.vexpr = function(e, data, augstoreval)
             var val;
             if (e.ctx !== AugStore)
                 val = this.vexpr(e.value);
+            var mangled = e.attr['$r']().v;
+            mangled = mangled.substring(1, mangled.length-1);
+            mangled = mangleName(this.u.private_, new Sk.builtin.str(mangled)).v;
+            mangled = fixReservedWords(mangled);
+            mangled = fixReservedNames(mangled);
             switch (e.ctx)
             {
                 case AugLoad:
                 case Load:
-                    return this._gr("lattr", "Sk.abstr.gattr(", val, ",", e.attr['$r']().v, ")");
+                    return this._gr("lattr", "Sk.abstr.gattr(", val, ",'", mangled, "')");
                 case AugStore:
                     out("if(", data, "!==undefined){"); // special case to avoid re-store if inplace worked
                     val = this.vexpr(augstoreval || null); // the || null can never happen, but closure thinks we can get here with it being undef
-                    out("Sk.abstr.sattr(", val, ",", e.attr['$r']().v, ",", data, ");");
+                    out("Sk.abstr.sattr(", val, ",'", mangled, "',", data, ");");
                     out("}");
                     break;
                 case Store:
-                    out("Sk.abstr.sattr(", val, ",", e.attr['$r']().v, ",", data, ");");
+                    out("Sk.abstr.sattr(", val, ",'", mangled, "',", data, ");");
                     break;
                 case Del:
-                    goog.asserts.fail("todo;");
+                    goog.asserts.fail("todo Del;");
                     break;
                 case Param:
                 default:
@@ -16893,7 +22400,9 @@ Compiler.prototype.caugassign = function(s)
             auge.ctx = AugStore;
             return this.vexpr(auge, res, e.value)
         case Subscript:
-            var auge = new Subscript(e.value, e.slice, AugLoad, e.lineno, e.col_offset);
+            // Only compile the subscript value once
+            var augsub = this.vslicesub(e.slice);
+            var auge = new Subscript(e.value, augsub, AugLoad, e.lineno, e.col_offset);
             var aug = this.vexpr(auge);
             var val = this.vexpr(s.value);
             var res = this._gr('inplbinopsubscr', "Sk.abstr.numberInplaceBinOp(", aug, ",", val, ",'", s.op.prototype._astname, "')");
@@ -16982,15 +22491,13 @@ Compiler.prototype.popFinallyBlock = function()
 
 Compiler.prototype.setupExcept = function(eb)
 {
-    out("$exc.push(", eb, ");try{");
+    out("$exc.push(", eb, ");");
     //this.pushExceptBlock(eb);
 };
 
 Compiler.prototype.endExcept = function()
 {
-    out("$exc.pop();}catch($err){");
-    out("$frm.blk=$exc.pop();");
-    out("Sk.yield();continue;}");
+    out("$exc.pop();");
 };
 
 Compiler.prototype.outputLocals = function(unit)
@@ -17031,7 +22538,7 @@ Compiler.prototype.outputAllUnits = function()
             ret += "case " + i + ": /* --- " + blocks[i]._name + " --- */";
             ret += blocks[i].join('');
 
-            ret += "goog.asserts.fail('unterminated block');";
+            ret += "throw new Sk.builtin.SystemError('internal error: unterminated block');";
         }
         ret += unit.suffixCode;
     }
@@ -17044,7 +22551,7 @@ Compiler.prototype.cif = function(s)
     var constant = this.exprConstant(s.test);
     if (constant === 0)
     {
-        if (s.orelse) 
+        if (s.orelse)
             this.vseqstmt(s.orelse);
     }
     else if (constant === 1)
@@ -17057,7 +22564,7 @@ Compiler.prototype.cif = function(s)
         var next = this.newBlock('next branch of if');
 
         var test = this.vexpr(s.test);
-        this._jumpfalse(this.vexpr(s.test), next);
+        this._jumpfalse(test, next);
         this.vseqstmt(s.body);
         this._jump(end);
 
@@ -17105,6 +22612,7 @@ Compiler.prototype.cwhile = function(s)
         {
             this.setBlock(orelse);
             this.vseqstmt(s.orelse);
+            this._jump(next);
         }
 
         this.setBlock(next);
@@ -17160,7 +22668,7 @@ Compiler.prototype.cfor = function(s)
 
 Compiler.prototype.craise = function(s)
 {
-    if (s.type.id.v === "StopIteration")
+    if (s && s.type && s.type.id && (s.type.id.v === "StopIteration"))
     {
         // currently, we only handle StopIteration, and all it does it return
         // undefined which is what our iterator protocol requires.
@@ -17170,47 +22678,98 @@ Compiler.prototype.craise = function(s)
     }
     else
     {
-        // todo;
         var inst = '';
         if (s.inst)
+        {
+            // handles: raise Error, arguments
             inst = this.vexpr(s.inst);
-        out("throw new ", this.vexpr(s.type), "(", inst, ");");
+            out("throw ", this.vexpr(s.type), "(", inst, ");");
+        }
+        else if (s.type)
+        {
+            if (s.type.func)
+            {
+                // handles: raise Error(arguments)
+                out("throw ", this.vexpr(s.type), ";");
+            }
+            else
+            {
+                // handles: raise Error
+                out("throw ", this.vexpr(s.type), "('');");
+            }
+        }
+        else
+        {
+            // re-raise
+            out("throw $err;");
+        }
     }
 };
 
 Compiler.prototype.ctryexcept = function(s)
 {
-    var except = this.newBlock("except");
+    var n = s.handlers.length;
+
+    // Create a block for each except clause
+    var handlers = [];
+    for (var i = 0; i < n; ++i)
+    {
+        handlers.push(this.newBlock("except_" + i + "_"));
+    }
+
+    var unhandled = this.newBlock("unhandled");
     var orelse = this.newBlock("orelse");
     var end = this.newBlock("end");
 
-    this.setupExcept(except);
-
+    this.setupExcept(handlers[0]);
     this.vseqstmt(s.body);
-
     this.endExcept();
-
     this._jump(orelse);
 
-    this.setBlock(except);
-    var n = s.handlers.length;
     for (var i = 0; i < n; ++i)
     {
+        this.setBlock(handlers[i]);
         var handler = s.handlers[i];
-        if (handler.type && i < n - 1)
+        if (!handler.type && i < n - 1)
+        {
             throw new SyntaxError("default 'except:' must be last");
-        except = this.newBlock("except_" + i + "_");
+        }
+
         if (handler.type)
         {
-            // todo; not right at all
-            this._jumpfalse(this.vexpr(handler.type), except);
+            // should jump to next handler if err not isinstance of handler.type
+            var handlertype = this.vexpr(handler.type);
+            var next = (i == n-1) ? unhandled : handlers[i+1];
+
+            // var isinstance = this.nameop(new Sk.builtin.str("isinstance"), Load));
+            // var check = this._gr('call', "Sk.misceval.callsim(", isinstance, ", $err, ", handlertype, ")");
+
+            // this check is not right, should use isinstance, but exception objects
+            // are not yet proper Python objects
+            var check = this._gr('instance', "$err instanceof ", handlertype);
+            this._jumpfalse(check, next);
         }
-        // todo; name
+
+        if (handler.name)
+        {
+            this.vexpr(handler.name, "$err");
+        }
+
+        // Need to execute finally before leaving body if an exception is raised
         this.vseqstmt(handler.body);
+
+        // Should jump to finally, but finally is not implemented yet
+        this._jump(end);
     }
+
+    // If no except clause catches exception, throw it again
+    this.setBlock(unhandled);
+    // Should execute finally first
+    out("throw $err;");
 
     this.setBlock(orelse);
     this.vseqstmt(s.orelse);
+    // Should jump to finally, but finally is not implemented yet
     this._jump(end);
     this.setBlock(end);
 };
@@ -17218,6 +22777,8 @@ Compiler.prototype.ctryexcept = function(s)
 Compiler.prototype.ctryfinally = function(s)
 {
     out("/*todo; tryfinally*/");
+    // everything but the finally?
+    this.ctryexcept(s.body[0]);
 };
 
 Compiler.prototype.cassert = function(s)
@@ -17232,7 +22793,7 @@ Compiler.prototype.cassert = function(s)
     this._jumptrue(test, end);
     // todo; exception handling
     // maybe replace with goog.asserts.fail?? or just an alert?
-    out("throw new Sk.builtins.AssertionError(", s.msg ? this.vexpr(s.msg) : "", ");");
+    out("throw new Sk.builtin.AssertionError(", s.msg ? this.vexpr(s.msg) : "", ");");
     this.setBlock(end);
 };
 
@@ -17298,7 +22859,7 @@ Compiler.prototype.cfromimport = function(s)
         if (i === 0 && alias.name.v === "*")
         {
             goog.asserts.assert(n === 1);
-            out("Sk.importStar(", mod, ",$loc);");
+            out("Sk.importStar(", mod,  ",$loc, $gbl);");
             return;
         }
 
@@ -17372,7 +22933,17 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
 
     var funcArgs = [];
     if (isGenerator)
+    {
+        if (kwarg)
+        {
+            throw new SyntaxError(coname.v + "(): keyword arguments in generators not supported");
+        }
+        if (vararg)
+        {
+            throw new SyntaxError(coname.v + "(): variable number of arguments in generators not supported");    
+        }
         funcArgs.push("$gen");
+    }
     else
     {
         if (kwarg)
@@ -17401,7 +22972,16 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     }
     var cells = "";
     if (hasCell)
-        cells = ",$cell=$ctx.$cell||{}";
+    {
+        if (isGenerator)
+        {
+            cells = ",$cell=$ctx.$cell || $gen.gi$cells";
+        }
+        else
+        {
+            cells = ",$cell=$ctx.$cell || {}";
+        }
+    }
 
     // note special usage of 'this' to avoid having to slice globals into
     // all function invocations in call
@@ -17425,23 +23005,14 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     //   foo.ask()
     //
     this.u.varDeclsCode += "var $frm=Sk._frameEnter(" + entryBlock + ");";
-    this.u.varDeclsCode += "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$loc=" + locals + cells + ",$gbl=$ctx.$gbl||this;"
+    this.u.varDeclsCode += "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$loc=" + locals + cells + ",$gbl=$ctx.$gbl||this,$err=undefined;"
       + "$ctx.$exc=$exc; " + (hasCell ? "$ctx.$cell=$cell; " : "") + "$ctx.$gbl=$gbl; $ctx.$loc=$loc;"
+		
     for (var i = 0; i < funcArgs.length; ++i)
     {
       this.u.varDeclsCode += "$ctx." + funcArgs[i] + "=" + "$ctx." + funcArgs[i] + "||" + funcArgs[i] + ";";
     }
 
-    //
-    // copy all parameters that are also cells into the cells dict. this is so
-    // they can be accessed correctly by nested scopes.
-    //
-    for (var i = 0; args && i < args.args.length; ++i)
-    {
-        var id = args.args[i].id;
-        if (this.isCell(id))
-            this.u.varDeclsCode += "$cell." + id.v + "=" + id.v + ";";
-    }
 
     //
     // initialize default arguments. we store the values of the defaults to
@@ -17470,6 +23041,28 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
             }
         }
     }
+    //
+    // copy all parameters that are also cells into the cells dict. this is so
+    // they can be accessed correctly by nested scopes.
+    //
+    for (var i = 0; args && i < args.args.length; ++i)
+    {
+        var id = args.args[i].id;
+        if (this.isCell(id))
+            this.u.varDeclsCode += "$cell." + id.v + "=$ctx." + id.v + ";";
+    }
+
+    //
+    // make sure correct number of arguments were passed (generators handled below)
+    //
+    if (!isGenerator) {
+        var minargs = args ? args.args.length - defaults.length : 0;
+        var maxargs = vararg ? Infinity : (args ? args.args.length : 0);
+        var kw = kwarg ? true : false;
+        this.u.varDeclsCode += "Sk.builtin.pyCheckArgs(\"" + coname.v + 
+            "\", arguments, " + minargs + ", " + maxargs + ", " + kw + 
+            ", " + hasFree + ");";
+    }
 
     //
     // initialize vararg, if any
@@ -17491,8 +23084,8 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     //
     // finally, set up the block switch that the jump code expects
     //
-    this.u.switchCode += "while(true){switch($frm.blk){";
-    this.u.suffixCode = "}break;}});";
+    this.u.switchCode += "while(true){try{ switch($frm.blk){";
+    this.u.suffixCode = "} }catch(err){if ($exc.length>0 && !(err instanceof SuspendExecution)) { $err = err; $frm.blk=$exc.pop(); Sk._frameLeave(); Sk.yield(); continue; } else { throw err; }} }});";
     this.u.suffixCode += "var " + scopename + "=" + cachedscope + ";";
 
     //
@@ -17560,7 +23153,7 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
     // yields.
     //
     // todo; possibly this should be outside?
-    // 
+    //
     var frees = "";
     if (hasFree)
     {
@@ -17573,10 +23166,15 @@ Compiler.prototype.buildcodeobj = function(n, coname, decorator_list, args, call
             frees += ",$free";
     }
     if (isGenerator)
+        // Keyword and variable arguments are not currently supported in generators.
+        // The call to pyCheckArgs assumes they can't be true.
         if (args && args.args.length > 0)
-            return this._gr("gener", "(function(){var $origargs=Array.prototype.slice.call(arguments);return new Sk.builtins['generator'](", scopename, ",$gbl,$origargs", frees, ");})");
+            return this._gr("gener", "new Sk.builtins['function']((function(){var $origargs=Array.prototype.slice.call(arguments);Sk.builtin.pyCheckArgs(\"", 
+                                     coname.v, "\",arguments,", args.args.length - defaults.length, ",", args.args.length, 
+                                     ");return new Sk.builtins['generator'](", scopename, ",$gbl,$origargs", frees, ");}))");
         else
-            return this._gr("gener", "(function(){return new Sk.builtins['generator'](", scopename, ",$gbl,[]", frees, ");})");
+            return this._gr("gener", "new Sk.builtins['function']((function(){Sk.builtin.pyCheckArgs(\"", coname.v, 
+                                     "\",arguments,0,0);return new Sk.builtins['generator'](", scopename, ",$gbl,[]", frees, ");}))");
     else
         return this._gr("funcobj", "new Sk.builtins['function'](", scopename, ",$gbl", frees ,")");
 };
@@ -17587,7 +23185,7 @@ Compiler.prototype.cfunction = function(s)
     var funcorgen = this.buildcodeobj(s, s.name, s.decorator_list, s.args, function(scopename)
             {
                 this.vseqstmt(s.body);
-                out("Sk._frameLeave();return null;"); // if we fall off the bottom, we want the ret to be None
+                out("Sk._frameLeave();return Sk.builtin.none.none$;"); // if we fall off the bottom, we want the ret to be None
             });
     this.nameop(s.name, Store, funcorgen);
 };
@@ -17678,7 +23276,7 @@ Compiler.prototype.cgenexpgen = function(generators, genIndex, elt)
     this.setBlock(end);
 
     if (genIndex === 1)
-        out("Sk._frameLeave();return null;");
+        out("Sk._frameLeave();return Sk.builtin.none.none$;");
 };
 
 Compiler.prototype.cgenexp = function(e)
@@ -17692,7 +23290,7 @@ Compiler.prototype.cgenexp = function(e)
     // but the code builder builds a wrapper that makes generators for normal
     // function generators, so we just do it outside (even just new'ing it
     // inline would be fine).
-    var gener = this._gr("gener", gen, "()");
+    var gener = this._gr("gener", "Sk.misceval.callsim(", gen, ");");
     // stuff the outermost iterator into the generator after evaluating it
     // outside of the function. it's retrieved by the fixed name above.
     out(gener, ".gi$locals.$iter0=Sk.abstr.iter(", this.vexpr(e.generators[0].iter), ");");
@@ -17788,7 +23386,7 @@ Compiler.prototype.vstmt = function(s)
             if (s.value)
                 out("Sk._frameLeave();return ", this.vexpr(s.value), ";");
             else
-                out("Sk._frameLeave();return null;");
+                out("Sk._frameLeave();return Sk.builtin.none.none$;");
             break;
         case Delete_:
             this.vseqexpr(s.targets);
@@ -17801,9 +23399,6 @@ Compiler.prototype.vstmt = function(s)
             break;
         case AugAssign:
             return this.caugassign(s);
-        case Print:
-            this.cprint(s);
-            break;
         case For_:
             return this.cfor(s);
         case While_:
@@ -17873,15 +23468,17 @@ Compiler.prototype.isCell = function(name)
 Compiler.prototype.nameop = function(name, ctx, dataToStore)
 {
     if ((ctx === Store || ctx === AugStore || ctx === Del) && name.v === "__debug__")
-        this.error("can not assign to __debug__");
+        throw new Sk.builtin.SyntaxError("can not assign to __debug__");
     if ((ctx === Store || ctx === AugStore || ctx === Del) && name.v === "None")
-        this.error("can not assign to None");
+        throw new Sk.builtin.SyntaxError("can not assign to None");
 
-    if (name.v === "None") return "null";
-    if (name.v === "True") return "true";
-    if (name.v === "False") return "false";
+    if (name.v === "None") return "Sk.builtin.none.none$";
+    if (name.v === "True") return "Sk.builtin.bool.true$";
+    if (name.v === "False") return "Sk.builtin.bool.false$";
 
     var mangled = mangleName(this.u.private_, name).v;
+    // Have to do this before looking it up in the scope
+    mangled = fixReservedNames(mangled);
     var op = 0;
     var optype = OP_NAME;
     var scope = this.u.ste.getScope(mangled);
@@ -17935,6 +23532,8 @@ Compiler.prototype.nameop = function(name, ctx, dataToStore)
             {
                 case Load:
                 case Param:
+                    // Need to check that it is bound!
+                    out("if (", mangled, " === undefined) { throw new Error('local variable \\\'", mangled, "\\\' referenced before assignment'); }\n");
                     return mangled;
                 case Store:
                     out(mangled, "=", dataToStore, ";");
@@ -18009,6 +23608,9 @@ Compiler.prototype.enterScope = function(name, key, lineno)
     u.name = name;
     u.firstlineno = lineno;
 
+    if (this.u && this.u.private_)
+        u.private_ = this.u.private_;
+
     this.stack.push(this.u);
     this.allUnits.push(u);
     var scopeName = this.gensym('scope');
@@ -18033,29 +23635,19 @@ Compiler.prototype.exitScope = function()
     if (this.u)
         this.u.activateScope();
 
-    if (prev.name.v !== "<module>") // todo; hacky
-        out(prev.scopename, ".co_name=new Sk.builtins['str'](", prev.name['$r']().v, ");");
+    if (prev.name.v !== "<module>") {// todo; hacky
+        var mangled = prev.name['$r']().v;
+        mangled = mangled.substring(1, mangled.length-1);
+        mangled = fixReservedWords(mangled);
+        mangled = fixReservedNames(mangled);
+        out(prev.scopename, ".co_name=new Sk.builtins['str']('", mangled, "');");
+    }
 };
 
 Compiler.prototype.cbody = function(stmts)
 {
     for (var i = 0; i < stmts.length; ++i)
         this.vstmt(stmts[i]);
-};
-
-Compiler.prototype.cprint = function(s)
-{
-    goog.asserts.assert(s instanceof Print);
-    var dest = 'null';
-    if (s.dest)
-        dest = this.vexpr(s.dest);
-
-    var n = s.values.length;
-    // todo; dest disabled
-    for (var i = 0; i < n; ++i)
-        out('Sk.misceval.print_(', /*dest, ',',*/ "new Sk.builtins['str'](", this.vexpr(s.values[i]), ').v);');
-    if (s.nl)
-        out('Sk.misceval.print_(', /*dest, ',*/ '"\\n");');
 };
 
 Compiler.prototype.cmod = function(mod)
@@ -18066,14 +23658,36 @@ Compiler.prototype.cmod = function(mod)
     var cachedscope = "$moddata.scopes['" + modf + "']";
 
     var entryBlock = this.newBlock('module entry');
+    
     // modified by allevato
     this.u.prefixCode = cachedscope + "=" + cachedscope + "||(function($modname){";
     this.u.varDeclsCode = "var $frm=Sk._frameEnter(" + entryBlock + ");" +
-      "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$gbl=$ctx.$gbl||{},$loc=$ctx.$loc||$gbl; $gbl.__name__=$modname;" +
-      "$ctx.$exc=$exc;$ctx.$gbl=$gbl;$ctx.$loc=$loc;";
-    this.u.switchCode = "while(true){switch($frm.blk){\n";
-    this.u.suffixCode = "}}});";
+      "var $ctx=$frm.ctx,$exc=$ctx.$exc||[],$gbl=$ctx.$gbl||{},$loc=$ctx.$loc||$gbl,$err=undefined; $gbl.__name__=$modname;" +
+      "$ctx.$exc=$exc;$ctx.$gbl=$gbl;$ctx.$loc=$loc;" +
+      "if (Sk.retainGlobals) {" + 
+      "    if (Sk.globals) { $gbl = Sk.globals; Sk.globals = $gbl }" + 
+      "    else { Sk.globals = $gbl; }" +
+      "} else { Sk.globals = $gbl; }";
+
+    // Add the try block that pops the try/except stack if one exists
+    // Github Issue #38
+    // Google Code Issue: 109 / 114
+    this.u.switchCode = "try{ while(true){try{ switch($frm.blk){\n";
+    this.u.suffixCode = "} }catch(err){if ($exc.length>0 && !(err instanceof SuspendExecution)) { $err = err; $frm.blk=$exc.pop(); Sk._frameLeave(); Sk.yield(); continue; } else { throw err; }} } }catch(err){ if (err instanceof Sk.builtin.SystemExit && !Sk.throwSystemExit) { Sk.misceval.print_(err.toString() + '\\n'); return $loc; } else { throw err; } } });";
     this.u.suffixCode += "var " + modf + "=" + cachedscope + ";";
+
+    // Note - this change may need to be adjusted for all the other instances of
+    // switchCode and suffixCode in this file.  Not knowing how to test those
+    // other cases I left them alone.   At least the changes to
+    // setupExcept and endExcept will insure that the generated JavaScript
+    // will be syntactically correct.  The worst that will happen is that when
+    // code in a try block blows up, we will not know to run the except block.
+    // The other problem is that we might catch something that is really an internal
+    // error - it might be nice to add code in the above catch block that looked at
+    // the kind of exception and only popped the stack for exceptions that are
+    // from the original code rather than artifacts of some code generation or
+    // exeution environment error.  We at least err on the side of exceptions
+    // being revealed to the user.  drchuck - Wed Jan 23 19:20:18 EST 2013
 
     switch (mod.constructor)
     {
@@ -18127,12 +23741,12 @@ function SuspendExecution(future)
  * HTTP request).
  * 
  * This works as follows. Imagine that you have an input function
- * (like Sk.input) that you want to implement asynchronously by
+ * (like Sk.inputfun) that you want to implement asynchronously by
  * displaying a text field in the browser window. In order to wait
  * for the user to type a response, program execution must be
- * suspended temporarily. So you could write Sk.input like this:
+ * suspended temporarily. So you could write Sk.inputfun like this:
  *
- * Sk.input = function(prompt) {
+ * Sk.inputfun = function(prompt) {
  *   return Sk.future(function(continueWith) {
  *     // add #textfield to the DOM
  *     $('#textfield').change(function() {
@@ -18309,9 +23923,111 @@ goog.exportSymbol("Sk._execModule", Sk._execModule);
 goog.exportSymbol("Sk._createOrRetrieveObject", Sk._createOrRetrieveObject);
 goog.exportSymbol("Sk._finishCreatingObject", Sk._finishCreatingObject);
 goog.exportSymbol("SuspendExecution", SuspendExecution);
+
+Sk.resetCompiler = function()
+{
+    Sk.gensymcount = 0;
+}
+
+goog.exportSymbol("Sk.resetCompiler", Sk.resetCompiler);
 // this is stored into sys specially, rather than created by sys
 Sk.sysmodules = new Sk.builtin.dict([]);
 Sk.realsyspath = undefined;
+Sk.externalLibraryCache = {};
+
+Sk.loadExternalLibraryInternal_ = function(path, inject) {
+    var request, result;
+
+    if (path == null) return void(0);
+
+    if (Sk.externalLibraryCache[path]) {
+        return Sk.externalLibraryCache[path];
+    }
+
+    request = new XMLHttpRequest();
+    request.open('GET', path, false);
+    request.send();
+
+    if (request.status !== 200) return void(0);
+
+    result = request.responseText;
+
+    if (inject) {
+        var scriptElement = document.createElement('script');
+        scriptElement.type = "text/javascript";
+        scriptElement.text = result;
+        document.getElementsByTagName('head')[0].appendChild(scriptElement);
+    }
+
+    return result;
+}
+
+Sk.loadExternalLibrary = function(name) {
+    var externalLibraryInfo, path, type, module,
+        dependencies, dep, ext, extMatch, co;
+
+    // check if the library has already been loaded and cached
+    if (Sk.externalLibraryCache[name]) return Sk.externalLibraryCache[name];
+
+    externalLibraryInfo = Sk.externalLibraries && Sk.externalLibraries[name];
+
+    // if no external library info can be found, bail out
+    if (!externalLibraryInfo) return void(0);
+
+    // if the external library info is just a string, assume it is the path
+    // otherwise dig into the info to find the path
+    path = typeof externalLibraryInfo === 'string'
+        ? externalLibraryInfo
+        : externalLibraryInfo.path;
+
+    if (typeof path !== 'string')
+    {
+        throw new Sk.builtin.ImportError("Invalid path specified for " + name);
+    }
+
+    // attempt to determine the type of the library (js or py)
+    // which is either specified explicitly in the library info
+    // or inferred from the file extension
+    ext = externalLibraryInfo.type;
+    if (!ext)
+    {
+        extMatch = path.match(/\.(js|py)$/);
+        ext = extMatch && extMatch[1];
+    }
+
+    if (!ext) throw new Sk.builtin.ImportError("Invalid file extension specified for " + name);
+
+    module = Sk.loadExternalLibraryInternal_(path, false);
+
+    if (!module) throw new Sk.builtin.ImportError("Failed to load remote module '" + name + "'");
+
+    // if the library has any js dependencies, load them in now
+    dependencies = externalLibraryInfo.dependencies;
+    if (dependencies && dependencies.length)
+    {
+        for(var i = 0; i < dependencies.length; i++)
+        {
+            dep = Sk.loadExternalLibraryInternal_(dependencies[i], true);
+            if (!dep)
+            {
+                throw new Sk.builtin.ImportError("Failed to load dependencies required for " + name);
+            }
+        }
+    }
+
+    if (ext === 'js')
+    {
+        co = { funcname: "$builtinmodule", code: module };
+    }
+    else
+    {
+        co = Sk.compile(module, path, "exec");
+    }
+
+    Sk.externalLibraryCache[name] = co;
+
+    return co;
+}
 
 /**
  * @param {string} name to look for
@@ -18406,14 +24122,15 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
     var parentModName;
 
     // if leaf is already in sys.modules, early out
-    var prev = Sk.sysmodules.mp$subscript(modname);
-    if (prev !== undefined)
-    {
+    try {
+        var prev = Sk.sysmodules.mp$subscript(modname);
         // if we're a dotted module, return the top level, otherwise ourselves
         if (modNameSplit.length > 1)
             return Sk.sysmodules.mp$subscript(modNameSplit[0]);
         else
-            return prev;
+            return prev;        
+    } catch (x) {
+        // not in sys.modules, continue
     }
 
     if (modNameSplit.length > 1)
@@ -18433,7 +24150,7 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
     // - run module and set the module locals returned to the module __dict__
     var module = new Sk.builtin.module();
     Sk.sysmodules.mp$ass_subscript(name, module);
-    var filename, co, googClosure;
+    var filename, co, googClosure, external;
 
     if (suppliedPyBody)
     {
@@ -18442,11 +24159,32 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
     }
     else
     {
-        // if we have it as a builtin (i.e. already in JS) module then load that.
-        var builtinfn = Sk.importSearchPathForName(name, ".js", true);
-        if (builtinfn)
+        // If an onBeforeImport method is supplied, call it and if
+        // the result is false or a string, prevent the import.
+        // This allows for a user to conditionally prevent the usage
+        // of certain libraries.
+        if (Sk.onBeforeImport && typeof Sk.onBeforeImport === 'function')
         {
-            filename = builtinfn;
+            var result = Sk.onBeforeImport(name);
+            if (result === false)
+            {
+                throw new Sk.builtin.ImportError('Importing ' + name + ' is not allowed');
+            }
+            else if (typeof result === 'string')
+            {
+                throw new Sk.builtin.ImportError(result);
+            }
+        }
+
+        // check first for an externally loaded library
+        external = Sk.loadExternalLibrary(name);
+        if (external)
+        {
+            co = external;
+        }
+        // if we have it as a builtin (i.e. already in JS) module then load that.
+        else if (filename = Sk.importSearchPathForName(name, ".js", true))
+        {
             co = { funcname: "$builtinmodule", code: Sk.read(filename) };
         }
         else
@@ -18499,8 +24237,7 @@ Sk.importModuleInternal_ = function(name, dumpJS, modname, suppliedPyBody)
 
     module.$js = finalcode; // todo; only in DEBUG?
 
-    var modlocs = goog.global.eval(finalcode);
-
+    var modlocs = goog.global['eval'](finalcode);
     // pass in __name__ so the module can set it (so that the code can access
     // it), but also set it after we're done so that builtins don't have to
     // remember to do it.
@@ -18544,6 +24281,8 @@ Sk.importMain = function(name, dumpJS)
 	Sk.sysmodules = new Sk.builtin.dict([]);
 	Sk.realsyspath = undefined;
 
+    Sk.resetCompiler();
+
     return Sk.importModuleInternal_(name, dumpJS, "__main__");
 };
 
@@ -18558,30 +24297,23 @@ Sk.importMainWithBody = function(name, dumpJS, body)
 	Sk.sysmodules = new Sk.builtin.dict([]);
 	Sk.realsyspath = undefined;
     
+    Sk.resetCompiler();
+
     return Sk.importModuleInternal_(name, dumpJS, "__main__", body);
-};
-
-Sk.importStar = function(module, locals)
-{
-    // allevato: TODO We should respect privacy guards here, like
-    // names beginning with underscores; probably also incorporate the
-    // __all__ attribute somehow
-
-    var modattrs = module['$d'];
-    for (var name in modattrs)
-    {
-        if (modattrs.hasOwnProperty(name))
-        {
-            locals[name] = modattrs[name];
-        }
-    }
 };
 
 Sk.builtin.__import__ = function(name, globals, locals, fromlist)
 {
+    // Save the Sk.globals variable importModuleInternal_ may replace it when it compiles
+    // a Python language module.  for some reason, __name__ gets overwritten.
+    var saveSk = Sk.globals;
     var ret = Sk.importModuleInternal_(name);
-    if (!fromlist || fromlist.length === 0)
+    if (saveSk !== Sk.globals) {
+        Sk.globals = saveSk;
+    }
+    if (!fromlist || fromlist.length === 0) {
         return ret;
+    }
     // if there's a fromlist we want to return the actual module, not the
     // toplevel namespace
     ret = Sk.sysmodules.mp$subscript(name);
@@ -18589,91 +24321,807 @@ Sk.builtin.__import__ = function(name, globals, locals, fromlist)
     return ret;
 };
 
+Sk.importStar = function(module,loc,global) {
+    // from the global scope, globals and locals can be the same.  So the loop below
+    // could accidentally overwrite __name__, erasing __main__.
+    var nn = global['__name__'];
+    var props = Object['getOwnPropertyNames'](module['$d'])
+    for(var i in props) {
+        loc[props[i]] = module['$d'][props[i]];
+    }
+    if (global['__name__'] !== nn) {
+        global['__name__'] = nn;
+    }
+}
+
 goog.exportSymbol("Sk.importMain", Sk.importMain);
 goog.exportSymbol("Sk.importMainWithBody", Sk.importMainWithBody);
+goog.exportSymbol("Sk.builtin.__import__", Sk.builtin.__import__);
 goog.exportSymbol("Sk.importStar", Sk.importStar);
-goog.exportSymbol("Sk.builtin.__import__", Sk.builtin.__import__);// Note: the hacky names on int, long, float have to correspond with the
+/**
+ * @constructor
+ * @param {Sk.builtin.list=} list
+ * @param {number=} length optional
+ * @extends Sk.builtin.object
+ */
+Sk.builtin.timSort = function(list, length){
+    this.list = new Sk.builtin.list(list.v);
+    // When we get into galloping mode, we stay there until both runs win less
+    // often than MIN_GALLOP consecutive times.  See listsort.txt for more info.
+    this.MIN_GALLOP = 7;
+    if (length) {
+        this.listlength = length;
+    }
+    else {
+        this.listlength = list.sq$length();
+    }
+};
+
+Sk.builtin.timSort.prototype.lt = function(a, b){
+	return Sk.misceval.richCompareBool(a, b, "Lt");
+};
+
+Sk.builtin.timSort.prototype.le = function(a, b){
+    return !this.lt(b, a)
+};
+
+Sk.builtin.timSort.prototype.setitem = function(item ,value){
+    this.list.v[item] = value;
+};
+
+/*
+ # binarysort is the best method for sorting small arrays: it does
+ # few compares, but can do data movement quadratic in the number of
+ # elements.
+ # "a" is a contiguous slice of a list, and is sorted via binary insertion.
+ # This sort is stable.
+ # On entry, the first "sorted" elements are already sorted.
+ # Even in case of error, the output slice will be some permutation of
+ # the input (nothing is lost or duplicated)
+*/
+Sk.builtin.timSort.prototype.binary_sort = function(a, sorted) {
+    for(var start = a.base + sorted; start < a.base + a.len; start++){
+        var l = a.base;
+        var r = start;
+        var pivot = a.getitem(r);
+        // Invariants:
+        // pivot >= all in [base, l).
+        // pivot  < all in [r, start).
+        // The second is vacuously true at the start.
+        while(l < r){
+            var p = l + ((r - l) >> 1);
+			if (this.lt(pivot, a.getitem(p))){
+                r = p;
+            }
+            else {
+                l = p + 1;
+            }
+        }
+        goog.asserts.assert(l === r);
+        // The invariants still hold, so pivot >= all in [base, l) and
+        // pivot < all in [l, start), so pivot belongs at l.  Note
+        // that if there are elements equal to pivot, l points to the
+        // first slot after them -- that's why this sort is stable.
+        // Slide over to make room.
+        for (var p = start; p > l; p--) {
+            a.setitem(p, a.getitem(p-1));
+        }
+        a.setitem(l, pivot);
+    }
+};
+
+Sk.builtin.timSort.prototype.count_run = function(a){
+	/*
+	# Compute the length of the run in the slice "a".
+    # "A run" is the longest ascending sequence, with
+    #
+    #     a[0] <= a[1] <= a[2] <= ...
+    #
+    # or the longest descending sequence, with
+    #
+    #     a[0] > a[1] > a[2] > ...
+    #
+    # Return (run, descending) where descending is False in the former case,
+    # or True in the latter.
+    # For its intended use in a stable mergesort, the strictness of the defn of
+    # "descending" is needed so that the caller can safely reverse a descending
+    # sequence without violating stability (strict > ensures there are no equal
+    # elements to get out of order).
+*/
+	var descending;
+	if (a.len <= 1) {
+		var n = a.len;
+		descending = false;
+	}
+	else {
+		var n = 2;
+		if (this.lt(a.getitem(a.base + 1), a.getitem(a.base))){
+			descending = true;
+			for (var p = a.base + 2; p < a.base + a.len; p++){
+				if (this.lt(a.getitem(p), a.getitem(p-1))){
+					n++;
+				}
+				else {
+					break;
+				}
+			}
+		}
+		else{
+			descending = false;
+			for (p = a.base + 2; p < a.base + a.len; p++){
+	        	if (this.lt(a.getitem(p), a.getitem(p-1)))
+				{
+			        break;
+			    }
+				else {
+					n++;
+				}
+			}
+		}
+	}
+	return {'run': new Sk.builtin.listSlice(a.list, a.base, n), 'descending': descending};
+};
+
+Sk.builtin.timSort.prototype.sort = function (){
+	/*
+	# ____________________________________________________________
+    # Entry point.
+	*/
+
+	var remaining = new Sk.builtin.listSlice(this.list, 0, this.listlength);
+	if (remaining.len < 2){
+		return;
+	}
+
+    // March over the array once, left to right, finding natural runs,
+    // and extending short natural runs to minrun elements.
+    this.merge_init();
+    var minrun = this.merge_compute_minrun(remaining.len);
+	while (remaining.len > 0){
+		// Identify next run.
+		var cr = this.count_run(remaining);
+		if (cr.descending){
+			cr.run.reverse();
+		}
+		// If short, extend to min(minrun, nremaining).
+		if (cr.run.len < minrun){
+			var sorted = cr.run.len;
+            if (minrun < remaining.len){
+                cr.run.len = minrun;
+            }
+            else {
+                cr.run.len = remaining.len;
+            }
+			this.binary_sort(cr.run, sorted)
+		}
+		// Advance remaining past this run.
+        remaining.advance(cr.run.len);
+		// Push run onto pending-runs stack, and maybe merge.
+        this.pending.push(cr.run);
+        this.merge_collapse();
+  	}
+	goog.asserts.assert(remaining.base == this.listlength);
+
+  	this.merge_force_collapse();
+  	goog.asserts.assert(this.pending.length == 1);
+	goog.asserts.assert(this.pending[0].base == 0);
+	goog.asserts.assert(this.pending[0].len == this.listlength);
+};
+
+/*
+	# Locate the proper position of key in a sorted vector; if the vector
+	# contains an element equal to key, return the position immediately to the
+	# left of the leftmost equal element -- or to the right of the rightmost
+	# equal element if the flag "rightmost" is set.
+	#
+	# "hint" is an index at which to begin the search, 0 <= hint < a.len.
+	# The closer hint is to the final result, the faster this runs.
+	#
+	# The return value is the index 0 <= k <= a.len such that
+	#
+	#     a[k-1] < key <= a[k]      (if rightmost is False)
+	#     a[k-1] <= key < a[k]      (if rightmost is True)
+	#
+	# as long as the indices are in bound.  IOW, key belongs at index k;
+	# or, IOW, the first k elements of a should precede key, and the last
+	# n-k should follow key.
+*/
+Sk.builtin.timSort.prototype.gallop = function(key, a, hint, rightmost){
+    goog.asserts.assert(0 <= hint && hint < a.len);
+	var lower;
+	var self = this;
+ 	if (rightmost) {
+		lower = function (a,b) { return self.le(a,b); } // search for the largest k for which a[k] <= key
+	}
+	else {
+		lower = function (a,b) { return self.lt(a,b); } // search for the largest k for which a[k] < key
+	}
+	var p = a.base + hint;
+	var lastofs = 0;
+	var ofs = 1;
+    var maxofs;
+	if (lower(a.getitem(p), key)) {
+		// a[hint] < key -- gallop right, until
+	    // a[hint + lastofs] < key <= a[hint + ofs]
+
+	    maxofs = a.len - hint // a[a.len-1] is highest
+	    while (ofs < maxofs){
+	    	if (lower(a.getitem(p + ofs), key)) {
+	        	lastofs = ofs
+	        	try {
+	            	ofs = (ofs << 1) + 1;
+                } catch (err){
+					ofs = maxofs
+				}
+			}
+	        else {
+	        	// key <= a[hint + ofs]
+	            break;
+			}
+        }
+        if (ofs > maxofs) {
+            ofs = maxofs;
+        }
+        // Translate back to offsets relative to a.
+        lastofs += hint;
+        ofs += hint;
+	}
+	else {
+		// key <= a[hint] -- gallop left, until
+        // a[hint - ofs] < key <= a[hint - lastofs]
+        maxofs = hint + 1   // a[0] is lowest
+        while (ofs < maxofs) {
+            if (lower(a.getitem(p - ofs), key)) {
+                break;
+			}
+            else {
+                // key <= a[hint - ofs]
+                lastofs = ofs
+                try {
+                    ofs = (ofs << 1) + 1;
+                } catch(err) {
+					ofs = maxofs;
+				}
+			}
+		}
+        if (ofs > maxofs){
+            ofs = maxofs
+		}
+        // Translate back to positive offsets relative to a.
+        var hintminofs = hint-ofs;
+		var hintminlastofs = hint-lastofs;
+        lastofs = hintminofs;
+        ofs = hintminlastofs;
+	}
+	goog.asserts.assert( -1 <= lastofs < ofs <= a.len);
+
+    // Now a[lastofs] < key <= a[ofs], so key belongs somewhere to the
+    // right of lastofs but no farther right than ofs.  Do a binary
+    // search, with invariant a[lastofs-1] < key <= a[ofs].
+
+    lastofs += 1;
+    while (lastofs < ofs){
+        var m = lastofs + ((ofs - lastofs) >> 1);
+        if (lower(a.getitem(a.base + m), key)){
+            lastofs = m+1;   // a[m] < key
+        }
+		else{
+            ofs = m;         // key <= a[m]
+		}
+	}
+    goog.asserts.assert(lastofs == ofs);         // so a[ofs-1] < key <= a[ofs]
+    return ofs;
+};
+
+// ____________________________________________________________
+
+Sk.builtin.timSort.prototype.merge_init = function(){
+    // This controls when we get *into* galloping mode.  It's initialized
+    // to MIN_GALLOP.  merge_lo and merge_hi tend to nudge it higher for
+    // random data, and lower for highly structured data.
+    this.min_gallop = this.MIN_GALLOP
+
+    // A stack of n pending runs yet to be merged.  Run #i starts at
+    // address pending[i].base and extends for pending[i].len elements.
+    // It's always true (so long as the indices are in bounds) that
+    //
+    //     pending[i].base + pending[i].len == pending[i+1].base
+    //
+    // so we could cut the storage for this, but it's a minor amount,
+    // and keeping all the info explicit simplifies the code.
+    this.pending = [];
+};
+
+// Merge the slice "a" with the slice "b" in a stable way, in-place.
+// a.len <= b.len.  See listsort.txt for more info.
+// a.len and b.len must be > 0, and a.base + a.len == b.base.
+// Must also have that b.list[b.base] < a.list[a.base], that
+// a.list[a.base+a.len-1] belongs at the end of the merge, and should have
+
+Sk.builtin.timSort.prototype.merge_lo= function(a, b) {
+    goog.asserts.assert(a.len > 0 && b.len > 0 && a.base + a.len == b.base);
+    var min_gallop = this.min_gallop;
+    var dest = a.base;
+    a = a.copyitems();
+
+    // Invariant: elements in "a" are waiting to be reinserted into the list
+    // at "dest".  They should be merged with the elements of "b".
+    // b.base == dest + a.len.
+    // We use a finally block to ensure that the elements remaining in
+    // the copy "a" are reinserted back into this.list in all cases.
+    try {
+        this.setitem(dest, b.popleft());
+
+        dest++;
+        if (a.len == 1 || b.len == 0){ return; }
+
+        var acount, bcount;
+        while (true){
+            acount = 0;   // number of times A won in a row
+            bcount = 0;   // number of times B won in a row
+
+            // Do the straightforward thing until (if ever) one run
+            // appears to win consistently.
+            while (true){
+                if (this.lt(b.getitem(b.base), a.getitem(a.base))){
+                    this.setitem(dest, b.popleft());
+                    dest ++;
+                    if (b.len == 0){ return; }
+                    bcount ++;
+                    acount = 0;
+                    if (bcount >= min_gallop){ break; }
+                }
+                else {
+                    this.setitem(dest, a.popleft());
+                    dest ++;
+                    if (a.len == 1){ return; }
+                    acount ++;
+                    bcount = 0;
+                    if (acount >= min_gallop){
+                        break;
+                    }
+                }
+            }
+
+            // One run is winning so consistently that galloping may
+            // be a huge win.  So try that, and continue galloping until
+            // (if ever) neither run appears to be winning consistently
+            // anymore.
+            min_gallop += 1;
+
+            while (true) {
+                min_gallop -= min_gallop > 1;
+                this.min_gallop = min_gallop;
+                acount = this.gallop(b.getitem(b.base), a, 0, true);
+                for (var p = a.base; p < a.base + acount; p++) {
+                    this.setitem(dest, a.getitem(p));
+                    dest++;
+                }
+
+                a.advance(acount);
+
+                if (a.len <= 1) { return; }
+
+                this.setitem(dest, b.popleft());
+                dest ++;
+
+                // a.len==0 is impossible now if the comparison
+                // function is consistent, but we can't assume
+                // that it is.
+                if (b.len == 0) { return; }
+
+                bcount = this.gallop(a.getitem(a.base), b, 0, false);
+
+                for (var p = b.base; p < b.base + bcount; p++) {
+                    this.setitem(dest, b.getitem(p))
+                    dest ++;
+                }
+
+                b.advance(bcount)
+                if (b.len == 0) { return; }
+                this.setitem(dest, a.popleft());
+                dest++;
+
+                if (a.len == 1) { return; }
+
+                if (acount < this.MIN_GALLOP && bcount < this.MIN_GALLOP) { break; }
+
+                min_gallop++;  // penalize it for leaving galloping mode
+                this.min_gallop = min_gallop;
+            }
+        }
+    }
+    finally{
+        // The last element of a belongs at the end of the merge, so we copy
+        // the remaining elements of b before the remaining elements of a.
+        goog.asserts.assert(a.len >= 0 && b.len >= 0);
+        for (var p = b.base; p < b.base + b.len; p++) {
+            this.setitem(dest, b.getitem(p))
+            dest ++;
+        }
+        for (var p = a.base; p < a.base + a.len; p++){
+            this.setitem(dest, a.getitem(p))
+            dest ++;
+        }
+    }
+}
+
+Sk.builtin.timSort.prototype.merge_hi= function(a, b) {
+    goog.asserts.assert(a.len > 0 && b.len > 0 && a.base + a.len == b.base);
+    var min_gallop = this.min_gallop;
+    var dest = b.base + b.len;
+    b = b.copyitems();
+
+    // Invariant: elements in "a" are waiting to be reinserted into the list
+    // at "dest".  They should be merged with the elements of "b".
+    // b.base == dest + a.len.
+    // We use a finally block to ensure that the elements remaining in
+    // the copy "a" are reinserted back into this.list in all cases.
+    try {
+        dest--;
+        this.setitem(dest, a.popright());
+
+        if (a.len == 0 || b.len == 1){ return; }
+
+        var acount, bcount, nexta, nextb;
+        while (true){
+            acount = 0;   // number of times A won in a row
+            bcount = 0;   // number of times B won in a row
+
+            // Do the straightforward thing until (if ever) one run
+            // appears to win consistently.
+            while (true){
+                nexta = a.getitem(a.base + a.len - 1);
+                nextb = b.getitem(b.base + b.len - 1);
+                if (this.lt(nextb, nexta)){
+                    dest--;
+                    this.setitem(dest, nexta);
+                    a.len--;
+                    if (a.len == 0){ return; }
+                    acount ++;
+                    bcount = 0;
+                    if (acount >= min_gallop){ break; }
+                }
+                else {
+                    dest--;
+                    this.setitem(dest, nextb);
+                    b.len--;
+                    if (b.len == 1){ return; }
+                    bcount ++;
+                    acount = 0;
+                    if (bcount >= min_gallop){ break; }
+                }
+            }
+
+            // One run is winning so consistently that galloping may
+            // be a huge win.  So try that, and continue galloping until
+            // (if ever) neither run appears to be winning consistently
+            // anymore.
+            min_gallop += 1;
+
+            while (true) {
+                min_gallop -= min_gallop > 1;
+                this.min_gallop = min_gallop;
+                nextb = b.getitem(b.base + b.len - 1);
+                var k = this.gallop(nextb, a, a.len - 1, true);
+                acount = a.len - k;
+                for (var p = a.base + a.len - 1; p > a.base + k - 1; p--) {
+                    dest--;
+                    this.setitem(dest, a.getitem(p));
+                }
+                a.len -= acount;
+                if (a.len == 0) { return; }
+
+                dest--;
+                this.setitem(dest, b.popright());
+                if (b.len == 1) { return; }
+
+                nexta = a.getitem(a.base + a.len - 1);
+                k = this.gallop(nexta, b, b.len - 1, false);
+                bcount = b.len - k;
+                for (var p = b.base + b.len - 1; p > b.base + k - 1; p--) {
+                    dest --;
+                    this.setitem(dest, b.getitem(p));
+                }
+
+                b.len -= bcount;
+
+                // b.len==0 is impossible now if the comparison
+                // function is consistent, but we can't assume
+                // that it is.
+                if (b.len <= 1) { return; }
+                dest--;
+                this.setitem(dest, a.popright());
+                if (a.len == 0) { return; }
+
+                if (acount < this.MIN_GALLOP && bcount < this.MIN_GALLOP) { break; }
+
+                min_gallop++;  // penalize it for leaving galloping mode
+                this.min_gallop = min_gallop;
+            }
+        }
+    }
+    finally{
+        // The last element of a belongs at the end of the merge, so we copy
+        // the remaining elements of b before the remaining elements of a.
+        goog.asserts.assert(a.len >= 0 && b.len >= 0);
+        for (var p = a.base + a.len - 1; p > a.base - 1; p--){
+            dest --;
+            this.setitem(dest, a.getitem(p))
+        }
+        for (var p = b.base + b.len - 1; p > b.base - 1; p--) {
+            dest--;
+            this.setitem(dest, b.getitem(p))
+        }
+    }
+}
+
+// Merge the two runs at stack indices i and i+1.
+
+Sk.builtin.timSort.prototype.merge_at = function(i){
+	if (i < 0) {
+		i = this.pending.length + i;
+	}
+
+    var a = this.pending[i];
+    var b = this.pending[i+1];
+    goog.asserts.assert(a.len > 0 && b.len > 0);
+    goog.asserts.assert(a.base + a.len == b.base);
+
+    // Record the length of the combined runs and remove the run b
+    this.pending[i] = new Sk.builtin.listSlice(this.list, a.base, a.len + b.len);
+    this.pending.splice(i + 1, 1)
+
+    // Where does b start in a?  Elements in a before that can be
+    // ignored (already in place).
+    var k = this.gallop(b.getitem(b.base), a, 0, true);
+    a.advance(k);
+    if (a.len == 0) { return; }
+
+    // Where does a end in b?  Elements in b after that can be
+    // ignored (already in place).
+    b.len = this.gallop(a.getitem(a.base+a.len-1), b, b.len-1, false)
+    if (b.len == 0) { return; }
+
+    // Merge what remains of the runs.  The direction is chosen to
+    // minimize the temporary storage needed.
+    if (a.len <= b.len) {
+        this.merge_lo(a, b);
+    }
+    else{
+        this.merge_hi(a, b);
+    }
+}
+
+// Examine the stack of runs waiting to be merged, merging adjacent runs
+// until the stack invariants are re-established:
+//
+// 1. len[-3] > len[-2] + len[-1]
+// 2. len[-2] > len[-1]
+//
+// See listsort.txt for more info.
+Sk.builtin.timSort.prototype.merge_collapse = function() {
+    var p = this.pending;
+    while (p.length > 1)
+    {
+        if (p.length >= 3 && p[p.length-3].len <= p[p.length-2].len + p[p.length-1].len) {
+            if (p[p.length-3].len < p[p.length-1].len) {
+                this.merge_at(-3);
+            }
+            else{
+                this.merge_at(-2);
+            }
+        } else if(p[p.length-2].len <= p[p.length-1].len) {
+            this.merge_at(-2);
+        }
+        else{
+            break;
+        }
+    }
+}
+
+// Regardless of invariants, merge all runs on the stack until only one
+// remains.  This is used at the end of the mergesort.
+
+Sk.builtin.timSort.prototype.merge_force_collapse = function(){
+    var p = this.pending
+    while (p.length > 1 ){
+        if (p.length >= 3 && p[p.length-3].len < p[p.length-1].len) {
+            this.merge_at(-3);
+        }
+        else{
+            this.merge_at(-2);
+        }
+    }
+}
+// Compute a good value for the minimum run length; natural runs shorter
+// than this are boosted artificially via binary insertion.
+//
+// If n < 64, return n (it's too small to bother with fancy stuff).
+// Else if n is an exact power of 2, return 32.
+// Else return an int k, 32 <= k <= 64, such that n/k is close to, but
+// strictly less than, an exact power of 2.
+//
+// See listsort.txt for more info.
+
+Sk.builtin.timSort.prototype.merge_compute_minrun = function (n){
+    var r = 0    // becomes 1 if any 1 bits are shifted off
+    while (n >= 64){
+        r = r | n & 1;
+        n >>= 1;
+    }
+    return n + r;
+};
+
+//ListSlice
+/**
+ * @constructor
+ * @param {Sk.builtin.list=} list
+ * @param {number=} base
+ * @param {number=} len
+ * @extends Sk.builtin.object
+ */
+Sk.builtin.listSlice = function(list, base, len) {
+    this.list = list;
+    this.base = base;
+    this.len = len;
+};
+
+Sk.builtin.listSlice.prototype.copyitems = function (){
+    //Make a copy of the slice of the original list
+    var start = this.base;
+    var stop = this.base + this.len;
+    goog.asserts.assert(0 <= start <= stop);
+    return new Sk.builtin.listSlice(new Sk.builtin.list(this.list.v.slice(start, stop)), 0, this.len);
+};
+
+Sk.builtin.listSlice.prototype.advance = function (n){
+    this.base += n;
+	this.len -= n;
+	goog.asserts.assert(this.base <= this.list.sq$length());
+};
+
+Sk.builtin.listSlice.prototype.getitem = function (item){
+    return this.list.v[item];
+};
+
+Sk.builtin.listSlice.prototype.setitem = function (item, value){
+    this.list.v[item] = value;
+};
+
+Sk.builtin.listSlice.prototype.popleft = function (){
+    var result = this.list.v[this.base];
+    this.base++;
+    this.len--;
+    return result;
+};
+
+Sk.builtin.listSlice.prototype.popright = function (){
+    this.len--;
+    return this.list.v[this.base + this.len];
+};
+
+Sk.builtin.listSlice.prototype.reverse = function (){
+    // Reverse the slice in-place.
+    var list = this.list;
+    var lo = this.base;
+    var hi = lo + this.len - 1;
+    while (lo < hi){
+        var list_hi = list.v[hi];
+        var list_lo = list.v[lo];
+        list.v[lo] = list_hi;
+        list.v[hi] = list_lo;
+        lo++;
+        hi--;
+    }
+};
+
+goog.exportSymbol("Sk.builtin.listSlice", Sk.builtin.listSlice);
+goog.exportSymbol("Sk.builtin.timSort", Sk.builtin.timSort);// Note: the hacky names on int, long, float have to correspond with the
 // uniquization that the compiler does for words that are reserved in
 // Javascript. This is a bit hokey.
 Sk.builtins = {
+'range': Sk.builtin.range,
+'round': Sk.builtin.round,
+'len': Sk.builtin.len,
+'min': Sk.builtin.min,
+'max': Sk.builtin.max,
+'sum': Sk.builtin.sum,
+'zip': Sk.builtin.zip,
 'abs': Sk.builtin.abs,
-//'all': Sk.builtin.all, // Added by allevato
-//'any': Sk.builtin.any, // Added by allevato
-//'ascii': Sk.builtin.ascii, // Added by allevato
-//'bin': Sk.builtin.bin, // Added by allevato
-//'bool': Sk.builtin.bool, // Added by allevato
-//'bytearray': Sk.builtin.bytearray, // Added by allevato
-//'bytes': Sk.builtin.bytes, // Added by allevato
 'chr': Sk.builtin.chr,
-//'classmethod': Sk.builtin.classmethod, // Added by allevato
-//'compile': Sk.builtin.compile, // Added by allevato
-//'complex': Sk.builtin.complex, // Added by allevato
-//'delattr': Sk.builtin.delattr, // Added by allevato
 'dict': Sk.builtin.dict,
+'hex': Sk.builtin.hex,
+'oct': Sk.builtin.oct,
+'bin': Sk.builtin.bin,
 'dir': Sk.builtin.dir,
-//'divmod': Sk.builtin.divmod, // Added by allevato
-//'enumerate': Sk.builtin.enumerate, // Added by allevato
-//'eval': Sk.builtin.eval, // Added by allevato
-//'exec': Sk.builtin.exec, // Added by allevato
-'fabs': Sk.builtin.abs, //  Added by RNL
-//'filter': Sk.builtin.filter, // Added by allevato
+'fabs': Sk.builtin.abs, 
 'float_$rw$': Sk.builtin.float_,
-//'format': Sk.builtin.format, // Added by allevato
-//'frozenset': Sk.builtin.frozenset, // Added by allevato
 'getattr': Sk.builtin.getattr,
-'globals': Sk.builtin.globals, // Added by allevato
-//'hasattr': Sk.builtin.hasattr, // Added by allevato
+'globals': Sk.builtin.globals, 
 'hash': Sk.builtin.hash,
-//'help': Sk.builtin.help, // Added by allevato
-//'hex': Sk.builtin.hex, // Added by allevato
-//'id': Sk.builtin.id, // Added by allevato
-'input': Sk.builtin.input,
 'int_$rw$': Sk.builtin.int_,
 'isinstance': Sk.builtin.isinstance,
-//'issubclass': Sk.builtin.issubclass, // Added by allevato
-//'iter': Sk.builtin.iter, // Added by allevato
-'len': Sk.builtin.len,
 'list': Sk.builtin.list,
-'locals': Sk.builtin.locals, // Added by allevato
-//'map': Sk.builtin.map, // Added by allevato
-'max': Sk.builtin.max,
-//'memoryview': Sk.builtin.memoryview, // Added by allevato
-'min': Sk.builtin.min,
-//'next': Sk.builtin.next, // Added by allevato
-'object': Sk.builtin.object,
-//'oct': Sk.builtin.oct, // Added by allevato
+'locals': Sk.builtin.locals,
 'open': Sk.builtin.open,
 'ord': Sk.builtin.ord,
-//'pow': Sk.builtin.pow, // Added by allevato
-//'property': Sk.builtin.property, // Added by allevato
-'range': Sk.builtin.range,
 'repr': Sk.builtin.repr,
-//'reversed': Sk.builtin.reversed, // Added by allevato
-'round': Sk.builtin.round, //  Added by allevato
-'set': Sk.builtin.set,
-//'setattr': Sk.builtin.setattr, // Added by allevato
-'slice': Sk.builtin.slice,
-//'sorted': Sk.builtin.sorted, // Added by allevato
-//'staticmethod': Sk.builtin.staticmethod, // Added by allevato
-'str': Sk.builtin.str,
-'sum': Sk.builtin.sum,
-//'super': Sk.builtin.super, // Added by allevato
-'tuple': Sk.builtin.tuple,
-'type': Sk.builtin.type,
-//'vars': Sk.builtin.vars, // Added by allevato
-//'zip': Sk.builtin.zip, // Added by allevato
+'hasattr': Sk.builtin.hasattr,
+
+'map' : Sk.builtin.map,
+'filter' : Sk.builtin.filter,
+'reduce' : Sk.builtin.reduce,
+'sorted' : Sk.builtin.sorted,
+
+'bool': Sk.builtin.bool,
+'any': Sk.builtin.any,
+'all': Sk.builtin.all,
 
 'AttributeError': Sk.builtin.AttributeError,
 'ValueError': Sk.builtin.ValueError,
+'Exception' : Sk.builtin.Exception,
+'ZeroDivisionError' : Sk.builtin.ZeroDivisionError,
+'AssertionError' : Sk.builtin.AssertionError,
+'ImportError' : Sk.builtin.ImportError,
+'IndentationError' : Sk.builtin.IndentationError,
+'IndexError' : Sk.builtin.IndexError,
+'KeyError' : Sk.builtin.KeyError,
+'TypeError' : Sk.builtin.TypeError,
+'NameError' : Sk.builtin.NameError,
+'IOError' : Sk.builtin.IOError,
+'NotImplementedError' : Sk.builtin.NotImplementedError,
+'SystemExit': Sk.builtin.SystemExit,
+'OverflowError' : Sk.builtin.OverflowError,
+'OperationError': Sk.builtin.OperationError,
 
 'file': Sk.builtin.file,
 'function': Sk.builtin.func,
 'generator': Sk.builtin.generator,
 'long_$rw$': Sk.builtin.lng,
 'method': Sk.builtin.method,
-/*'read': Sk.builtin.read,*/
+'object': Sk.builtin.object,
+'slice': Sk.builtin.slice,
+'str': Sk.builtin.str,
+'set': Sk.builtin.set,
+'tuple': Sk.builtin.tuple,
+'type': Sk.builtin.type,
+'input': Sk.builtin.input,
+'raw_input': Sk.builtin.raw_input,
 'jseval': Sk.builtin.jseval,
 'jsmillis': Sk.builtin.jsmillis,
-'long_div_mode': Sk.builtin.lng.longDivideMode
+'quit': Sk.builtin.quit,
+'exit': Sk.builtin.quit,
+'pow' : Sk.builtin.pow,
+'globals' : Sk.builtin.globals,
+'issubclass' : Sk.builtin.issubclass,
+'super': Sk.builtin.superbi,
+'print': Sk.builtin.print,
+
+// Functions below are not implemented
+'bytearray': Sk.builtin.bytearray,
+'callable': Sk.builtin.callable,
+'complex' : Sk.builtin.complex,
+'delattr' : Sk.builtin.delattr,
+'divmod' : Sk.builtin.divmod,
+'eval_$rn$' : Sk.builtin.eval_,
+'execfile' : Sk.builtin.execfile,
+'format' : Sk.builtin.format,
+'frozenset' : Sk.builtin.frozenset,
+'help' : Sk.builtin.help,
+'iter': Sk.builtin.iter,
+'memoryview' : Sk.builtin.memoryview,
+'next' : Sk.builtin.next_,
+'property' : Sk.builtin.property,
+'reload' : Sk.builtin.reload,
+'reversed' : Sk.builtin.reversed,
+'unichr' : Sk.builtin.unichr,
+'vars' : Sk.builtin.vars,
+'xrange' : Sk.builtin.xrange,
+'apply_$rn$' : Sk.builtin.apply_,
+'buffer' : Sk.builtin.buffer,
+'coerce' : Sk.builtin.coerce,
+'intern' : Sk.builtin.intern,
+'enumerate': Sk.builtin.enumerate
 };
 goog.exportSymbol("Sk.builtins", Sk.builtins);

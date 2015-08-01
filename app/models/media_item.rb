@@ -85,8 +85,8 @@ class MediaItem < ActiveRecord::Base
     if file.present?
       if user
         # TODO make this configurable
-        if file.file.size.to_f > 1.megabyte
-          errors.add(:file, "You cannot upload a file greater than 1MB")
+        if file.file.size.to_f > 2.megabyte
+          errors.add(:file, "You cannot upload a file greater than 2MB")
         end
 
         bytes_used = MediaItem.where(user_id: user.id).sum(:file_size)

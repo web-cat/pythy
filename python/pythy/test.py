@@ -315,7 +315,83 @@ class TestCase(unittest.TestCase):
       _originalBuiltins[name] = __builtins__[name]
       safeBuiltins[name] = function
 
+  def assertSoundsSimilar(self, expected, actual):
+    length = actual.getLength()
 
+    self.assertEqual(expected.getLength(), length)
+
+    ALLOWABLE_ERROR = 0
+
+    for i in range(length):
+      actualSample = actual.getSampleValueAt(i)
+      expectedSample = expected.getSampleValueAt(i)
+
+      if abs(actualSample - expectedSample) > ALLOWABLE_ERROR:
+        self.fail('Some samples do not have the expected values')
+
+  # --------------------------------------------------------------
+  def assertImagesSimilar(self, reason, expected, actual):
+    width = actual.getWidth()
+    height = actual.getHeight()
+
+    self.assertEqual(expected.getWidth(), width, \
+      reason + ", the width of your final image was incorrect.")
+    self.assertEqual(expected.getHeight(), height, \
+      reason + ", the height of your final image was incorrect.")
+
+    ALLOWABLE_ERROR = 1
+
+    red_errors = False
+    green_errors = False
+    blue_errors = False
+
+    # Compare the pixels in the student's image and the correct image,
+    # using the tolerance above. Keep track of which color channels
+    # contained incorrect values.
+
+    for r in range(height):
+      for c in range(width):
+        actualpixel = actual.getPixel(c, r)
+        expectedpixel = expected.getPixel(c, r)
+
+        if abs(actualpixel.getRed() - expectedpixel.getRed()) > ALLOWABLE_ERROR:
+          red_errors = True
+
+        if abs(actualpixel.getGreen() - expectedpixel.getGreen()) > ALLOWABLE_ERROR:
+          green_errors = True
+
+        if abs(actualpixel.getBlue() - expectedpixel.getBlue()) > ALLOWABLE_ERROR:
+          blue_errors = True
+
+    channels = ''
+
+    # Construct a hint message based on which color channels, if any,
+    # had incorrect values.
+
+    if red_errors:
+      channels = 'red'
+
+      if green_errors:
+        if blue_errors:
+          channels += ', green, and blue components'
+        else:
+          channels += ' and green components'
+      elif blue_errors:
+        channels += ' and blue components'
+      else:
+        channels += ' components'
+    elif green_errors:
+      channels += 'green'
+
+      if blue_errors:
+        channels += ' and blue components'
+      else:
+        channels += ' components'
+    elif blue_errors:
+      channels += 'blue components'
+
+    if len(channels) > 0:
+      self.fail('The ' + channels + ' contained some incorrect values.')
 
 # =========================================================================
 class TestRunner:

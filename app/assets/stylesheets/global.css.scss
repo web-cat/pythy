@@ -545,6 +545,12 @@ table td p.hint {
 
 
 #Sk-canvasModal {
+  width: auto;
+
+  .modal-header {
+    cursor: move;
+  }
+
   .modal-footer {
     form.form-inline {
       margin-bottom: 0;
@@ -594,6 +600,7 @@ table td p.hint {
     td#canvas-color-swatch {
       width: 30px;
       border: 1px solid #333;
+      background-color: rgb(0,0,0);
     }
   }
 }

@@ -68,7 +68,12 @@ class MediaController < ApplicationController
 
         if filename_override
           file.original_filename = filename_override
+
+          if File.extname(filename_override) == '.wavmp3'
+            convertWavToMp3(file, requesting_user.id)
+          end
         end
+
 
         # To make the media library act more like a folder, we check to
         # see if a file with the given name already exists. If so, we
@@ -124,6 +129,14 @@ class MediaController < ApplicationController
 
 
   private 
+
+  def convertWavToMp3(uploadedFile, userId)
+    uploadedFile.original_filename = uploadedFile.original_filename.sub('.wavmp3', '.mp3')
+    outfile = "tmp/#{userId}-#{uploadedFile.original_filename}"
+    system("lame #{uploadedFile.path} #{outfile}")
+    FileUtils.mv(outfile, uploadedFile.path)
+    uploadedFile.tempfile = File.new(uploadedFile.path)
+  end
 
   # -------------------------------------------------------------
   def set_upload_url

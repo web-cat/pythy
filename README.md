@@ -16,9 +16,12 @@ Setup Instructions
 1. Ruby
 2. The Ruby on Rails framework. 
 3. Mysql client and server. (For linux install the dev packages also.)
-4. A JavaScript runtime. (Ex: Node.js)
-5. Redis server.
-6. Imagemagick.
+4. A JavaScript runtime (Ex: Node.js)
+5. The Redis server.
+6. The [lame](http://lame.sourceforge.net/) mp3 encoder.
+7. [Pillow](https://pypi.python.org/pypi/Pillow) - The Python Imaging Library Fork for server side image processing.
+8. The [wave](https://docs.python.org/2/library/wave.html) module for server side sound processing.
+9. Imagemagick.
 
 (For an ubuntu installation see [Setup Ruby on Rails on Ubuntu](https://gorails.com/setup/ubuntu/14.04))
 

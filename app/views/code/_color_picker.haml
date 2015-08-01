@@ -1,0 +1,36 @@
+#mediacomp-colorpicker.modal.hide.fade
+  .modal-header
+    = close_button_tag dismiss: 'modal'
+    %h3
+      Color Picker
+
+  .modal-body
+    .clearfix
+    .pull-left
+      %canvas#mediacomp-colorpicker-canvas
+    .pull-left#mediacomp-colorpicker-sidebar
+      %table
+        %tbody
+          %tr
+            %td
+              = label_tag 'mediacomp-color-red', 'Red:'
+            %td
+              %input.mediacomp-color-field.input-mini#mediacomp-color-red{type: 'number', min: 0, max: 255}
+          %tr
+            %td
+              = label_tag 'mediacomp-color-green', 'Green:'
+            %td
+              %input.mediacomp-color-field.input-mini#mediacomp-color-green{type: 'number', min: 0, max: 255}
+          %tr
+            %td
+              = label_tag 'mediacomp-color-blue', 'Blue:'
+            %td
+              %input.mediacomp-color-field.input-mini#mediacomp-color-blue{type: 'number', min: 0, max: 255}
+          %tr
+            %td
+            %td
+              #mediacomp-color-swatch
+
+  .modal-footer
+    = button_tag 'Cancel', class: 'btn', data: { dismiss: 'modal'}, id: 'mediacomp-colorpicker-cancel'
+    = button_tag 'Ok', class: 'btn btn-primary', data: { dismiss: 'modal'}, id: 'mediacomp-colorpicker-ok'
