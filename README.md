@@ -11,7 +11,7 @@ For more information please see the [slides](http://sofia.cs.vt.edu/cta-mediacom
 
 Setup Instructions
 ------------------
-### Dependencies
+### Dependencies to be installed manually
 
 1. Ruby
 2. The Ruby on Rails framework. 
@@ -21,13 +21,14 @@ Setup Instructions
 6. The [lame](http://lame.sourceforge.net/) mp3 encoder.
 7. [Pillow](https://pypi.python.org/pypi/Pillow) - The Python Imaging Library Fork for server side image processing.
 8. The [wave](https://docs.python.org/2/library/wave.html) module for server side sound processing.
+9. Imagemagick.
 
 (For an ubuntu installation see [Setup Ruby on Rails on Ubuntu](https://gorails.com/setup/ubuntu/14.04))
 
 ### Linux
 1.  Clone the git repository. `git clone https://github.com/web-cat/pythy.git`
 2.  Go into the newly created pythy directory. `cd pythy`
-3.  Install the dependencies. `bundle install`
+3.  Install the dependencies. `bundle install` and `npm install`
 4.  Create a database configuration file at `config/database.yml`. 
     The adapter must be mysql2 as some of the sql statements will not work
     otherwise. [Sample configuration file](#sample-database-configuration-file).
@@ -39,6 +40,7 @@ Setup Instructions
 10. To be able to use the grading feature, you need to have
 [sidekiq](https://github.com/mperham/sidekiq) running on the server.
 `bundle exec sidekiq`. The sidekiq dashboard can be accessed at /sidekiq. 
+11. Start the juggernaut server by running `./node_modules/juggernaut/server.js`
 
 #### Running the tests
 The tests are located in the `spec` directory. To run them, first prepare the

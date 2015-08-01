@@ -1,0 +1,8 @@
+{
+  "name": "Pythy",
+  "version": "0.1.0",
+  "description": "An online IDE for novice Python environment",
+  "dependencies": {
+    "juggernaut": "2.1.1"
+  }
+}
