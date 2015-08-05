@@ -14,8 +14,16 @@ def _wrapColor(value):
 
 _validateColor = _noWrapColor
 
+_picked_colors = []
+
+def setPickedColor(color): _picked_colors.append(color)
+
 def pickAColor():
-  return black
+  if(len(_picked_colors)):
+    return _picked_colors.pop(0)
+  else:
+    raise IndexError('Please set atleast one color using ' +
+                     'setPickedColor(color) before calling this method') 
 
 def makeColor(red, green=None, blue=None):
   return Color(red, green, blue)

@@ -100,8 +100,6 @@ def openSoundTool(sound): pass
 
 def writeSoundTo(sound, path): pass
 
-def stopPlaying(sound): pass
-  
 class UnsupportedFileType(Exception): pass
 
 class IncorrectOperation(Exception): pass
@@ -242,4 +240,3 @@ Sound.getSampleObjectAt = getSampleObjectAt
 Sound.getSamples = getSamples
 Sound.duplicate = duplicateSound
 Sound.writeToFile = writeSoundTo
-Sound.stopPlaying = stopPlaying

@@ -83,7 +83,9 @@ class ColorTest(unittest.TestCase):
     self.assertEqual('Color, r=42, g=133, b=56', color.__str__())
 
   def test_pickAColor(self):
-    color = pickAColor()
+    with self.assertRaises(IndexError): color = pickAColor()
+    setPickedColor(black)
+    color = pickAColor();
 
     self.assertEqual(0, color._red)
     self.assertEqual(0, color._green)
