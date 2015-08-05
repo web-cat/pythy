@@ -425,20 +425,6 @@ class PictureTest(unittest.TestCase):
       for y in range(11):
         self.assertEqual((192, 192, 192, 255), pic.pixels[x,y])
 
-  def test_pickAFile(self):
-    fileURL = pickAFile()
-    self.assertEqual('http://localhost:9000/imgs/test.jpg', fileURL)
-
-  def test_setMediaPath(self):
-    with self.assertRaises(NotImplementedError) as ex:
-      setMediaPath('abc')
-    self.assertEqual('Pythy does not support setting the media path', str(ex.exception))
-
-  def test_getMediaPath(self):
-    with self.assertRaises(NotImplementedError) as ex:
-      getMediaPath()
-    self.assertEqual('Pythy does not support getting the media path', str(ex.exception))
-
   def test_writePictureTo(self):
     pic = EmptyPicture(10, 11, lightGray)
     writePictureTo(pic, 'abc.png')

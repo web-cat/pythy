@@ -11,14 +11,15 @@ from sound.sound import *
 
 _picked_files = []
 
-def setPickedFile(filename):
-  _picked_files.append(filename)
+def setPickedFile(filename): _picked_files.append(filename)
 
 def pickAFile():
-  return _picked_files.pop(0)
+  if(len(_picked_files)):
+    return _picked_files.pop(0)
+  else:
+    raise IndexError('Please set atleast one picked file using ' +
+                     'setPickedFile(filename) before calling this method') 
 
-def setMediaPath(path):
-  raise NotImplementedError('Pythy does not support setting the media path')
+def setMediaPath(path): pass
 
-def getMediaPath():
-  raise NotImplementedError('Pythy does not support getting the media path')
+def getMediaPath(filename=''): return filename
